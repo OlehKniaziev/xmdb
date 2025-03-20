@@ -31,3 +31,38 @@ TEST(SQLParser, select_stmt) {
 
     EXPECT_EQ(select_stmt->table->type, SQLExpr::IDENT);
 }
+
+TEST(SQLParser, eof_error) {
+    ok::ArenaAllocator arena{};
+    auto source = ""_sv;
+    SQLParser parser{&arena, source};
+
+    EXPECT_TRUE(parser.is_eof());
+
+    auto expr = parser.expression();
+    EXPECT_FALSE(expr.has_value());
+
+    EXPECT_TRUE(parser.error.has_value());
+
+    auto error = parser.error.value;
+    EXPECT_EQ(error.message, "unexpected EOF"_sv);
+
+    auto expected_location = SourceLocation{1, 1, 0};
+    EXPECT_EQ(error.location, expected_location);
+}
+
+TEST(SQLParser, token_mismatch_error) {
+    ok::ArenaAllocator arena{};
+    auto source = "not_select error FROM parser_errors"_sv;
+    SQLParser parser{&arena, source};
+
+    auto opt_stmt = parser.select_stmt();
+    EXPECT_FALSE(opt_stmt.has_value());
+    EXPECT_TRUE(parser.error.has_value());
+
+    auto error = parser.error.value;
+    EXPECT_EQ(error.message, "expected a token of type SELECT, but got identifier instead"_sv);
+
+    auto expected_location = SourceLocation{1, 1, (uint32_t)strlen("not_select")};
+    EXPECT_EQ(error.location, expected_location);
+}

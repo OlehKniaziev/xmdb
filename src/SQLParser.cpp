@@ -1,4 +1,5 @@
 #include "SQLParser.hpp"
+#include <cstddef>
 
 #define TRY(x)                                                                                                         \
     do {                                                                                                               \
@@ -6,8 +7,43 @@
         if (!_x.has_value()) return {};                                                                                \
     } while (0)
 
+#define SET_TOKEN_MISMATCH(got, ...)                                                                                   \
+    do {                                                                                                               \
+        SQLToken::Type expected_arr[] = {__VA_ARGS__};                                                                 \
+        ::ok::Slice<SQLToken::Type> expected = {expected_arr, OK_ARR_LEN(expected_arr)};                               \
+        set_token_mismatch((got), expected);                                                                           \
+    } while (0)
+
+using namespace ok::literals;
+
 namespace xmdb {
-SQLParser::SQLParser(ok::ArenaAllocator* arena, StringView source) : arena{arena} {
+namespace {
+SourceLocation locate_token(StringView source, SQLToken token) {
+    OK_ASSERT((uintptr_t)token.data.data >= (uintptr_t)source.data);
+
+    ptrdiff_t token_offset = token.data.data - source.data;
+
+    uint32_t line = 1;
+    uint32_t column = 1;
+    for (ptrdiff_t i = 0; i < token_offset; ++i) {
+        // TODO: support DOS-style newlines
+        if (source[i] == '\n') {
+            line++;
+            column = 1;
+        } else {
+            column++;
+        }
+    }
+
+    return SourceLocation{
+            .line = line,
+            .column = column,
+            .length = (uint32_t) token.data.count,
+    };
+}
+}; // namespace
+
+SQLParser::SQLParser(ok::ArenaAllocator* arena, StringView source) : arena{arena}, source{source} {
     auto tokens = ok::List<SQLToken>::alloc(arena);
     SQLLexer lexer{source};
 
@@ -73,17 +109,67 @@ bool SQLParser::try_expect(SQLToken::Type token_type) {
 }
 
 Optional<SQLToken> SQLParser::expect(SQLToken::Type token_type) {
+    if (is_eof()) {
+        set_eof();
+        return {};
+    }
+
     if (cur_token_is(token_type)) {
         return tokens[pos++];
     }
 
-    OK_TODO();
+    SET_TOKEN_MISMATCH(tokens[pos], token_type);
+
     return {};
 }
 
-Optional<SQLToken> SQLParser::get_cur_token_or_signal_eof() const {
-    if (pos >= tokens.count) OK_TODO();
+Optional<SQLToken> SQLParser::get_cur_token_or_signal_eof() {
+    if (is_eof()) {
+        set_eof();
+        return {};
+    }
 
     return tokens[pos];
+}
+
+void SQLParser::set_token_mismatch(SQLToken got, ok::Slice<SQLToken::Type> expected) {
+    OK_ASSERT(expected.count != 0);
+
+    auto token_location = locate_token(source, got);
+
+    String message;
+
+    auto got_sv = sql_token_type_to_string_view(got.type);
+    if (expected.count == 1) {
+        auto expected_sv = sql_token_type_to_string_view(expected[0]);
+        message = String::format(arena, "expected a token of type " OK_SV_FMT ", but got " OK_SV_FMT " instead",
+                                 OK_SV_ARG(expected_sv), OK_SV_ARG(got_sv));
+    } else {
+        message = String::alloc(arena, "expected a token of types ");
+
+        for (size_t i = 0; i < expected.count; i++) {
+            auto expected_sv = sql_token_type_to_string_view(expected[i]);
+            message.format_append(OK_SV_FMT, OK_SV_ARG(expected_sv));
+            if (i != expected.count - 1) message.append("or "_sv);
+        }
+
+        message.format_append(", but got " OK_SV_FMT " instead", OK_SV_ARG(got_sv));
+    }
+
+    error = Error{message, token_location};
+}
+
+void SQLParser::set_eof() {
+    SourceLocation location;
+    if (tokens.count > 0) location = locate_token(source, tokens[tokens.count - 1]);
+    else
+        location = {
+                .line = 1,
+                .column = 1,
+                .length = 0,
+        };
+
+    auto message = String::alloc(arena, "unexpected EOF");
+    error = Error{message, location};
 }
 }; // namespace xmdb

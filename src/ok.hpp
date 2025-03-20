@@ -67,6 +67,8 @@
     abort(); \
 } while (0)
 
+#define OK_ARR_LEN(xs) (sizeof((xs)) / sizeof((xs)[0]))
+
 #if defined(__unix__) || defined(__unix) || defined(__APPLE__)
 
 #define OK_UNIX 1
@@ -319,6 +321,15 @@ struct StringView {
 
     String to_string(Allocator* a) const;
 
+    inline StringView view(size_t start, size_t end) const {
+        OK_ASSERT(end >= start);
+        return StringView{data + start, end - start};
+    }
+
+    inline StringView view(size_t start) const {
+        return view(start, count);
+    }
+
     inline bool operator ==(const StringView rhs) const {
         if (count != rhs.count) return false;
 
@@ -337,6 +348,11 @@ struct StringView {
 
     inline bool operator!=(const String& string) const {
         return !(*this == string);
+    }
+
+    inline const char& operator [](size_t idx) const {
+        OK_ASSERT(idx < count);
+        return data[idx];
     }
 
     const char* data;
