@@ -3,6 +3,12 @@
 namespace xmdb {
 SQLTokenTable sql_token_table{};
 
+StringView sql_token_types_pretty[] = {
+#define X(str, tok) [SQLToken::tok] = StringView{str},
+        XMDB_ENUM_SQL_TOKENS
+#undef X
+};
+
 using namespace ok::literals;
 
 namespace {
@@ -14,7 +20,7 @@ inline bool is_valid_ident_char(char c) {
 ok::Optional<SQLToken> SQLLexer::next() {
     skip_whitespace();
 
-    if (pos >= source.count())
+    if (pos >= source.count)
         return {};
 
     char cur;
