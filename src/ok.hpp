@@ -319,19 +319,29 @@ struct StringView {
 
     String to_string(Allocator* a) const;
 
+    inline bool operator ==(const StringView rhs) const {
+        if (count != rhs.count) return false;
+
+        for (size_t i = 0; i < count; i++) {
+            if (data[i] != rhs.data[i]) return false;
+        }
+
+        return true;
+    }
+
+    inline bool operator!=(const StringView & string_view) const {
+        return !(*this == string_view);
+    }
+
+    bool operator ==(const String& string) const;
+
+    inline bool operator!=(const String& string) const {
+        return !(*this == string);
+    }
+
     const char* data;
     size_t count;
 };
-
-inline bool operator ==(const StringView lhs, const StringView rhs) {
-    if (lhs.count != rhs.count) return false;
-
-    for (size_t i = 0; i < lhs.count; i++) {
-        if (lhs.data[i] != rhs.data[i]) return false;
-    }
-
-    return true;
-}
 
 inline namespace literals {
 constexpr StringView operator ""_sv(const char* cstr, size_t len) {
@@ -403,14 +413,20 @@ struct String {
         return data.count - 1;
     }
 
-    inline bool operator ==(const String& other) {
-        if (other.count() != count()) return false;
+    inline bool operator ==(const String& other) const {
+        return view() == other.view();
+    }
 
-        for (size_t i = 0; i < count(); ++i) {
-            if (data.items[i] != other.data.items[i]) return false;
-        }
+    inline bool operator ==(const StringView& other) const {
+        return view() == other;
+    }
 
-        return true;
+    inline bool operator !=(const String& other) const {
+        return !(*this == other);
+    }
+
+    inline bool operator !=(const StringView& other) const {
+        return !(*this == other);
     }
 
     inline char& operator [](size_t idx) {
@@ -1202,6 +1218,10 @@ bool String::starts_with(StringView prefix) {
 }
 
 // STRING VIEW IMPLEMENTATION
+bool StringView::operator ==(const String& string) const {
+    return *this == string.view();
+}
+
 String StringView::to_string(Allocator* a) const {
     return String::alloc(a, data, count);
 }

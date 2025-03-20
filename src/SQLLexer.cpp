@@ -5,6 +5,12 @@ SQLTokenTable sql_token_table{};
 
 using namespace ok::literals;
 
+namespace {
+inline bool is_valid_ident_char(char c) {
+    return ok::is_alpha(c) || ok::is_digit(c) || c == '_';
+}
+};
+
 ok::Optional<SQLToken> SQLLexer::next() {
     skip_whitespace();
 
@@ -38,7 +44,7 @@ ok::Optional<SQLToken> SQLLexer::next() {
         if (ok::is_digit(cur))
             OK_TODO();
 
-        StringView ident = take_while(ok::is_alpha);
+        StringView ident = take_while(is_valid_ident_char);
 
         Optional<SQLToken::Type> kw_token_type = sql_token_table.get(ident);
 
