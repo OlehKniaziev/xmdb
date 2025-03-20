@@ -7,6 +7,7 @@ namespace xmdb {
 struct SQLStmt {
     enum Type {
         SELECT,
+        USE,
     };
 
     Type type;
@@ -42,6 +43,17 @@ struct SQLSelectStmt : public SQLStmt {
 
     ok::Slice<SQLExpr*> exprs;
     SQLExpr* table;
+};
+
+struct SQLUseStmt : public SQLStmt {
+    static SQLUseStmt* alloc(ok::Allocator* allocator, ok::StringView database) {
+        auto* stmt = allocator->alloc<SQLUseStmt>();
+        stmt->type = USE;
+        stmt->database = database.to_string(allocator);
+        return stmt;
+    }
+
+    ok::String database;
 };
 };
 

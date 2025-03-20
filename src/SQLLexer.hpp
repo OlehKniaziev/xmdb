@@ -3,20 +3,21 @@
 
 #include "ok.hpp"
 
+using ok::Optional;
 using ok::String;
 using ok::StringView;
 using ok::Table;
-using ok::Optional;
 
-#define XMDB_ENUM_SQL_KEYWORDS                                                                                           \
+#define XMDB_ENUM_SQL_KEYWORDS                                                                                         \
     X("SELECT", KW_SELECT)                                                                                             \
-    X("FROM", KW_FROM)
+    X("FROM", KW_FROM)                                                                                                 \
+    X("USE", KW_USE)
 
-#define XMDB_ENUM_SQL_TOKENS \
-    X("comma", COMMA) \
-    X("dot", DOT) \
-    X("identifier", IDENT) \
-    X("semicolon", SEMICOLON) \
+#define XMDB_ENUM_SQL_TOKENS                                                                                           \
+    X("comma", COMMA)                                                                                                  \
+    X("dot", DOT)                                                                                                      \
+    X("identifier", IDENT)                                                                                             \
+    X("semicolon", SEMICOLON)                                                                                          \
     XMDB_ENUM_SQL_KEYWORDS
 
 namespace xmdb {
@@ -42,12 +43,14 @@ using SQLTokenTable = Table<StringView, SQLToken::Type>;
 extern SQLTokenTable sql_token_table;
 
 struct SQLLexer {
-    explicit SQLLexer(String source) : source{source.view()}, pos{0} {}
-    explicit SQLLexer(StringView source) : source{source}, pos{0} {}
+    explicit SQLLexer(String source) : source{source.view()}, pos{0} {
+    }
+    explicit SQLLexer(StringView source) : source{source}, pos{0} {
+    }
 
     Optional<SQLToken> next();
 
-    template <typename F>
+    template<typename F>
     StringView take_while(F pred) {
         size_t start = pos;
 
@@ -63,6 +66,6 @@ struct SQLLexer {
     StringView source;
     size_t pos;
 };
-};
+}; // namespace xmdb
 
 #endif // XMDB_SQLLEXER_H_

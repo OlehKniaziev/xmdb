@@ -32,6 +32,17 @@ TEST(SQLParser, select_stmt) {
     EXPECT_EQ(select_stmt->table->type, SQLExpr::IDENT);
 }
 
+TEST(SQLParser, use_stmt) {
+    ok::ArenaAllocator arena{};
+    auto source = "USE some_database;"_sv;
+    SQLParser parser{&arena, source};
+
+    auto use_stmt = parser.use_stmt();
+    EXPECT_TRUE(use_stmt.has_value());
+
+    EXPECT_EQ(use_stmt.value->database, "some_database"_sv);
+}
+
 TEST(SQLParser, eof_error) {
     ok::ArenaAllocator arena{};
     auto source = ""_sv;

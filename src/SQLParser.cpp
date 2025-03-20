@@ -82,6 +82,14 @@ Optional<SQLSelectStmt*> SQLParser::select_stmt() {
     return select_stmt;
 }
 
+Optional<SQLUseStmt*> SQLParser::use_stmt() {
+    TRY(expect(SQLToken::KW_USE));
+    auto database = expect(SQLToken::IDENT);
+    if (!database.has_value()) return {};
+
+    return SQLUseStmt::alloc(arena, database.value.data);
+}
+
 Optional<SQLExpr*> SQLParser::expression() {
     auto token = get_cur_token_or_signal_eof();
     if (!token.has_value()) return {};
