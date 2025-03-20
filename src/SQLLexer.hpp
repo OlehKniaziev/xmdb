@@ -11,13 +11,18 @@ using ok::Table;
 #define XMDB_ENUM_SQL_KEYWORDS                                                                                         \
     X("SELECT", KW_SELECT)                                                                                             \
     X("FROM", KW_FROM)                                                                                                 \
-    X("USE", KW_USE)
+    X("USE", KW_USE)                                                                                                   \
+    X("INSERT", KW_INSERT)                                                                                             \
+    X("INTO", KW_INTO)                                                                                                 \
+    X("VALUES", KW_VALUES)
 
 #define XMDB_ENUM_SQL_TOKENS                                                                                           \
     X("comma", COMMA)                                                                                                  \
     X("dot", DOT)                                                                                                      \
     X("identifier", IDENT)                                                                                             \
     X("semicolon", SEMICOLON)                                                                                          \
+    X("l_paren", L_PAREN)                                                                                          \
+    X("r_paren", R_PAREN)                                                                                          \
     XMDB_ENUM_SQL_KEYWORDS
 
 namespace xmdb {

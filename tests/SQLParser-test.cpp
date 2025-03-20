@@ -43,6 +43,31 @@ TEST(SQLParser, use_stmt) {
     EXPECT_EQ(use_stmt.value->database, "some_database"_sv);
 }
 
+TEST(SQLParser, insert_stmt) {
+    ok::ArenaAllocator arena{};
+    auto source = "INSERT INTO Users (name, age) VALUES (oleh, some_age);"_sv;
+    SQLParser parser{&arena, source};
+
+    auto insert_stmt = parser.insert_stmt();
+    EXPECT_TRUE(insert_stmt.has_value());
+
+    EXPECT_EQ(insert_stmt.value->table->type, SQLExpr::IDENT);
+    EXPECT_EQ(static_cast<SQLExprIdentifier*>(insert_stmt.value->table)->value, "Users"_sv);
+
+    EXPECT_EQ(insert_stmt.value->columns.count, 2);
+    EXPECT_EQ(insert_stmt.value->columns[0], "name"_sv);
+    EXPECT_EQ(insert_stmt.value->columns[1], "age"_sv);
+
+    EXPECT_EQ(insert_stmt.value->values.count, 2);
+
+    auto values = insert_stmt.value->values.cast<SQLExprIdentifier*>();
+    EXPECT_EQ(values[0]->value, "oleh"_sv);
+    EXPECT_EQ(values[1]->value, "some_age"_sv);
+
+    EXPECT_EQ(insert_stmt.value->values_counts.count, 1);
+    EXPECT_EQ(insert_stmt.value->values_counts[0], 2);
+}
+
 TEST(SQLParser, eof_error) {
     ok::ArenaAllocator arena{};
     auto source = ""_sv;

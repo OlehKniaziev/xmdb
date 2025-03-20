@@ -19,7 +19,7 @@ using namespace ok::literals;
 namespace xmdb {
 namespace {
 SourceLocation locate_token(StringView source, SQLToken token) {
-    OK_ASSERT((uintptr_t)token.data.data >= (uintptr_t)source.data);
+    OK_ASSERT((uintptr_t) token.data.data >= (uintptr_t) source.data);
 
     ptrdiff_t token_offset = token.data.data - source.data;
 
@@ -84,10 +84,60 @@ Optional<SQLSelectStmt*> SQLParser::select_stmt() {
 
 Optional<SQLUseStmt*> SQLParser::use_stmt() {
     TRY(expect(SQLToken::KW_USE));
+
     auto database = expect(SQLToken::IDENT);
-    if (!database.has_value()) return {};
+    TRY(database);
 
     return SQLUseStmt::alloc(arena, database.value.data);
+}
+
+Optional<SQLInsertStmt*> SQLParser::insert_stmt() {
+    TRY(expect(SQLToken::KW_INSERT));
+    TRY(expect(SQLToken::KW_INTO));
+
+    auto table_expr = expression();
+    TRY(table_expr);
+
+    TRY(expect(SQLToken::L_PAREN));
+
+    auto columns = ok::List<ok::String>::alloc(arena);
+
+    while (true) {
+        auto column = expect(SQLToken::IDENT);
+        TRY(column);
+        columns.push(column.value.data.to_string(arena));
+
+        if (!try_expect(SQLToken::COMMA)) break;
+    }
+
+    TRY(expect(SQLToken::R_PAREN));
+
+    TRY(expect(SQLToken::KW_VALUES));
+
+    auto values = ok::List<SQLExpr*>::alloc(arena);
+    auto values_counts = ok::List<uint32_t>::alloc(arena);
+
+    while (true) {
+        size_t values_count = 0;
+
+        TRY(expect(SQLToken::L_PAREN));
+        while (true) {
+            auto expr = expression();
+            TRY(expr);
+
+            values.push(expr.value);
+            values_count++;
+
+            if (!try_expect(SQLToken::COMMA)) break;
+        }
+        TRY(expect(SQLToken::R_PAREN));
+
+        values_counts.push(values_count);
+
+        if (!try_expect(SQLToken::COMMA)) break;
+    }
+
+    return SQLInsertStmt::alloc(arena, table_expr.value, columns.slice(), values.slice(), values_counts.slice());
 }
 
 Optional<SQLExpr*> SQLParser::expression() {

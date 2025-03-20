@@ -46,6 +46,18 @@ ok::Optional<SQLToken> SQLLexer::next() {
         pos++;
         return token;
     }
+    case '(': {
+        token.type = SQLToken::L_PAREN;
+        token.data = source.view(pos, pos + 1);
+        pos++;
+        return token;
+    }
+    case ')': {
+        token.type = SQLToken::R_PAREN;
+        token.data = source.view(pos, pos + 1);
+        pos++;
+        return token;
+    }
     default: {
         if (ok::is_digit(cur))
             OK_TODO();

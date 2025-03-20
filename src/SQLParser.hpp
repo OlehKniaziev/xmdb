@@ -16,6 +16,8 @@ struct SQLParser {
 
     Optional<SQLSelectStmt*> select_stmt();
     Optional<SQLUseStmt*> use_stmt();
+    Optional<SQLInsertStmt*> insert_stmt();
+
     Optional<SQLExpr*> expression();
 
     bool cur_token_is(SQLToken::Type) const;

@@ -8,6 +8,7 @@ struct SQLStmt {
     enum Type {
         SELECT,
         USE,
+        INSERT,
     };
 
     Type type;
@@ -55,6 +56,24 @@ struct SQLUseStmt : public SQLStmt {
 
     ok::String database;
 };
+
+struct SQLInsertStmt : public SQLStmt {
+    static SQLInsertStmt* alloc(ok::Allocator* allocator, SQLExpr* table, ok::Slice<ok::String> columns,
+                                ok::Slice<SQLExpr*> values, ok::Slice<uint32_t> values_counts) {
+        auto* stmt = allocator->alloc<SQLInsertStmt>();
+        stmt->type = INSERT;
+        stmt->table = table;
+        stmt->columns = columns;
+        stmt->values = values;
+        stmt->values_counts = values_counts;
+        return stmt;
+    }
+
+    SQLExpr* table;
+    ok::Slice<ok::String> columns;
+    ok::Slice<SQLExpr*> values;
+    ok::Slice<uint32_t> values_counts;
 };
+}; // namespace xmdb
 
 #endif // XMDB_AST_H_
