@@ -131,18 +131,37 @@ struct SQLDropStmt : public SQLStmt {
 struct SQLCreateStmt : public SQLStmt {
     enum class Target : uint8_t {
         DATABASE,
+        TABLE,
     };
-
-    static SQLCreateStmt* alloc(ok::Allocator* allocator, Target target, ok::String name) {
-        auto* stmt = allocator->alloc<SQLCreateStmt>();
-        stmt->type = CREATE;
-        stmt->target = target;
-        stmt->name = name;
-        return stmt;
-    }
 
     Target target;
     ok::String name;
+};
+
+struct SQLCreateDatabaseStmt : public SQLCreateStmt {
+    static SQLCreateDatabaseStmt* alloc(ok::Allocator* allocator, ok::String name) {
+        auto* stmt = allocator->alloc<SQLCreateDatabaseStmt>();
+        stmt->type = CREATE;
+        stmt->target = Target::DATABASE;
+        stmt->name = name;
+        return stmt;
+    }
+};
+
+struct SQLCreateTableStmt : public SQLCreateStmt {
+    static SQLCreateTableStmt* alloc(ok::Allocator* allocator, ok::String name, ok::Slice<ok::String> column_names,
+                                     ok::Slice<ok::String> column_types) {
+        auto* stmt = allocator->alloc<SQLCreateTableStmt>();
+        stmt->type = CREATE;
+        stmt->target = Target::TABLE;
+        stmt->name = name;
+        stmt->column_names = column_names;
+        stmt->column_types = column_types;
+        return stmt;
+    }
+
+    ok::Slice<ok::String> column_names;
+    ok::Slice<ok::String> column_types;
 };
 }; // namespace xmdb
 

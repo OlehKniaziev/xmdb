@@ -227,22 +227,49 @@ Optional<SQLDropStmt*> SQLParser::drop_stmt() {
 Optional<SQLCreateStmt*> SQLParser::create_stmt() {
     TRY(expect(SQLToken::KW_CREATE));
 
-    SQLCreateStmt::Target create_target;
+    SQLCreateStmt* stmt;
 
-    if (try_expect(SQLToken::KW_DATABASE)) create_target = SQLCreateStmt::Target::DATABASE;
-    else {
+    if (try_expect(SQLToken::KW_DATABASE)) {
+        auto name = expect(SQLToken::IDENT);
+        TRY(name);
+
+        stmt = SQLCreateDatabaseStmt::alloc(arena, name.value.data.to_string(arena));
+    } else if (try_expect(SQLToken::KW_TABLE)) {
+        auto name = expect(SQLToken::IDENT);
+        TRY(name);
+
+        auto column_names = ok::List<ok::String>::alloc(arena);
+        auto column_types = ok::List<ok::String>::alloc(arena);
+
+        TRY(expect(SQLToken::L_PAREN));
+
+        while (true) {
+            auto column_name = expect(SQLToken::IDENT);
+            TRY(column_name);
+
+            auto column_type = expect(SQLToken::IDENT);
+            TRY(column_type);
+
+            column_names.push(column_name.value.data.to_string(arena));
+            column_types.push(column_type.value.data.to_string(arena));
+
+            if (!try_expect(SQLToken::COMMA)) break;
+        }
+
+        TRY(expect(SQLToken::R_PAREN));
+
+        stmt = SQLCreateTableStmt::alloc(arena, name.value.data.to_string(arena), column_names.slice(),
+                                         column_types.slice());
+    } else {
         auto token = get_cur_token_or_signal_eof();
         TRY(token);
         SET_TOKEN_MISMATCH(token.value, SQLToken::KW_CREATE);
         return {};
     }
 
-    auto name = expect(SQLToken::IDENT);
-    TRY(name);
-
     TRY(expect(SQLToken::SEMICOLON));
 
-    return SQLCreateStmt::alloc(arena, create_target, name.value.data.to_string(arena));
+    return stmt;
 }
 
 Optional<SQLExpr*> SQLParser::expression() {

@@ -169,16 +169,42 @@ TEST(SQLParser, drop_table_stmt) {
     EXPECT_EQ(drop_stmt.value->name, "MyTable"_sv);
 }
 
-TEST(SQLParser, CREATE_database_stmt) {
+TEST(SQLParser, create_database_stmt) {
     ok::ArenaAllocator arena{};
     auto source = "CREATE DATABASE MyDb;"_sv;
     SQLParser parser{&arena, source};
 
-    auto CREATE_stmt = parser.create_stmt();
-    ASSERT_TRUE(CREATE_stmt.has_value());
+    auto create_stmt = parser.create_stmt();
+    ASSERT_TRUE(create_stmt.has_value());
 
-    EXPECT_EQ(CREATE_stmt.value->target, SQLCreateStmt::Target::DATABASE);
-    EXPECT_EQ(CREATE_stmt.value->name, "MyDb"_sv);
+    EXPECT_EQ(create_stmt.value->target, SQLCreateStmt::Target::DATABASE);
+    EXPECT_EQ(create_stmt.value->name, "MyDb"_sv);
+}
+
+TEST(SQLParser, create_table_stmt) {
+    ok::ArenaAllocator arena{};
+    auto source = R"sql(CREATE TABLE MyTable (
+        column1 int,
+        column2 text
+    );)sql"_sv;
+    SQLParser parser{&arena, source};
+
+    auto create_stmt = parser.create_stmt();
+    ASSERT_TRUE(create_stmt.has_value());
+
+    EXPECT_EQ(create_stmt.value->target, SQLCreateStmt::Target::TABLE);
+    EXPECT_EQ(create_stmt.value->name, "MyTable"_sv);
+
+    auto create_table = static_cast<SQLCreateTableStmt*>(create_stmt.value);
+
+    ASSERT_EQ(create_table->column_names.count, create_table->column_types.count);
+    EXPECT_EQ(create_table->column_names.count, 2);
+
+    EXPECT_EQ(create_table->column_names[0], "column1"_sv);
+    EXPECT_EQ(create_table->column_names[1], "column2"_sv);
+
+    EXPECT_EQ(create_table->column_types[0], "int"_sv);
+    EXPECT_EQ(create_table->column_types[1], "text"_sv);
 }
 
 TEST(SQLParser, eof_error) {
