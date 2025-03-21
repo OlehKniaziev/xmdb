@@ -19,7 +19,7 @@ using namespace ok::literals;
 namespace xmdb {
 namespace {
 SourceLocation locate_token(StringView source, SQLToken token) {
-    OK_ASSERT((uintptr_t)token.data.data >= (uintptr_t)source.data);
+    OK_ASSERT((uintptr_t) token.data.data >= (uintptr_t) source.data);
 
     ptrdiff_t token_offset = token.data.data - source.data;
 
@@ -80,6 +80,196 @@ Optional<SQLSelectStmt*> SQLParser::select_stmt() {
     TRY(expect(SQLToken::SEMICOLON));
 
     return select_stmt;
+}
+
+Optional<SQLUseStmt*> SQLParser::use_stmt() {
+    TRY(expect(SQLToken::KW_USE));
+
+    auto database = expect(SQLToken::IDENT);
+    TRY(database);
+
+    return SQLUseStmt::alloc(arena, database.value.data);
+}
+
+Optional<SQLInsertStmt*> SQLParser::insert_stmt() {
+    TRY(expect(SQLToken::KW_INSERT));
+    TRY(expect(SQLToken::KW_INTO));
+
+    auto table_expr = expression();
+    TRY(table_expr);
+
+    TRY(expect(SQLToken::L_PAREN));
+
+    auto columns = ok::List<ok::String>::alloc(arena);
+
+    while (true) {
+        auto column = expect(SQLToken::IDENT);
+        TRY(column);
+        columns.push(column.value.data.to_string(arena));
+
+        if (!try_expect(SQLToken::COMMA)) break;
+    }
+
+    TRY(expect(SQLToken::R_PAREN));
+
+    TRY(expect(SQLToken::KW_VALUES));
+
+    auto values = ok::List<SQLExpr*>::alloc(arena);
+    auto values_counts = ok::List<uint32_t>::alloc(arena);
+
+    while (true) {
+        size_t values_count = 0;
+
+        TRY(expect(SQLToken::L_PAREN));
+        while (true) {
+            auto expr = expression();
+            TRY(expr);
+
+            values.push(expr.value);
+            values_count++;
+
+            if (!try_expect(SQLToken::COMMA)) break;
+        }
+        TRY(expect(SQLToken::R_PAREN));
+
+        values_counts.push(values_count);
+
+        if (!try_expect(SQLToken::COMMA)) break;
+    }
+
+    return SQLInsertStmt::alloc(arena, table_expr.value, columns.slice(), values.slice(), values_counts.slice());
+}
+
+Optional<SQLUpdateStmt*> SQLParser::update_stmt() {
+    TRY(expect(SQLToken::KW_UPDATE));
+
+    auto table_expr = expression();
+    TRY(table_expr);
+
+    TRY(expect(SQLToken::KW_SET));
+
+    auto columns = ok::List<ok::String>::alloc(arena);
+    auto values = ok::List<SQLExpr*>::alloc(arena);
+
+    while (true) {
+        auto column = expect(SQLToken::IDENT);
+        TRY(column);
+
+        TRY(expect(SQLToken::EQ));
+
+        auto value = expression();
+        TRY(value);
+
+        columns.push(column.value.data.to_string(arena));
+        values.push(value.value);
+
+        if (!try_expect(SQLToken::COMMA)) break;
+    }
+
+    Optional<SQLExpr*> filter_expr{};
+
+    if (try_expect(SQLToken::KW_WHERE)) {
+        auto filter = expression();
+        TRY(filter);
+
+        filter_expr = filter.value;
+    }
+
+    TRY(expect(SQLToken::SEMICOLON));
+
+    return SQLUpdateStmt::alloc(arena, table_expr.value, columns.slice(), values.slice(), filter_expr);
+}
+
+Optional<SQLDeleteStmt*> SQLParser::delete_stmt() {
+    TRY(expect(SQLToken::KW_DELETE));
+    TRY(expect(SQLToken::KW_FROM));
+
+    auto table_expr = expression();
+    TRY(table_expr);
+
+    Optional<SQLExpr*> filter_expr{};
+
+    if (try_expect(SQLToken::KW_WHERE)) {
+        auto filter = expression();
+        TRY(filter);
+        filter_expr = filter.value;
+    }
+
+    TRY(expect(SQLToken::SEMICOLON));
+
+    return SQLDeleteStmt::alloc(arena, table_expr.value, filter_expr);
+}
+
+Optional<SQLDropStmt*> SQLParser::drop_stmt() {
+    TRY(expect(SQLToken::KW_DROP));
+
+    SQLDropStmt::Target drop_target;
+
+    if (try_expect(SQLToken::KW_TABLE)) drop_target = SQLDropStmt::Target::TABLE;
+    else if (try_expect(SQLToken::KW_DATABASE))
+        drop_target = SQLDropStmt::Target::DATABASE;
+    else {
+        auto token = get_cur_token_or_signal_eof();
+        TRY(token);
+
+        SET_TOKEN_MISMATCH(token.value, SQLToken::KW_TABLE, SQLToken::KW_DATABASE);
+        return {};
+    }
+
+    auto name = expect(SQLToken::IDENT);
+    TRY(name);
+
+    TRY(expect(SQLToken::SEMICOLON));
+
+    return SQLDropStmt::alloc(arena, drop_target, name.value.data.to_string(arena));
+}
+
+Optional<SQLCreateStmt*> SQLParser::create_stmt() {
+    TRY(expect(SQLToken::KW_CREATE));
+
+    SQLCreateStmt* stmt;
+
+    if (try_expect(SQLToken::KW_DATABASE)) {
+        auto name = expect(SQLToken::IDENT);
+        TRY(name);
+
+        stmt = SQLCreateDatabaseStmt::alloc(arena, name.value.data.to_string(arena));
+    } else if (try_expect(SQLToken::KW_TABLE)) {
+        auto name = expect(SQLToken::IDENT);
+        TRY(name);
+
+        auto column_names = ok::List<ok::String>::alloc(arena);
+        auto column_types = ok::List<ok::String>::alloc(arena);
+
+        TRY(expect(SQLToken::L_PAREN));
+
+        while (true) {
+            auto column_name = expect(SQLToken::IDENT);
+            TRY(column_name);
+
+            auto column_type = expect(SQLToken::IDENT);
+            TRY(column_type);
+
+            column_names.push(column_name.value.data.to_string(arena));
+            column_types.push(column_type.value.data.to_string(arena));
+
+            if (!try_expect(SQLToken::COMMA)) break;
+        }
+
+        TRY(expect(SQLToken::R_PAREN));
+
+        stmt = SQLCreateTableStmt::alloc(arena, name.value.data.to_string(arena), column_names.slice(),
+                                         column_types.slice());
+    } else {
+        auto token = get_cur_token_or_signal_eof();
+        TRY(token);
+        SET_TOKEN_MISMATCH(token.value, SQLToken::KW_CREATE);
+        return {};
+    }
+
+    TRY(expect(SQLToken::SEMICOLON));
+
+    return stmt;
 }
 
 Optional<SQLExpr*> SQLParser::expression() {
@@ -162,12 +352,11 @@ void SQLParser::set_token_mismatch(SQLToken got, ok::Slice<SQLToken::Type> expec
 void SQLParser::set_eof() {
     SourceLocation location;
     if (tokens.count > 0) location = locate_token(source, tokens[tokens.count - 1]);
-    else
-        location = {
-                .line = 1,
-                .column = 1,
-                .length = 0,
-        };
+    else {
+        location.line = 1;
+        location.column = 1;
+        location.length = 0;
+    }
 
     auto message = String::alloc(arena, "unexpected EOF");
     error = Error{message, location};

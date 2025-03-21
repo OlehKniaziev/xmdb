@@ -289,8 +289,12 @@ struct Slice {
         return slice(start, count);
     }
 
-    inline Slice<T> slice() const {
-        return slice(0, count);
+    template <typename Dest>
+    inline Slice<Dest> cast() const {
+        Slice<Dest> slice;
+        slice.items = (const Dest*)items;
+        slice.count = count;
+        return slice;
     }
 
     inline const T& operator [](size_t idx) const {

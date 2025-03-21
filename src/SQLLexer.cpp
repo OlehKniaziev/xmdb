@@ -15,13 +15,12 @@ namespace {
 inline bool is_valid_ident_char(char c) {
     return ok::is_alpha(c) || ok::is_digit(c) || c == '_';
 }
-};
+}; // namespace
 
 ok::Optional<SQLToken> SQLLexer::next() {
     skip_whitespace();
 
-    if (pos >= source.count)
-        return {};
+    if (pos >= source.count) return {};
 
     char cur;
 
@@ -46,9 +45,26 @@ ok::Optional<SQLToken> SQLLexer::next() {
         pos++;
         return token;
     }
+    case '(': {
+        token.type = SQLToken::L_PAREN;
+        token.data = source.view(pos, pos + 1);
+        pos++;
+        return token;
+    }
+    case ')': {
+        token.type = SQLToken::R_PAREN;
+        token.data = source.view(pos, pos + 1);
+        pos++;
+        return token;
+    }
+    case '=': {
+        token.type = SQLToken::EQ;
+        token.data = source.view(pos, pos + 1);
+        pos++;
+        return token;
+    }
     default: {
-        if (ok::is_digit(cur))
-            OK_TODO();
+        if (ok::is_digit(cur)) OK_TODO();
 
         StringView ident = take_while(is_valid_ident_char);
 

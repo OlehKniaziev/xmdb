@@ -15,6 +15,13 @@ struct SQLParser {
     explicit SQLParser(ok::ArenaAllocator*, StringView);
 
     Optional<SQLSelectStmt*> select_stmt();
+    Optional<SQLUseStmt*> use_stmt();
+    Optional<SQLInsertStmt*> insert_stmt();
+    Optional<SQLUpdateStmt*> update_stmt();
+    Optional<SQLDeleteStmt*> delete_stmt();
+    Optional<SQLDropStmt*> drop_stmt();
+    Optional<SQLCreateStmt*> create_stmt();
+
     Optional<SQLExpr*> expression();
 
     bool cur_token_is(SQLToken::Type) const;
