@@ -10,6 +10,7 @@ struct SQLStmt {
         USE,
         INSERT,
         UPDATE,
+        DELETE,
     };
 
     Type type;
@@ -91,6 +92,19 @@ struct SQLUpdateStmt : public SQLStmt {
     SQLExpr* table;
     ok::Slice<ok::String> columns;
     ok::Slice<SQLExpr*> values;
+    ok::Optional<SQLExpr*> filter;
+};
+
+struct SQLDeleteStmt : public SQLStmt {
+    static SQLDeleteStmt* alloc(ok::Allocator* allocator, SQLExpr* table, ok::Optional<SQLExpr*> filter) {
+        auto* stmt = allocator->alloc<SQLDeleteStmt>();
+        stmt->type = DELETE;
+        stmt->table = table;
+        stmt->filter = filter;
+        return stmt;
+    }
+
+    SQLExpr* table;
     ok::Optional<SQLExpr*> filter;
 };
 }; // namespace xmdb

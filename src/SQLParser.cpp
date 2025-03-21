@@ -180,6 +180,26 @@ Optional<SQLUpdateStmt*> SQLParser::update_stmt() {
     return SQLUpdateStmt::alloc(arena, table_expr.value, columns.slice(), values.slice(), filter_expr);
 }
 
+Optional<SQLDeleteStmt*> SQLParser::delete_stmt() {
+    TRY(expect(SQLToken::KW_DELETE));
+    TRY(expect(SQLToken::KW_FROM));
+
+    auto table_expr = expression();
+    TRY(table_expr);
+
+    Optional<SQLExpr*> filter_expr{};
+
+    if (try_expect(SQLToken::KW_WHERE)) {
+        auto filter = expression();
+        TRY(filter);
+        filter_expr = filter.value;
+    }
+
+    TRY(expect(SQLToken::SEMICOLON));
+
+    return SQLDeleteStmt::alloc(arena, table_expr.value, filter_expr);
+}
+
 Optional<SQLExpr*> SQLParser::expression() {
     auto token = get_cur_token_or_signal_eof();
     if (!token.has_value()) return {};

@@ -114,6 +114,37 @@ TEST(SQLParser, update_stmt_without_filter) {
     EXPECT_FALSE(update_stmt.value->filter.has_value());
 }
 
+TEST(SQLParser, delete_stmt_with_filter) {
+    ok::ArenaAllocator arena{};
+    auto source = "DELETE FROM Users WHERE false;"_sv;
+    SQLParser parser{&arena, source};
+
+    auto delete_stmt = parser.delete_stmt();
+    ASSERT_TRUE(delete_stmt.has_value());
+
+    EXPECT_EQ(delete_stmt.value->table->type, SQLExpr::IDENT);
+    EXPECT_EQ(static_cast<SQLExprIdentifier*>(delete_stmt.value->table)->value, "Users"_sv);
+
+    ASSERT_TRUE(delete_stmt.value->filter.has_value());
+
+    EXPECT_EQ(delete_stmt.value->filter.value->type, SQLExpr::IDENT);
+    EXPECT_EQ(static_cast<SQLExprIdentifier*>(delete_stmt.value->filter.value)->value, "false"_sv);
+}
+
+TEST(SQLParser, delete_stmt_without_filter) {
+    ok::ArenaAllocator arena{};
+    auto source = "DELETE FROM Users;"_sv;
+    SQLParser parser{&arena, source};
+
+    auto delete_stmt = parser.delete_stmt();
+    ASSERT_TRUE(delete_stmt.has_value());
+
+    EXPECT_EQ(delete_stmt.value->table->type, SQLExpr::IDENT);
+    EXPECT_EQ(static_cast<SQLExprIdentifier*>(delete_stmt.value->table)->value, "Users"_sv);
+
+    EXPECT_FALSE(delete_stmt.value->filter.has_value());
+}
+
 TEST(SQLParser, eof_error) {
     ok::ArenaAllocator arena{};
     auto source = ""_sv;
