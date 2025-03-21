@@ -1,5 +1,5 @@
-#include <gtest/gtest.h>
 #include "SQLParser.hpp"
+#include <gtest/gtest.h>
 
 using namespace xmdb;
 using namespace ok::literals;
@@ -68,6 +68,30 @@ TEST(SQLParser, insert_stmt) {
     EXPECT_EQ(insert_stmt.value->values_counts[0], 2);
 }
 
+TEST(SQLParser, update_stmt_with_filter) {
+    ok::ArenaAllocator arena{};
+    auto source = "UPDATE Users SET age = some_age WHERE true;"_sv;
+    SQLParser parser{&arena, source};
+
+    auto update_stmt = parser.update_stmt();
+    ASSERT_TRUE(update_stmt.has_value());
+
+    EXPECT_EQ(update_stmt.value->table->type, SQLExpr::IDENT);
+    EXPECT_EQ(static_cast<SQLExprIdentifier*>(update_stmt.value->table)->value, "Users"_sv);
+
+    EXPECT_EQ(update_stmt.value->columns.count, 1);
+    EXPECT_EQ(update_stmt.value->columns[0], "age"_sv);
+
+    EXPECT_EQ(update_stmt.value->values.count, 1);
+
+    auto values = update_stmt.value->values.cast<SQLExprIdentifier*>();
+    EXPECT_EQ(values[0]->value, "some_age"_sv);
+
+    ASSERT_TRUE(update_stmt.value->filter.has_value());
+    EXPECT_EQ(update_stmt.value->filter.value->type, SQLExpr::IDENT);
+    EXPECT_EQ(static_cast<SQLExprIdentifier*>(update_stmt.value->filter.value)->value, "true"_sv);
+}
+
 TEST(SQLParser, eof_error) {
     ok::ArenaAllocator arena{};
     auto source = ""_sv;
@@ -99,6 +123,6 @@ TEST(SQLParser, token_mismatch_error) {
     auto error = parser.error.value;
     EXPECT_EQ(error.message, "expected a token of type SELECT, but got identifier instead"_sv);
 
-    auto expected_location = SourceLocation{1, 1, (uint32_t)strlen("not_select")};
+    auto expected_location = SourceLocation{1, 1, (uint32_t) strlen("not_select")};
     EXPECT_EQ(error.location, expected_location);
 }

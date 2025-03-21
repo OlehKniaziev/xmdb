@@ -9,6 +9,7 @@ struct SQLStmt {
         SELECT,
         USE,
         INSERT,
+        UPDATE,
     };
 
     Type type;
@@ -73,6 +74,24 @@ struct SQLInsertStmt : public SQLStmt {
     ok::Slice<ok::String> columns;
     ok::Slice<SQLExpr*> values;
     ok::Slice<uint32_t> values_counts;
+};
+
+struct SQLUpdateStmt : public SQLStmt {
+    static SQLUpdateStmt* alloc(ok::Allocator* allocator, SQLExpr* table, ok::Slice<ok::String> columns,
+                                ok::Slice<SQLExpr*> values, ok::Optional<SQLExpr*> filter) {
+        auto* stmt = allocator->alloc<SQLUpdateStmt>();
+        stmt->type = UPDATE;
+        stmt->table = table;
+        stmt->columns = columns;
+        stmt->values = values;
+        stmt->filter = filter;
+        return stmt;
+    }
+
+    SQLExpr* table;
+    ok::Slice<ok::String> columns;
+    ok::Slice<SQLExpr*> values;
+    ok::Optional<SQLExpr*> filter;
 };
 }; // namespace xmdb
 

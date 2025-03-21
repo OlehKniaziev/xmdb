@@ -140,6 +140,46 @@ Optional<SQLInsertStmt*> SQLParser::insert_stmt() {
     return SQLInsertStmt::alloc(arena, table_expr.value, columns.slice(), values.slice(), values_counts.slice());
 }
 
+Optional<SQLUpdateStmt*> SQLParser::update_stmt() {
+    TRY(expect(SQLToken::KW_UPDATE));
+
+    auto table_expr = expression();
+    TRY(table_expr);
+
+    TRY(expect(SQLToken::KW_SET));
+
+    auto columns = ok::List<ok::String>::alloc(arena);
+    auto values = ok::List<SQLExpr*>::alloc(arena);
+
+    while (true) {
+        auto column = expect(SQLToken::IDENT);
+        TRY(column);
+
+        TRY(expect(SQLToken::EQ));
+
+        auto value = expression();
+        TRY(value);
+
+        columns.push(column.value.data.to_string(arena));
+        values.push(value.value);
+
+        if (!try_expect(SQLToken::COMMA)) break;
+    }
+
+    Optional<SQLExpr*> filter_expr{};
+
+    if (try_expect(SQLToken::KW_WHERE)) {
+        auto filter = expression();
+        TRY(filter);
+
+        filter_expr = filter.value;
+    }
+
+    TRY(expect(SQLToken::SEMICOLON));
+
+    return SQLUpdateStmt::alloc(arena, table_expr.value, columns.slice(), values.slice(), filter_expr);
+}
+
 Optional<SQLExpr*> SQLParser::expression() {
     auto token = get_cur_token_or_signal_eof();
     if (!token.has_value()) return {};
@@ -220,12 +260,11 @@ void SQLParser::set_token_mismatch(SQLToken got, ok::Slice<SQLToken::Type> expec
 void SQLParser::set_eof() {
     SourceLocation location;
     if (tokens.count > 0) location = locate_token(source, tokens[tokens.count - 1]);
-    else
-        location = {
-                .line = 1,
-                .column = 1,
-                .length = 0,
-        };
+    else {
+        location.line = 1;
+        location.column = 1;
+        location.length = 0;
+    }
 
     auto message = String::alloc(arena, "unexpected EOF");
     error = Error{message, location};

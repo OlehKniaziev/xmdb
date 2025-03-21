@@ -17,6 +17,7 @@ struct SQLParser {
     Optional<SQLSelectStmt*> select_stmt();
     Optional<SQLUseStmt*> use_stmt();
     Optional<SQLInsertStmt*> insert_stmt();
+    Optional<SQLUpdateStmt*> update_stmt();
 
     Optional<SQLExpr*> expression();
 
