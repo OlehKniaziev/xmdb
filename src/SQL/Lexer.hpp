@@ -1,7 +1,7 @@
 #ifndef XMDB_SQLLEXER_H_
 #define XMDB_SQLLEXER_H_
 
-#include "ok.hpp"
+#include <Core/ok.hpp>
 
 using ok::Optional;
 using ok::String;
@@ -34,10 +34,10 @@ using ok::Table;
     X("equals", EQ)                                                                                                    \
     XMDB_ENUM_SQL_KEYWORDS
 
-namespace xmdb {
-extern StringView sql_token_types_pretty[];
+namespace xmdb::SQL {
+extern StringView token_types_pretty[];
 
-struct SQLToken {
+struct Token {
     enum Type : uint8_t {
 #define X(_t, t) t,
         XMDB_ENUM_SQL_TOKENS
@@ -48,21 +48,21 @@ struct SQLToken {
     StringView data;
 };
 
-inline StringView sql_token_type_to_string_view(SQLToken::Type type) {
-    return sql_token_types_pretty[type];
+inline StringView token_type_to_string_view(Token::Type type) {
+    return token_types_pretty[type];
 }
 
-using SQLTokenTable = Table<StringView, SQLToken::Type>;
+using TokenTable = Table<StringView, Token::Type>;
 
-extern SQLTokenTable sql_token_table;
+extern TokenTable token_table;
 
-struct SQLLexer {
-    explicit SQLLexer(String source) : source{source.view()}, pos{0} {
+struct Lexer {
+    explicit Lexer(String source) : source{source.view()}, pos{0} {
     }
-    explicit SQLLexer(StringView source) : source{source}, pos{0} {
+    explicit Lexer(StringView source) : source{source}, pos{0} {
     }
 
-    Optional<SQLToken> next();
+    Optional<Token> next();
 
     template<typename F>
     StringView take_while(F pred) {

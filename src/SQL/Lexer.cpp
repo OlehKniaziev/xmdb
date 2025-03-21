@@ -1,10 +1,10 @@
-#include "SQLLexer.hpp"
+#include "Lexer.hpp"
 
-namespace xmdb {
-SQLTokenTable sql_token_table{};
+namespace xmdb::SQL {
+TokenTable token_table{};
 
-StringView sql_token_types_pretty[] = {
-#define X(str, tok) [SQLToken::tok] = StringView{str},
+StringView token_types_pretty[] = {
+#define X(str, tok) [Token::tok] = StringView{str},
         XMDB_ENUM_SQL_TOKENS
 #undef X
 };
@@ -17,48 +17,48 @@ inline bool is_valid_ident_char(char c) {
 }
 }; // namespace
 
-ok::Optional<SQLToken> SQLLexer::next() {
+ok::Optional<Token> Lexer::next() {
     skip_whitespace();
 
     if (pos >= source.count) return {};
 
     char cur;
 
-    SQLToken token{};
+    Token token{};
 
     switch ((cur = source.data[pos])) {
     case ',': {
-        token.type = SQLToken::COMMA;
+        token.type = Token::COMMA;
         token.data = source.view(pos, pos + 1);
         pos++;
         return token;
     }
     case '.': {
-        token.type = SQLToken::DOT;
+        token.type = Token::DOT;
         token.data = source.view(pos, pos + 1);
         pos++;
         return token;
     }
     case ';': {
-        token.type = SQLToken::SEMICOLON;
+        token.type = Token::SEMICOLON;
         token.data = source.view(pos, pos + 1);
         pos++;
         return token;
     }
     case '(': {
-        token.type = SQLToken::L_PAREN;
+        token.type = Token::L_PAREN;
         token.data = source.view(pos, pos + 1);
         pos++;
         return token;
     }
     case ')': {
-        token.type = SQLToken::R_PAREN;
+        token.type = Token::R_PAREN;
         token.data = source.view(pos, pos + 1);
         pos++;
         return token;
     }
     case '=': {
-        token.type = SQLToken::EQ;
+        token.type = Token::EQ;
         token.data = source.view(pos, pos + 1);
         pos++;
         return token;
@@ -68,9 +68,9 @@ ok::Optional<SQLToken> SQLLexer::next() {
 
         StringView ident = take_while(is_valid_ident_char);
 
-        Optional<SQLToken::Type> kw_token_type = sql_token_table.get(ident);
+        Optional<Token::Type> kw_token_type = token_table.get(ident);
 
-        token.type = kw_token_type.or_else(SQLToken::IDENT);
+        token.type = kw_token_type.or_else(Token::IDENT);
         token.data = ident;
 
         return token;

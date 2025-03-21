@@ -1,5 +1,5 @@
-#include "SQLParser.hpp"
 #include <cstddef>
+#include "Parser.hpp"
 
 #define TRY(x)                                                                                                         \
     do {                                                                                                               \
@@ -9,16 +9,16 @@
 
 #define SET_TOKEN_MISMATCH(got, ...)                                                                                   \
     do {                                                                                                               \
-        SQLToken::Type expected_arr[] = {__VA_ARGS__};                                                                 \
-        ::ok::Slice<SQLToken::Type> expected = {expected_arr, OK_ARR_LEN(expected_arr)};                               \
+        Token::Type expected_arr[] = {__VA_ARGS__};                                                                 \
+        ::ok::Slice<Token::Type> expected = {expected_arr, OK_ARR_LEN(expected_arr)};                               \
         set_token_mismatch((got), expected);                                                                           \
     } while (0)
 
 using namespace ok::literals;
 
-namespace xmdb {
+namespace xmdb::SQL {
 namespace {
-SourceLocation locate_token(StringView source, SQLToken token) {
+SourceLocation locate_token(StringView source, Token token) {
     OK_ASSERT((uintptr_t) token.data.data >= (uintptr_t) source.data);
 
     ptrdiff_t token_offset = token.data.data - source.data;
@@ -43,9 +43,9 @@ SourceLocation locate_token(StringView source, SQLToken token) {
 }
 }; // namespace
 
-SQLParser::SQLParser(ok::ArenaAllocator* arena, StringView source) : arena{arena}, source{source} {
-    auto tokens = ok::List<SQLToken>::alloc(arena);
-    SQLLexer lexer{source};
+Parser::Parser(ok::ArenaAllocator* arena, StringView source) : arena{arena}, source{source} {
+    auto tokens = ok::List<Token>::alloc(arena);
+    Lexer lexer{source};
 
     for (auto token = lexer.next(); token.has_value(); token = lexer.next()) {
         tokens.push(token.value);
@@ -54,10 +54,10 @@ SQLParser::SQLParser(ok::ArenaAllocator* arena, StringView source) : arena{arena
     this->tokens = tokens.slice();
 }
 
-Optional<SQLSelectStmt*> SQLParser::select_stmt() {
-    TRY(expect(SQLToken::KW_SELECT));
+Optional<SelectStmt*> Parser::select_stmt() {
+    TRY(expect(Token::KW_SELECT));
 
-    auto exprs = ok::List<SQLExpr*>::alloc(arena);
+    auto exprs = ok::List<Expr*>::alloc(arena);
 
     while (true) {
         auto expr = expression();
@@ -65,62 +65,62 @@ Optional<SQLSelectStmt*> SQLParser::select_stmt() {
 
         exprs.push(expr.value);
 
-        if (!try_expect(SQLToken::COMMA)) break;
+        if (!try_expect(Token::COMMA)) break;
     }
 
-    TRY(expect(SQLToken::KW_FROM));
+    TRY(expect(Token::KW_FROM));
 
     auto table_expr = expression();
     if (!table_expr.has_value()) return {};
 
-    auto* select_stmt = arena->alloc<SQLSelectStmt>();
+    auto* select_stmt = arena->alloc<SelectStmt>();
     select_stmt->exprs = exprs.slice();
     select_stmt->table = table_expr.value;
 
-    TRY(expect(SQLToken::SEMICOLON));
+    TRY(expect(Token::SEMICOLON));
 
     return select_stmt;
 }
 
-Optional<SQLUseStmt*> SQLParser::use_stmt() {
-    TRY(expect(SQLToken::KW_USE));
+Optional<UseStmt*> Parser::use_stmt() {
+    TRY(expect(Token::KW_USE));
 
-    auto database = expect(SQLToken::IDENT);
+    auto database = expect(Token::IDENT);
     TRY(database);
 
-    return SQLUseStmt::alloc(arena, database.value.data);
+    return UseStmt::alloc(arena, database.value.data);
 }
 
-Optional<SQLInsertStmt*> SQLParser::insert_stmt() {
-    TRY(expect(SQLToken::KW_INSERT));
-    TRY(expect(SQLToken::KW_INTO));
+Optional<InsertStmt*> Parser::insert_stmt() {
+    TRY(expect(Token::KW_INSERT));
+    TRY(expect(Token::KW_INTO));
 
     auto table_expr = expression();
     TRY(table_expr);
 
-    TRY(expect(SQLToken::L_PAREN));
+    TRY(expect(Token::L_PAREN));
 
     auto columns = ok::List<ok::String>::alloc(arena);
 
     while (true) {
-        auto column = expect(SQLToken::IDENT);
+        auto column = expect(Token::IDENT);
         TRY(column);
         columns.push(column.value.data.to_string(arena));
 
-        if (!try_expect(SQLToken::COMMA)) break;
+        if (!try_expect(Token::COMMA)) break;
     }
 
-    TRY(expect(SQLToken::R_PAREN));
+    TRY(expect(Token::R_PAREN));
 
-    TRY(expect(SQLToken::KW_VALUES));
+    TRY(expect(Token::KW_VALUES));
 
-    auto values = ok::List<SQLExpr*>::alloc(arena);
+    auto values = ok::List<Expr*>::alloc(arena);
     auto values_counts = ok::List<uint32_t>::alloc(arena);
 
     while (true) {
         size_t values_count = 0;
 
-        TRY(expect(SQLToken::L_PAREN));
+        TRY(expect(Token::L_PAREN));
         while (true) {
             auto expr = expression();
             TRY(expr);
@@ -128,34 +128,34 @@ Optional<SQLInsertStmt*> SQLParser::insert_stmt() {
             values.push(expr.value);
             values_count++;
 
-            if (!try_expect(SQLToken::COMMA)) break;
+            if (!try_expect(Token::COMMA)) break;
         }
-        TRY(expect(SQLToken::R_PAREN));
+        TRY(expect(Token::R_PAREN));
 
         values_counts.push(values_count);
 
-        if (!try_expect(SQLToken::COMMA)) break;
+        if (!try_expect(Token::COMMA)) break;
     }
 
-    return SQLInsertStmt::alloc(arena, table_expr.value, columns.slice(), values.slice(), values_counts.slice());
+    return InsertStmt::alloc(arena, table_expr.value, columns.slice(), values.slice(), values_counts.slice());
 }
 
-Optional<SQLUpdateStmt*> SQLParser::update_stmt() {
-    TRY(expect(SQLToken::KW_UPDATE));
+Optional<UpdateStmt*> Parser::update_stmt() {
+    TRY(expect(Token::KW_UPDATE));
 
     auto table_expr = expression();
     TRY(table_expr);
 
-    TRY(expect(SQLToken::KW_SET));
+    TRY(expect(Token::KW_SET));
 
     auto columns = ok::List<ok::String>::alloc(arena);
-    auto values = ok::List<SQLExpr*>::alloc(arena);
+    auto values = ok::List<Expr*>::alloc(arena);
 
     while (true) {
-        auto column = expect(SQLToken::IDENT);
+        auto column = expect(Token::IDENT);
         TRY(column);
 
-        TRY(expect(SQLToken::EQ));
+        TRY(expect(Token::EQ));
 
         auto value = expression();
         TRY(value);
@@ -163,133 +163,133 @@ Optional<SQLUpdateStmt*> SQLParser::update_stmt() {
         columns.push(column.value.data.to_string(arena));
         values.push(value.value);
 
-        if (!try_expect(SQLToken::COMMA)) break;
+        if (!try_expect(Token::COMMA)) break;
     }
 
-    Optional<SQLExpr*> filter_expr{};
+    Optional<Expr*> filter_expr{};
 
-    if (try_expect(SQLToken::KW_WHERE)) {
+    if (try_expect(Token::KW_WHERE)) {
         auto filter = expression();
         TRY(filter);
 
         filter_expr = filter.value;
     }
 
-    TRY(expect(SQLToken::SEMICOLON));
+    TRY(expect(Token::SEMICOLON));
 
-    return SQLUpdateStmt::alloc(arena, table_expr.value, columns.slice(), values.slice(), filter_expr);
+    return UpdateStmt::alloc(arena, table_expr.value, columns.slice(), values.slice(), filter_expr);
 }
 
-Optional<SQLDeleteStmt*> SQLParser::delete_stmt() {
-    TRY(expect(SQLToken::KW_DELETE));
-    TRY(expect(SQLToken::KW_FROM));
+Optional<DeleteStmt*> Parser::delete_stmt() {
+    TRY(expect(Token::KW_DELETE));
+    TRY(expect(Token::KW_FROM));
 
     auto table_expr = expression();
     TRY(table_expr);
 
-    Optional<SQLExpr*> filter_expr{};
+    Optional<Expr*> filter_expr{};
 
-    if (try_expect(SQLToken::KW_WHERE)) {
+    if (try_expect(Token::KW_WHERE)) {
         auto filter = expression();
         TRY(filter);
         filter_expr = filter.value;
     }
 
-    TRY(expect(SQLToken::SEMICOLON));
+    TRY(expect(Token::SEMICOLON));
 
-    return SQLDeleteStmt::alloc(arena, table_expr.value, filter_expr);
+    return DeleteStmt::alloc(arena, table_expr.value, filter_expr);
 }
 
-Optional<SQLDropStmt*> SQLParser::drop_stmt() {
-    TRY(expect(SQLToken::KW_DROP));
+Optional<DropStmt*> Parser::drop_stmt() {
+    TRY(expect(Token::KW_DROP));
 
-    SQLDropStmt::Target drop_target;
+    DropStmt::Target drop_target;
 
-    if (try_expect(SQLToken::KW_TABLE)) drop_target = SQLDropStmt::Target::TABLE;
-    else if (try_expect(SQLToken::KW_DATABASE))
-        drop_target = SQLDropStmt::Target::DATABASE;
+    if (try_expect(Token::KW_TABLE)) drop_target = DropStmt::Target::TABLE;
+    else if (try_expect(Token::KW_DATABASE))
+        drop_target = DropStmt::Target::DATABASE;
     else {
         auto token = get_cur_token_or_signal_eof();
         TRY(token);
 
-        SET_TOKEN_MISMATCH(token.value, SQLToken::KW_TABLE, SQLToken::KW_DATABASE);
+        SET_TOKEN_MISMATCH(token.value, Token::KW_TABLE, Token::KW_DATABASE);
         return {};
     }
 
-    auto name = expect(SQLToken::IDENT);
+    auto name = expect(Token::IDENT);
     TRY(name);
 
-    TRY(expect(SQLToken::SEMICOLON));
+    TRY(expect(Token::SEMICOLON));
 
-    return SQLDropStmt::alloc(arena, drop_target, name.value.data.to_string(arena));
+    return DropStmt::alloc(arena, drop_target, name.value.data.to_string(arena));
 }
 
-Optional<SQLCreateStmt*> SQLParser::create_stmt() {
-    TRY(expect(SQLToken::KW_CREATE));
+Optional<CreateStmt*> Parser::create_stmt() {
+    TRY(expect(Token::KW_CREATE));
 
-    SQLCreateStmt* stmt;
+    CreateStmt* stmt;
 
-    if (try_expect(SQLToken::KW_DATABASE)) {
-        auto name = expect(SQLToken::IDENT);
+    if (try_expect(Token::KW_DATABASE)) {
+        auto name = expect(Token::IDENT);
         TRY(name);
 
-        stmt = SQLCreateDatabaseStmt::alloc(arena, name.value.data.to_string(arena));
-    } else if (try_expect(SQLToken::KW_TABLE)) {
-        auto name = expect(SQLToken::IDENT);
+        stmt = CreateDatabaseStmt::alloc(arena, name.value.data.to_string(arena));
+    } else if (try_expect(Token::KW_TABLE)) {
+        auto name = expect(Token::IDENT);
         TRY(name);
 
         auto column_names = ok::List<ok::String>::alloc(arena);
         auto column_types = ok::List<ok::String>::alloc(arena);
 
-        TRY(expect(SQLToken::L_PAREN));
+        TRY(expect(Token::L_PAREN));
 
         while (true) {
-            auto column_name = expect(SQLToken::IDENT);
+            auto column_name = expect(Token::IDENT);
             TRY(column_name);
 
-            auto column_type = expect(SQLToken::IDENT);
+            auto column_type = expect(Token::IDENT);
             TRY(column_type);
 
             column_names.push(column_name.value.data.to_string(arena));
             column_types.push(column_type.value.data.to_string(arena));
 
-            if (!try_expect(SQLToken::COMMA)) break;
+            if (!try_expect(Token::COMMA)) break;
         }
 
-        TRY(expect(SQLToken::R_PAREN));
+        TRY(expect(Token::R_PAREN));
 
-        stmt = SQLCreateTableStmt::alloc(arena, name.value.data.to_string(arena), column_names.slice(),
+        stmt = CreateTableStmt::alloc(arena, name.value.data.to_string(arena), column_names.slice(),
                                          column_types.slice());
     } else {
         auto token = get_cur_token_or_signal_eof();
         TRY(token);
-        SET_TOKEN_MISMATCH(token.value, SQLToken::KW_CREATE);
+        SET_TOKEN_MISMATCH(token.value, Token::KW_CREATE);
         return {};
     }
 
-    TRY(expect(SQLToken::SEMICOLON));
+    TRY(expect(Token::SEMICOLON));
 
     return stmt;
 }
 
-Optional<SQLExpr*> SQLParser::expression() {
+Optional<Expr*> Parser::expression() {
     auto token = get_cur_token_or_signal_eof();
     if (!token.has_value()) return {};
 
     switch (token.value.type) {
-    case SQLToken::IDENT: {
+    case Token::IDENT: {
         pos++;
-        return SQLExprIdentifier::alloc(arena, token.value.data);
+        return ExprIdentifier::alloc(arena, token.value.data);
     }
     default: OK_TODO();
     }
 }
 
-bool SQLParser::cur_token_is(SQLToken::Type token_type) const {
+bool Parser::cur_token_is(Token::Type token_type) const {
     return pos < tokens.count && tokens[pos].type == token_type;
 }
 
-bool SQLParser::try_expect(SQLToken::Type token_type) {
+bool Parser::try_expect(Token::Type token_type) {
     if (cur_token_is(token_type)) {
         pos++;
         return true;
@@ -298,7 +298,7 @@ bool SQLParser::try_expect(SQLToken::Type token_type) {
     return false;
 }
 
-Optional<SQLToken> SQLParser::expect(SQLToken::Type token_type) {
+Optional<Token> Parser::expect(Token::Type token_type) {
     if (is_eof()) {
         set_eof();
         return {};
@@ -313,7 +313,7 @@ Optional<SQLToken> SQLParser::expect(SQLToken::Type token_type) {
     return {};
 }
 
-Optional<SQLToken> SQLParser::get_cur_token_or_signal_eof() {
+Optional<Token> Parser::get_cur_token_or_signal_eof() {
     if (is_eof()) {
         set_eof();
         return {};
@@ -322,23 +322,23 @@ Optional<SQLToken> SQLParser::get_cur_token_or_signal_eof() {
     return tokens[pos];
 }
 
-void SQLParser::set_token_mismatch(SQLToken got, ok::Slice<SQLToken::Type> expected) {
+void Parser::set_token_mismatch(Token got, ok::Slice<Token::Type> expected) {
     OK_ASSERT(expected.count != 0);
 
     auto token_location = locate_token(source, got);
 
     String message;
 
-    auto got_sv = sql_token_type_to_string_view(got.type);
+    auto got_sv = token_type_to_string_view(got.type);
     if (expected.count == 1) {
-        auto expected_sv = sql_token_type_to_string_view(expected[0]);
+        auto expected_sv = token_type_to_string_view(expected[0]);
         message = String::format(arena, "expected a token of type " OK_SV_FMT ", but got " OK_SV_FMT " instead",
                                  OK_SV_ARG(expected_sv), OK_SV_ARG(got_sv));
     } else {
         message = String::alloc(arena, "expected a token of types ");
 
         for (size_t i = 0; i < expected.count; i++) {
-            auto expected_sv = sql_token_type_to_string_view(expected[i]);
+            auto expected_sv = token_type_to_string_view(expected[i]);
             message.format_append(OK_SV_FMT, OK_SV_ARG(expected_sv));
             if (i != expected.count - 1) message.append("or "_sv);
         }
@@ -349,7 +349,7 @@ void SQLParser::set_token_mismatch(SQLToken got, ok::Slice<SQLToken::Type> expec
     error = Error{message, token_location};
 }
 
-void SQLParser::set_eof() {
+void Parser::set_eof() {
     SourceLocation location;
     if (tokens.count > 0) location = locate_token(source, tokens[tokens.count - 1]);
     else {
