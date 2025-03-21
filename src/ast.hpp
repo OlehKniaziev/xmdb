@@ -110,7 +110,7 @@ struct SQLDeleteStmt : public SQLStmt {
 };
 
 struct SQLDropStmt : public SQLStmt {
-    enum Target : uint8_t {
+    enum class Target : uint8_t {
         TABLE,
         DATABASE,
     };

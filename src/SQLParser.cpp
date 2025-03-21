@@ -205,8 +205,8 @@ Optional<SQLDropStmt*> SQLParser::drop_stmt() {
 
     SQLDropStmt::Target drop_target;
 
-    if (try_expect(SQLToken::KW_TABLE))         drop_target = SQLDropStmt::TABLE;
-    else if (try_expect(SQLToken::KW_DATABASE)) drop_target = SQLDropStmt::DATABASE;
+    if (try_expect(SQLToken::KW_TABLE))         drop_target = SQLDropStmt::Target::TABLE;
+    else if (try_expect(SQLToken::KW_DATABASE)) drop_target = SQLDropStmt::Target::DATABASE;
     else {
         auto token = get_cur_token_or_signal_eof();
         TRY(token);

@@ -153,7 +153,7 @@ TEST(SQLParser, drop_database_stmt) {
     auto drop_stmt = parser.drop_stmt();
     ASSERT_TRUE(drop_stmt.has_value());
 
-    EXPECT_EQ(drop_stmt.value->target, SQLDropStmt::DATABASE);
+    EXPECT_EQ(drop_stmt.value->target, SQLDropStmt::Target::DATABASE);
     EXPECT_EQ(drop_stmt.value->name, "MyDb"_sv);
 }
 
@@ -165,7 +165,7 @@ TEST(SQLParser, drop_table_stmt) {
     auto drop_stmt = parser.drop_stmt();
     ASSERT_TRUE(drop_stmt.has_value());
 
-    EXPECT_EQ(drop_stmt.value->target, SQLDropStmt::TABLE);
+    EXPECT_EQ(drop_stmt.value->target, SQLDropStmt::Target::TABLE);
     EXPECT_EQ(drop_stmt.value->name, "MyTable"_sv);
 }
 
