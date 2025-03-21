@@ -205,8 +205,9 @@ Optional<SQLDropStmt*> SQLParser::drop_stmt() {
 
     SQLDropStmt::Target drop_target;
 
-    if (try_expect(SQLToken::KW_TABLE))         drop_target = SQLDropStmt::Target::TABLE;
-    else if (try_expect(SQLToken::KW_DATABASE)) drop_target = SQLDropStmt::Target::DATABASE;
+    if (try_expect(SQLToken::KW_TABLE)) drop_target = SQLDropStmt::Target::TABLE;
+    else if (try_expect(SQLToken::KW_DATABASE))
+        drop_target = SQLDropStmt::Target::DATABASE;
     else {
         auto token = get_cur_token_or_signal_eof();
         TRY(token);
@@ -221,6 +222,27 @@ Optional<SQLDropStmt*> SQLParser::drop_stmt() {
     TRY(expect(SQLToken::SEMICOLON));
 
     return SQLDropStmt::alloc(arena, drop_target, name.value.data.to_string(arena));
+}
+
+Optional<SQLCreateStmt*> SQLParser::create_stmt() {
+    TRY(expect(SQLToken::KW_CREATE));
+
+    SQLCreateStmt::Target create_target;
+
+    if (try_expect(SQLToken::KW_DATABASE)) create_target = SQLCreateStmt::Target::DATABASE;
+    else {
+        auto token = get_cur_token_or_signal_eof();
+        TRY(token);
+        SET_TOKEN_MISMATCH(token.value, SQLToken::KW_CREATE);
+        return {};
+    }
+
+    auto name = expect(SQLToken::IDENT);
+    TRY(name);
+
+    TRY(expect(SQLToken::SEMICOLON));
+
+    return SQLCreateStmt::alloc(arena, create_target, name.value.data.to_string(arena));
 }
 
 Optional<SQLExpr*> SQLParser::expression() {

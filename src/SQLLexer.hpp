@@ -21,7 +21,8 @@ using ok::Table;
     X("DELETE", KW_DELETE)                                                                                             \
     X("DROP", KW_DROP)                                                                                                 \
     X("TABLE", KW_TABLE)                                                                                               \
-    X("DATABASE", KW_DATABASE)
+    X("DATABASE", KW_DATABASE)                                                                                         \
+    X("CREATE", KW_CREATE)
 
 #define XMDB_ENUM_SQL_TOKENS                                                                                           \
     X("comma", COMMA)                                                                                                  \

@@ -169,6 +169,18 @@ TEST(SQLParser, drop_table_stmt) {
     EXPECT_EQ(drop_stmt.value->name, "MyTable"_sv);
 }
 
+TEST(SQLParser, CREATE_database_stmt) {
+    ok::ArenaAllocator arena{};
+    auto source = "CREATE DATABASE MyDb;"_sv;
+    SQLParser parser{&arena, source};
+
+    auto CREATE_stmt = parser.create_stmt();
+    ASSERT_TRUE(CREATE_stmt.has_value());
+
+    EXPECT_EQ(CREATE_stmt.value->target, SQLCreateStmt::Target::DATABASE);
+    EXPECT_EQ(CREATE_stmt.value->name, "MyDb"_sv);
+}
+
 TEST(SQLParser, eof_error) {
     ok::ArenaAllocator arena{};
     auto source = ""_sv;

@@ -12,6 +12,7 @@ struct SQLStmt {
         UPDATE,
         DELETE,
         DROP,
+        CREATE,
     };
 
     Type type;
@@ -118,6 +119,23 @@ struct SQLDropStmt : public SQLStmt {
     static SQLDropStmt* alloc(ok::Allocator* allocator, Target target, ok::String name) {
         auto* stmt = allocator->alloc<SQLDropStmt>();
         stmt->type = DROP;
+        stmt->target = target;
+        stmt->name = name;
+        return stmt;
+    }
+
+    Target target;
+    ok::String name;
+};
+
+struct SQLCreateStmt : public SQLStmt {
+    enum class Target : uint8_t {
+        DATABASE,
+    };
+
+    static SQLCreateStmt* alloc(ok::Allocator* allocator, Target target, ok::String name) {
+        auto* stmt = allocator->alloc<SQLCreateStmt>();
+        stmt->type = CREATE;
         stmt->target = target;
         stmt->name = name;
         return stmt;
