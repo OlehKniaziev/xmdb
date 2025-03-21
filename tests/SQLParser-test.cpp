@@ -145,6 +145,30 @@ TEST(SQLParser, delete_stmt_without_filter) {
     EXPECT_FALSE(delete_stmt.value->filter.has_value());
 }
 
+TEST(SQLParser, drop_database_stmt) {
+    ok::ArenaAllocator arena{};
+    auto source = "DROP DATABASE MyDb;"_sv;
+    SQLParser parser{&arena, source};
+
+    auto drop_stmt = parser.drop_stmt();
+    ASSERT_TRUE(drop_stmt.has_value());
+
+    EXPECT_EQ(drop_stmt.value->target, SQLDropStmt::DATABASE);
+    EXPECT_EQ(drop_stmt.value->name, "MyDb"_sv);
+}
+
+TEST(SQLParser, drop_table_stmt) {
+    ok::ArenaAllocator arena{};
+    auto source = "DROP TABLE MyTable;"_sv;
+    SQLParser parser{&arena, source};
+
+    auto drop_stmt = parser.drop_stmt();
+    ASSERT_TRUE(drop_stmt.has_value());
+
+    EXPECT_EQ(drop_stmt.value->target, SQLDropStmt::TABLE);
+    EXPECT_EQ(drop_stmt.value->name, "MyTable"_sv);
+}
+
 TEST(SQLParser, eof_error) {
     ok::ArenaAllocator arena{};
     auto source = ""_sv;

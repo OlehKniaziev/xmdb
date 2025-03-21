@@ -18,7 +18,10 @@ using ok::Table;
     X("VALUES", KW_VALUES)                                                                                             \
     X("UPDATE", KW_UPDATE)                                                                                             \
     X("SET", KW_SET)                                                                                                   \
-    X("DELETE", KW_DELETE)
+    X("DELETE", KW_DELETE)                                                                                             \
+    X("DROP", KW_DROP)                                                                                                 \
+    X("TABLE", KW_TABLE)                                                                                               \
+    X("DATABASE", KW_DATABASE)
 
 #define XMDB_ENUM_SQL_TOKENS                                                                                           \
     X("comma", COMMA)                                                                                                  \

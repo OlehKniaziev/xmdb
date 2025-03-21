@@ -11,6 +11,7 @@ struct SQLStmt {
         INSERT,
         UPDATE,
         DELETE,
+        DROP,
     };
 
     Type type;
@@ -106,6 +107,24 @@ struct SQLDeleteStmt : public SQLStmt {
 
     SQLExpr* table;
     ok::Optional<SQLExpr*> filter;
+};
+
+struct SQLDropStmt : public SQLStmt {
+    enum Target : uint8_t {
+        TABLE,
+        DATABASE,
+    };
+
+    static SQLDropStmt* alloc(ok::Allocator* allocator, Target target, ok::String name) {
+        auto* stmt = allocator->alloc<SQLDropStmt>();
+        stmt->type = DROP;
+        stmt->target = target;
+        stmt->name = name;
+        return stmt;
+    }
+
+    Target target;
+    ok::String name;
 };
 }; // namespace xmdb
 

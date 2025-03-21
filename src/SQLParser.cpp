@@ -200,6 +200,29 @@ Optional<SQLDeleteStmt*> SQLParser::delete_stmt() {
     return SQLDeleteStmt::alloc(arena, table_expr.value, filter_expr);
 }
 
+Optional<SQLDropStmt*> SQLParser::drop_stmt() {
+    TRY(expect(SQLToken::KW_DROP));
+
+    SQLDropStmt::Target drop_target;
+
+    if (try_expect(SQLToken::KW_TABLE))         drop_target = SQLDropStmt::TABLE;
+    else if (try_expect(SQLToken::KW_DATABASE)) drop_target = SQLDropStmt::DATABASE;
+    else {
+        auto token = get_cur_token_or_signal_eof();
+        TRY(token);
+
+        SET_TOKEN_MISMATCH(token.value, SQLToken::KW_TABLE, SQLToken::KW_DATABASE);
+        return {};
+    }
+
+    auto name = expect(SQLToken::IDENT);
+    TRY(name);
+
+    TRY(expect(SQLToken::SEMICOLON));
+
+    return SQLDropStmt::alloc(arena, drop_target, name.value.data.to_string(arena));
+}
+
 Optional<SQLExpr*> SQLParser::expression() {
     auto token = get_cur_token_or_signal_eof();
     if (!token.has_value()) return {};
