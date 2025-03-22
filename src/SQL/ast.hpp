@@ -19,8 +19,9 @@ struct Stmt {
 };
 
 struct Expr {
-    enum Type {
+    enum Type : uint8_t {
         IDENT,
+        INTEGER_LIT,
     };
 
     Type type;
@@ -35,6 +36,17 @@ struct ExprIdentifier : public Expr {
     }
 
     ok::String value;
+};
+
+struct ExprInteger : public Expr {
+    static ExprInteger* alloc(ok::Allocator* allocator, int64_t value) {
+        auto* expr = allocator->alloc<ExprInteger>();
+        expr->type = INTEGER_LIT;
+        expr->value = value;
+        return expr;
+    }
+
+    int64_t value;
 };
 
 struct SelectStmt : public Stmt {

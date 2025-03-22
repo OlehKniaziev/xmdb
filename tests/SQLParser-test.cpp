@@ -6,13 +6,18 @@ using namespace ok::literals;
 
 TEST(SQLParser, expression) {
     ok::ArenaAllocator arena{};
-    auto source = "some_very_nice_expression"_sv;
+    auto source = "some_very_nice_expression 999"_sv;
     Parser parser{&arena, source};
 
     auto ident = parser.expression();
-    EXPECT_TRUE(ident.has_value());
+    ASSERT_TRUE(ident.has_value());
     EXPECT_EQ(ident.value->type, Expr::IDENT);
     EXPECT_EQ(static_cast<ExprIdentifier*>(ident.value)->value, "some_very_nice_expression"_sv);
+
+    auto integer = parser.expression();
+    ASSERT_TRUE(integer.has_value());
+    EXPECT_EQ(integer.value->type, Expr::INTEGER_LIT);
+    EXPECT_EQ(static_cast<ExprInteger*>(integer.value)->value, 999);
 }
 
 TEST(SQLParser, select_stmt) {

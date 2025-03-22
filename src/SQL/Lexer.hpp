@@ -32,6 +32,7 @@ using ok::Table;
     X("l_paren", L_PAREN)                                                                                              \
     X("r_paren", R_PAREN)                                                                                              \
     X("equals", EQ)                                                                                                    \
+    X("integer_literal", INTEGER)                                                                                      \
     XMDB_ENUM_SQL_KEYWORDS
 
 namespace xmdb::SQL {
@@ -80,6 +81,6 @@ struct Lexer {
     StringView source;
     size_t pos;
 };
-}; // namespace xmdb
+}; // namespace xmdb::SQL
 
 #endif // XMDB_SQLLEXER_H_

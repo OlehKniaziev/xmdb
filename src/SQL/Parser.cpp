@@ -281,6 +281,12 @@ Optional<Expr*> Parser::expression() {
         pos++;
         return ExprIdentifier::alloc(arena, token.value.data);
     }
+    case Token::INTEGER: {
+        pos++;
+        int64_t integer;
+        OK_ASSERT(ok::parse_int64(token.value.data, &integer));
+        return ExprInteger::alloc(arena, integer);
+    }
     default: OK_TODO();
     }
 }

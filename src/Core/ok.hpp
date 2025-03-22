@@ -27,12 +27,13 @@
 #ifndef OK_H_
 #define OK_H_
 
-#include <cstdlib>
-#include <cstdio>
-#include <cstring>
-#include <cstdint>
-#include <cstdarg>
+#include <cctype>
 #include <cerrno>
+#include <cstdarg>
+#include <cstdint>
+#include <cstdio>
+#include <cstdlib>
+#include <cstring>
 #include <fcntl.h>
 #include <sys/types.h>
 
@@ -1015,6 +1016,8 @@ String to_string(Allocator*, uint32_t);
 String to_string(Allocator*, int64_t);
 String to_string(Allocator*, uint64_t);
 
+bool parse_int64(StringView, int64_t*);
+
 #ifdef OK_IMPLEMENTATION
 
 FixedBufferAllocator _temp_allocator_impl{};
@@ -1438,6 +1441,28 @@ String to_string(Allocator* allocator, int64_t input_value) {
     s.data.count = string_count + 1;
 
     return s;
+}
+
+bool parse_int64(StringView source, int64_t* out) {
+    int64_t result = 0;
+    size_t coef = 1;
+
+    for (intptr_t i = source.count - 1; i > 0; --i) {
+        auto c = source[i];
+        if (!is_digit(c)) return false;
+
+        uint8_t digit = c - '0';
+        result += digit * coef;
+        coef *= 10;
+    }
+
+    if (is_digit(source[0])) result += (source[0] - '0') * coef;
+    else if (source[0] == '-') result = -result;
+    else return false;
+
+    *out = result;
+
+    return true;
 }
 
 void println(const char* msg) {

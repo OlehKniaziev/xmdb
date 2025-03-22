@@ -64,7 +64,14 @@ ok::Optional<Token> Lexer::next() {
         return token;
     }
     default: {
-        if (ok::is_digit(cur)) OK_TODO();
+        if (ok::is_digit(cur)) {
+            StringView integer = take_while(ok::is_digit);
+            token.type = Token::INTEGER;
+            token.data = integer;
+            return token;
+        }
+
+        OK_ASSERT(is_valid_ident_char(cur));
 
         StringView ident = take_while(is_valid_ident_char);
 
