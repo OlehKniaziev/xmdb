@@ -35,6 +35,8 @@ using ok::Table;
     X("l_paren", L_PAREN)                                                                                              \
     X("r_paren", R_PAREN)                                                                                              \
     X("equals", EQ)                                                                                                    \
+    X("greater_than", GT)                                                                                              \
+    X("less_than", LT)                                                                                                 \
     X("integer_literal", INTEGER)                                                                                      \
     X("string_literal", STRING)                                                                                        \
     X("unterminated_string", UNTERMINATED_STRING)                                                                      \

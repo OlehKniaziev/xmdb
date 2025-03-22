@@ -63,6 +63,18 @@ ok::Optional<Token> Lexer::next() {
         pos++;
         return token;
     }
+    case '<': {
+        token.type = Token::LT;
+        token.data = source.view(pos, pos + 1);
+        pos++;
+        return token;
+    }
+    case '>': {
+        token.type = Token::GT;
+        token.data = source.view(pos, pos + 1);
+        pos++;
+        return token;
+    }
     case '\'':
     case '"': {
         auto quote = cur;

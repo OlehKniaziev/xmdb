@@ -26,6 +26,7 @@ struct Expr {
         TRUE_LIT,
         FALSE_LIT,
         NULL_LIT,
+        BINARY_OP,
     };
 
     static Expr* true_literal;
@@ -66,6 +67,27 @@ struct ExprString : public Expr {
     }
 
     ok::String value;
+};
+
+struct ExprBinaryOp : public Expr {
+    enum class Kind : uint8_t {
+        EQ,
+        GT,
+        LT,
+    };
+
+    static ExprBinaryOp* alloc(ok::Allocator* allocator, Kind kind, Expr* left, Expr* right) {
+        auto* expr = allocator->alloc<ExprBinaryOp>();
+        expr->type = BINARY_OP;
+        expr->kind = kind;
+        expr->left = left;
+        expr->right = right;
+        return expr;
+    }
+
+    Kind kind;
+    Expr* left;
+    Expr* right;
 };
 
 struct SelectStmt : public Stmt {

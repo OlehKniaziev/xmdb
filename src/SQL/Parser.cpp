@@ -41,6 +41,41 @@ SourceLocation locate_token(StringView source, Token token) {
             .length = (uint32_t) token.data.count,
     };
 }
+
+Optional<Expr*> parse_expression_prim(Parser* parser) {
+    auto token = parser->get_cur_token_or_signal_eof();
+    if (!token.has_value()) return {};
+
+    switch (token.value.type) {
+    case Token::IDENT: {
+        ++parser->pos;
+        return ExprIdentifier::alloc(parser->arena, token.value.data);
+    }
+    case Token::INTEGER: {
+        ++parser->pos;
+        int64_t integer;
+        OK_ASSERT(ok::parse_int64(token.value.data, &integer));
+        return ExprInteger::alloc(parser->arena, integer);
+    }
+    case Token::STRING: {
+        ++parser->pos;
+        return ExprString::alloc(parser->arena, token.value.data.to_string(parser->arena));
+    }
+    case Token::KW_TRUE: {
+        ++parser->pos;
+        return Expr::true_literal;
+    }
+    case Token::KW_FALSE: {
+        ++parser->pos;
+        return Expr::false_literal;
+    }
+    case Token::KW_NULL: {
+        ++parser->pos;
+        return Expr::null_literal;
+    }
+    default: OK_TODO();
+    }
+}
 }; // namespace
 
 Parser::Parser(ok::ArenaAllocator* arena, StringView source) : arena{arena}, source{source} {
@@ -273,37 +308,36 @@ Optional<CreateStmt*> Parser::create_stmt() {
 }
 
 Optional<Expr*> Parser::expression() {
+    auto lhs = parse_expression_prim(this);
+    TRY(lhs);
+
     auto token = get_cur_token_or_signal_eof();
-    if (!token.has_value()) return {};
+
+    if (!token.has_value()) return lhs;
 
     switch (token.value.type) {
-    case Token::IDENT: {
+    case Token::EQ: {
         ++pos;
-        return ExprIdentifier::alloc(arena, token.value.data);
+        auto rhs = expression();
+        TRY(rhs);
+
+        return ExprBinaryOp::alloc(arena, ExprBinaryOp::Kind::EQ, lhs.value, rhs.value);
     }
-    case Token::INTEGER: {
+    case Token::LT: {
         ++pos;
-        int64_t integer;
-        OK_ASSERT(ok::parse_int64(token.value.data, &integer));
-        return ExprInteger::alloc(arena, integer);
+        auto rhs = expression();
+        TRY(rhs);
+
+        return ExprBinaryOp::alloc(arena, ExprBinaryOp::Kind::LT, lhs.value, rhs.value);
     }
-    case Token::STRING: {
+    case Token::GT: {
         ++pos;
-        return ExprString::alloc(arena, token.value.data.to_string(arena));
+        auto rhs = expression();
+        TRY(rhs);
+
+        return ExprBinaryOp::alloc(arena, ExprBinaryOp::Kind::GT, lhs.value, rhs.value);
     }
-    case Token::KW_TRUE: {
-        ++pos;
-        return Expr::true_literal;
-    }
-    case Token::KW_FALSE: {
-        ++pos;
-        return Expr::false_literal;
-    }
-    case Token::KW_NULL: {
-        ++pos;
-        return Expr::null_literal;
-    }
-    default: OK_TODO();
+    default: return lhs;
     }
 }
 
