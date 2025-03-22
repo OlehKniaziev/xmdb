@@ -22,7 +22,10 @@ using ok::Table;
     X("DROP", KW_DROP)                                                                                                 \
     X("TABLE", KW_TABLE)                                                                                               \
     X("DATABASE", KW_DATABASE)                                                                                         \
-    X("CREATE", KW_CREATE)
+    X("CREATE", KW_CREATE)                                                                                             \
+    X("TRUE", KW_TRUE)                                                                                                 \
+    X("FALSE", KW_FALSE)                                                                                               \
+    X("NULL", KW_NULL)
 
 #define XMDB_ENUM_SQL_TOKENS                                                                                           \
     X("comma", COMMA)                                                                                                  \
@@ -32,6 +35,11 @@ using ok::Table;
     X("l_paren", L_PAREN)                                                                                              \
     X("r_paren", R_PAREN)                                                                                              \
     X("equals", EQ)                                                                                                    \
+    X("greater_than", GT)                                                                                              \
+    X("less_than", LT)                                                                                                 \
+    X("integer_literal", INTEGER)                                                                                      \
+    X("string_literal", STRING)                                                                                        \
+    X("unterminated_string", UNTERMINATED_STRING)                                                                      \
     XMDB_ENUM_SQL_KEYWORDS
 
 namespace xmdb::SQL {
@@ -80,6 +88,6 @@ struct Lexer {
     StringView source;
     size_t pos;
 };
-}; // namespace xmdb
+}; // namespace xmdb::SQL
 
 #endif // XMDB_SQLLEXER_H_

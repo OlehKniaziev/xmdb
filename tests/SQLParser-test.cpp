@@ -4,15 +4,84 @@
 using namespace xmdb::SQL;
 using namespace ok::literals;
 
-TEST(SQLParser, expression) {
+TEST(SQLParser, primary_expression) {
     ok::ArenaAllocator arena{};
-    auto source = "some_very_nice_expression"_sv;
+    auto source = R"(some_very_nice_expression 999 "a string literal!" TRUE FALSE NULL)"_sv;
     Parser parser{&arena, source};
 
     auto ident = parser.expression();
-    EXPECT_TRUE(ident.has_value());
+    ASSERT_TRUE(ident.has_value());
     EXPECT_EQ(ident.value->type, Expr::IDENT);
     EXPECT_EQ(static_cast<ExprIdentifier*>(ident.value)->value, "some_very_nice_expression"_sv);
+
+    auto integer = parser.expression();
+    ASSERT_TRUE(integer.has_value());
+    EXPECT_EQ(integer.value->type, Expr::INTEGER_LIT);
+    EXPECT_EQ(static_cast<ExprInteger*>(integer.value)->value, 999);
+
+    auto string = parser.expression();
+    ASSERT_TRUE(string.has_value());
+    EXPECT_EQ(string.value->type, Expr::STRING_LIT);
+    EXPECT_EQ(static_cast<ExprString*>(string.value)->value, "a string literal!"_sv);
+
+    auto true_expr = parser.expression();
+    ASSERT_TRUE(true_expr.has_value());
+    EXPECT_EQ(true_expr.value->type, Expr::TRUE_LIT);
+
+    auto false_expr = parser.expression();
+    ASSERT_TRUE(false_expr.has_value());
+    EXPECT_EQ(false_expr.value->type, Expr::FALSE_LIT);
+
+    auto null_expr = parser.expression();
+    ASSERT_TRUE(null_expr.has_value());
+    EXPECT_EQ(null_expr.value->type, Expr::NULL_LIT);
+}
+
+TEST(SQLParser, binary_expression) {
+    ok::ArenaAllocator arena{};
+    auto source = R"(1 > 2 5 < some_ident 4 = "some_string" 1 = 2 = 3)"_sv;
+    Parser parser{&arena, source};
+
+    auto gt = parser.expression();
+    ASSERT_TRUE(gt.has_value());
+    ASSERT_EQ(gt.value->type, Expr::BINARY_OP);
+
+    auto gt_bin = static_cast<ExprBinaryOp*>(gt.value);
+    ASSERT_EQ(gt_bin->kind, ExprBinaryOp::Kind::GT);
+    EXPECT_EQ(gt_bin->left->type, Expr::INTEGER_LIT);
+    EXPECT_EQ(gt_bin->right->type, Expr::INTEGER_LIT);
+
+    auto lt = parser.expression();
+    ASSERT_TRUE(lt.has_value());
+    ASSERT_EQ(lt.value->type, Expr::BINARY_OP);
+
+    auto lt_bin = static_cast<ExprBinaryOp*>(lt.value);
+    ASSERT_EQ(lt_bin->kind, ExprBinaryOp::Kind::LT);
+    EXPECT_EQ(lt_bin->left->type, Expr::INTEGER_LIT);
+    EXPECT_EQ(lt_bin->right->type, Expr::IDENT);
+
+    auto eq = parser.expression();
+    ASSERT_TRUE(eq.has_value());
+    ASSERT_EQ(eq.value->type, Expr::BINARY_OP);
+
+    auto eq_bin = static_cast<ExprBinaryOp*>(eq.value);
+    ASSERT_EQ(eq_bin->kind, ExprBinaryOp::Kind::EQ);
+    EXPECT_EQ(eq_bin->left->type, Expr::INTEGER_LIT);
+    EXPECT_EQ(eq_bin->right->type, Expr::STRING_LIT);
+
+    auto eq_eq = parser.expression();
+    ASSERT_TRUE(eq_eq.has_value());
+    ASSERT_EQ(eq_eq.value->type, Expr::BINARY_OP);
+
+    auto eq_eq_bin = static_cast<ExprBinaryOp*>(eq_eq.value);
+    ASSERT_EQ(eq_eq_bin->kind, ExprBinaryOp::Kind::EQ);
+    EXPECT_EQ(eq_eq_bin->left->type, Expr::INTEGER_LIT);
+    EXPECT_EQ(eq_eq_bin->right->type, Expr::BINARY_OP);
+
+    auto eq_eq_rhs = static_cast<ExprBinaryOp*>(eq_eq_bin->right);
+    ASSERT_EQ(eq_eq_rhs->kind, ExprBinaryOp::Kind::EQ);
+    EXPECT_EQ(eq_eq_rhs->left->type, Expr::INTEGER_LIT);
+    EXPECT_EQ(eq_eq_rhs->right->type, Expr::INTEGER_LIT);
 }
 
 TEST(SQLParser, select_stmt) {

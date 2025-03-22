@@ -27,12 +27,13 @@
 #ifndef OK_H_
 #define OK_H_
 
-#include <cstdlib>
-#include <cstdio>
-#include <cstring>
-#include <cstdint>
-#include <cstdarg>
+#include <cctype>
 #include <cerrno>
+#include <cstdarg>
+#include <cstdint>
+#include <cstdio>
+#include <cstdlib>
+#include <cstring>
 #include <fcntl.h>
 #include <sys/types.h>
 
@@ -1015,6 +1016,8 @@ String to_string(Allocator*, uint32_t);
 String to_string(Allocator*, int64_t);
 String to_string(Allocator*, uint64_t);
 
+bool parse_int64(StringView, int64_t*);
+
 #ifdef OK_IMPLEMENTATION
 
 FixedBufferAllocator _temp_allocator_impl{};
@@ -1290,20 +1293,21 @@ static inline off_t _lseek(int fd, off_t offset, int whence) {
 }
 
 void File::seek_start() const {
-    off_t seek_res = _lseek(fd, 0, SEEK_END);
+    off_t seek_res = _lseek(fd, 0, SEEK_SET);
     OK_ASSERT(seek_res != (off_t)-1);
 }
 
 off_t File::seek_end() const {
-    off_t seek_res = _lseek(fd, 0, SEEK_SET);
+    off_t seek_res = _lseek(fd, 0, SEEK_END);
     OK_ASSERT(seek_res != (off_t)-1);
 
     return seek_res;
 }
 
 size_t File::size() const {
+    off_t res = seek_end();
     seek_start();
-    return seek_end();
+    return res;
 }
 
 static inline int64_t _read(int fd, void* buffer, size_t count) {
@@ -1438,6 +1442,30 @@ String to_string(Allocator* allocator, int64_t input_value) {
     s.data.count = string_count + 1;
 
     return s;
+}
+
+bool parse_int64(StringView source, int64_t* out) {
+    if (source.count == 0) return false;
+
+    int64_t result = 0;
+    size_t coef = 1;
+
+    for (intptr_t i = source.count - 1; i > 0; --i) {
+        auto c = source[i];
+        if (!is_digit(c)) return false;
+
+        uint8_t digit = c - '0';
+        result += digit * coef;
+        coef *= 10;
+    }
+
+    if (is_digit(source[0])) result += (source[0] - '0') * coef;
+    else if (source[0] == '-') result = -result;
+    else return false;
+
+    *out = result;
+
+    return true;
 }
 
 void println(const char* msg) {

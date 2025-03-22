@@ -6,7 +6,7 @@ using namespace xmdb::SQL;
 using namespace ok::literals;
 
 TEST(Lexer, Next) {
-    Lexer lexer{"SELECT id, name FROM Users"_sv};
+    Lexer lexer{"SELECT id, name, 123 FROM Users"_sv};
 
     EXPECT_EQ(lexer.next().get().type, Token::KW_SELECT);
 
@@ -19,6 +19,12 @@ TEST(Lexer, Next) {
     auto name_token = lexer.next().get();
     EXPECT_EQ(name_token.type, Token::IDENT);
     EXPECT_EQ(name_token.data, "name"_sv);
+
+    EXPECT_EQ(lexer.next().get().type, Token::COMMA);
+
+    auto int_token = lexer.next().get();
+    EXPECT_EQ(int_token.type, Token::INTEGER);
+    EXPECT_EQ(int_token.data, "123"_sv);
 
     EXPECT_EQ(lexer.next().get().type, Token::KW_FROM);
 
