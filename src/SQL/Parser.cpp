@@ -1,5 +1,5 @@
-#include <cstddef>
 #include "Parser.hpp"
+#include <cstddef>
 
 #define TRY(x)                                                                                                         \
     do {                                                                                                               \
@@ -9,8 +9,8 @@
 
 #define SET_TOKEN_MISMATCH(got, ...)                                                                                   \
     do {                                                                                                               \
-        Token::Type expected_arr[] = {__VA_ARGS__};                                                                 \
-        ::ok::Slice<Token::Type> expected = {expected_arr, OK_ARR_LEN(expected_arr)};                               \
+        Token::Type expected_arr[] = {__VA_ARGS__};                                                                    \
+        ::ok::Slice<Token::Type> expected = {expected_arr, OK_ARR_LEN(expected_arr)};                                  \
         set_token_mismatch((got), expected);                                                                           \
     } while (0)
 
@@ -259,7 +259,7 @@ Optional<CreateStmt*> Parser::create_stmt() {
         TRY(expect(Token::R_PAREN));
 
         stmt = CreateTableStmt::alloc(arena, name.value.data.to_string(arena), column_names.slice(),
-                                         column_types.slice());
+                                      column_types.slice());
     } else {
         auto token = get_cur_token_or_signal_eof();
         TRY(token);
@@ -278,14 +278,18 @@ Optional<Expr*> Parser::expression() {
 
     switch (token.value.type) {
     case Token::IDENT: {
-        pos++;
+        ++pos;
         return ExprIdentifier::alloc(arena, token.value.data);
     }
     case Token::INTEGER: {
-        pos++;
+        ++pos;
         int64_t integer;
         OK_ASSERT(ok::parse_int64(token.value.data, &integer));
         return ExprInteger::alloc(arena, integer);
+    }
+    case Token::STRING: {
+        ++pos;
+        return ExprString::alloc(arena, token.value.data.to_string(arena));
     }
     default: OK_TODO();
     }
@@ -367,4 +371,4 @@ void Parser::set_eof() {
     auto message = String::alloc(arena, "unexpected EOF");
     error = Error{message, location};
 }
-}; // namespace xmdb
+}; // namespace xmdb::SQL

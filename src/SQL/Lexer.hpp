@@ -33,6 +33,8 @@ using ok::Table;
     X("r_paren", R_PAREN)                                                                                              \
     X("equals", EQ)                                                                                                    \
     X("integer_literal", INTEGER)                                                                                      \
+    X("string_literal", STRING)                                                                                        \
+    X("unterminated_string", UNTERMINATED_STRING)                                                                      \
     XMDB_ENUM_SQL_KEYWORDS
 
 namespace xmdb::SQL {

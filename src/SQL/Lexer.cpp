@@ -63,6 +63,28 @@ ok::Optional<Token> Lexer::next() {
         pos++;
         return token;
     }
+    case '\'':
+    case '"': {
+        auto quote = cur;
+
+        ++pos;
+
+        auto start = pos;
+        while (pos < source.count && source.data[pos] != quote) ++pos;
+
+        if (pos >= source.count) {
+            token.type = Token::UNTERMINATED_STRING;
+            token.data = source.view(start, pos);
+            return token;
+        }
+
+        token.type = Token::STRING;
+        token.data = source.view(start, pos);
+
+        ++pos;
+
+        return token;
+    }
     default: {
         if (ok::is_digit(cur)) {
             StringView integer = take_while(ok::is_digit);
