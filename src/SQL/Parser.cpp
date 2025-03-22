@@ -291,6 +291,18 @@ Optional<Expr*> Parser::expression() {
         ++pos;
         return ExprString::alloc(arena, token.value.data.to_string(arena));
     }
+    case Token::KW_TRUE: {
+        ++pos;
+        return Expr::true_literal;
+    }
+    case Token::KW_FALSE: {
+        ++pos;
+        return Expr::false_literal;
+    }
+    case Token::KW_NULL: {
+        ++pos;
+        return Expr::null_literal;
+    }
     default: OK_TODO();
     }
 }

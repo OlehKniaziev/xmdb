@@ -6,7 +6,7 @@ using namespace ok::literals;
 
 TEST(SQLParser, expression) {
     ok::ArenaAllocator arena{};
-    auto source = R"(some_very_nice_expression 999 "a string literal!")"_sv;
+    auto source = R"(some_very_nice_expression 999 "a string literal!" TRUE FALSE NULL)"_sv;
     Parser parser{&arena, source};
 
     auto ident = parser.expression();
@@ -21,8 +21,20 @@ TEST(SQLParser, expression) {
 
     auto string = parser.expression();
     ASSERT_TRUE(string.has_value());
-    EXPECT_EQ(string.value->type, Expr::INTEGER_LIT);
+    EXPECT_EQ(string.value->type, Expr::STRING_LIT);
     EXPECT_EQ(static_cast<ExprString*>(string.value)->value, "a string literal!"_sv);
+
+    auto true_expr = parser.expression();
+    ASSERT_TRUE(true_expr.has_value());
+    EXPECT_EQ(true_expr.value->type, Expr::TRUE_LIT);
+
+    auto false_expr = parser.expression();
+    ASSERT_TRUE(false_expr.has_value());
+    EXPECT_EQ(false_expr.value->type, Expr::FALSE_LIT);
+
+    auto null_expr = parser.expression();
+    ASSERT_TRUE(null_expr.has_value());
+    EXPECT_EQ(null_expr.value->type, Expr::NULL_LIT);
 }
 
 TEST(SQLParser, select_stmt) {

@@ -23,7 +23,14 @@ struct Expr {
         IDENT,
         INTEGER_LIT,
         STRING_LIT,
+        TRUE_LIT,
+        FALSE_LIT,
+        NULL_LIT,
     };
+
+    static Expr* true_literal;
+    static Expr* false_literal;
+    static Expr* null_literal;
 
     Type type;
 };
@@ -53,7 +60,7 @@ struct ExprInteger : public Expr {
 struct ExprString : public Expr {
     static ExprString* alloc(ok::Allocator* allocator, ok::String value) {
         auto* expr = allocator->alloc<ExprString>();
-        expr->type = INTEGER_LIT;
+        expr->type = STRING_LIT;
         expr->value = value;
         return expr;
     }

@@ -22,7 +22,10 @@ using ok::Table;
     X("DROP", KW_DROP)                                                                                                 \
     X("TABLE", KW_TABLE)                                                                                               \
     X("DATABASE", KW_DATABASE)                                                                                         \
-    X("CREATE", KW_CREATE)
+    X("CREATE", KW_CREATE)                                                                                             \
+    X("TRUE", KW_TRUE)                                                                                                 \
+    X("FALSE", KW_FALSE)                                                                                               \
+    X("NULL", KW_NULL)
 
 #define XMDB_ENUM_SQL_TOKENS                                                                                           \
     X("comma", COMMA)                                                                                                  \
