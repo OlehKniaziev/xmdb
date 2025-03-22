@@ -45,8 +45,8 @@ foreach(test_file ${test_files})
 
   target_link_libraries(
           ${test_exe_name}
-          xmdb-core
-          xmdb-sql
+          LibCore
+          LibSQL::shared
   )
 
   gtest_discover_tests(${test_exe_name})
