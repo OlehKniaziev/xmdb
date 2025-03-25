@@ -13,6 +13,7 @@ struct Stmt {
         DELETE,
         DROP,
         CREATE,
+        EXPR,
     };
 
     Type type;
@@ -27,6 +28,7 @@ struct Expr {
         FALSE_LIT,
         NULL_LIT,
         BINARY_OP,
+        SELECT,
     };
 
     static Expr* true_literal;
@@ -90,9 +92,9 @@ struct ExprBinaryOp : public Expr {
     Expr* right;
 };
 
-struct SelectStmt : public Stmt {
-    static SelectStmt* alloc(ok::Allocator* allocator, ok::Slice<Expr*> exprs, Expr* table) {
-        auto* stmt = allocator->alloc<SelectStmt>();
+struct ExprSelect : public Expr {
+    static ExprSelect* alloc(ok::Allocator* allocator, ok::Slice<Expr*> exprs, Expr* table) {
+        auto* stmt = allocator->alloc<ExprSelect>();
         stmt->type = SELECT;
         stmt->exprs = exprs;
         stmt->table = table;
@@ -101,6 +103,17 @@ struct SelectStmt : public Stmt {
 
     ok::Slice<Expr*> exprs;
     Expr* table;
+};
+
+struct ExprStmt : public Stmt {
+    static ExprStmt* alloc(ok::Allocator* allocator, Expr* expr) {
+        auto* stmt = allocator->alloc<ExprStmt>();
+        stmt->type = EXPR;
+        stmt->expr = expr;
+        return stmt;
+    }
+
+    Expr* expr;
 };
 
 struct UseStmt : public Stmt {

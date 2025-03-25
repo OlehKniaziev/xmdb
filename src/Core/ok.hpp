@@ -34,6 +34,8 @@
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
+#include <climits>
+
 #include <fcntl.h>
 #include <sys/types.h>
 
@@ -94,6 +96,7 @@
 #include <memoryapi.h>
 #include <heapapi.h>
 #include <io.h>
+#include <share.h>
 
 #undef max
 #undef min
@@ -109,20 +112,74 @@
 #error "Only UNIX-like systems and Windows are supported"
 #endif // platform check
 
-#ifdef __GNUC__
-#define ATTRIBUTE_PRINTF(fmt, args) __attribute__((format(printf, fmt, args)))
+#if SIZE_MAX == UINT32_MAX
+#  define OK_BITS_32
+#elif SIZE_MAX == UINT64_MAX
+#  define OK_BITS_64
 #else
-#define ATTRIBUTE_PRINTF(fmt, args)
+#  error "Could not determine architecture bit size"
+#endif // word size check
+
+using U8 = uint8_t;
+using U16 = uint16_t;
+using U32 = uint32_t;
+using U64 = uint64_t;
+
+using S8 = int8_t;
+using S16 = int16_t;
+using S32 = int32_t;
+using S64 = int64_t;
+
+using F32 = float;
+using F64 = double;
+
+#if defined(OK_BITS_32)
+    using UZ = uint32_t;
+    using SZ = int32_t;
+#elif defined(OK_BITS_64)
+    using UZ = uint64_t;
+    using SZ = int64_t;
+#else
+#error "Could not determine architecture bit size"
+#endif
+
+#ifdef __GNUC__
+#define OK_ATTRIBUTE_PRINTF(fmt, args) __attribute__((format(printf, fmt, args)))
+#else
+#define OK_ATTRIBUTE_PRINTF(fmt, args)
 #endif // __GNUC__
 
 namespace ok {
+// min and max
+template <typename T>
+constexpr const T& max(const T& a) {
+    return a;
+}
+
+template <typename T, typename... Rest>
+constexpr const T& max(const T& x, const Rest&... xs) {
+    const T& xs_max = max(xs...);
+    return x > xs_max ? x : xs_max;
+}
+
+template <typename T>
+constexpr const T& min(const T& a) {
+    return a;
+}
+
+template <typename T, typename... Rest>
+constexpr const T& min(const T& x, const Rest&... xs) {
+    const T& xs_min = min(xs...);
+    return x < xs_min ? x : xs_min;
+}
+
 struct Allocator {
     // required methods
-    virtual void* raw_alloc(size_t size) = 0;
-    virtual void raw_dealloc(void* ptr, size_t size) = 0;
+    virtual void* raw_alloc(UZ size) = 0;
+    virtual void raw_dealloc(void* ptr, UZ size) = 0;
 
     // optional methods
-    virtual void* raw_resize(void* ptr, size_t old_size, size_t new_size) {
+    virtual void* raw_resize(void* ptr, UZ old_size, UZ new_size) {
         void* new_ptr = raw_alloc(new_size);
         memcpy(new_ptr, ptr, old_size);
         raw_dealloc(ptr, old_size);
@@ -131,17 +188,17 @@ struct Allocator {
 
     // provided methods
     template <typename T>
-    inline T* alloc(size_t size = 1) {
+    inline T* alloc(UZ size = 1) {
         return (T*)raw_alloc(sizeof(T) * size);
     }
 
     template <typename T>
-    inline void dealloc(T* ptr, size_t count) {
+    inline void dealloc(T* ptr, UZ count) {
         return raw_dealloc((void*)ptr, count * sizeof(T));
     }
 
     template <typename T>
-    inline T* resize(T* ptr, size_t old_size, size_t new_size) {
+    inline T* resize(T* ptr, UZ old_size, UZ new_size) {
         T* new_ptr = alloc<T>(new_size);
         memcpy((void*)new_ptr, ptr, old_size * sizeof(T));
         dealloc<T>(ptr, old_size);
@@ -153,14 +210,14 @@ extern Allocator* temp_allocator;
 extern Allocator* static_allocator;
 
 struct FixedBufferAllocator : public Allocator {
-    void* raw_alloc(size_t size) override;
-    void raw_dealloc(void* ptr, size_t size) override;
+    void* raw_alloc(UZ size) override;
+    void raw_dealloc(void* ptr, UZ size) override;
 
-    static constexpr size_t DEFAULT_PAGE_COUNT = 5;
+    static constexpr UZ DEFAULT_PAGE_COUNT = 5;
 
     void* buffer;
-    size_t buffer_size;
-    size_t buffer_off;
+    UZ buffer_size;
+    UZ buffer_off;
 };
 
 static inline uintptr_t align_to(uintptr_t size, uintptr_t align) {
@@ -169,34 +226,34 @@ static inline uintptr_t align_to(uintptr_t size, uintptr_t align) {
 
 struct ArenaAllocator : public Allocator {
     struct Region {
-        size_t avail() const {
+        UZ avail() const {
             OK_ASSERT(off <= size);
             return size - off;
         }
 
         Region* next;
         void* data;
-        size_t size;
-        size_t off;
+        UZ size;
+        UZ off;
     };
 
-    void* raw_alloc(size_t size) override;
-    void raw_dealloc(void* ptr, size_t size) override;
-    void* raw_resize(void* ptr, size_t old_size, size_t new_size) override;
+    void* raw_alloc(UZ size) override;
+    void raw_dealloc(void* ptr, UZ size) override;
+    void* raw_resize(void* ptr, UZ old_size, UZ new_size) override;
 
-    Region* alloc_region(size_t size);
+    Region* alloc_region(UZ size);
 
-    inline size_t avail() const {
-        size_t result = 0;
+    inline UZ avail() const {
+        UZ result = 0;
         for (Region* r = head; r != nullptr; r = r->next) result += r->avail();
         return result;
     }
 
-    inline void reserve(size_t bytes) {
-        size_t available_bytes = avail();
+    inline void reserve(UZ bytes) {
+        UZ available_bytes = avail();
 
         if (available_bytes < bytes) {
-            size_t bytes_needed = bytes - available_bytes;
+            UZ bytes_needed = bytes - available_bytes;
             Region* r = alloc_region(bytes_needed);
             r->next = head;
             head = r;
@@ -216,24 +273,56 @@ struct ArenaAllocator : public Allocator {
 };
 
 // templates
-#define OK_LIST_GROW_FACTOR(x) ((((x) + 1) * 3) >> 1)
-
 template <typename T>
 struct Slice;
 
+template <typename T, UZ N>
+struct Array {
+    T items[N];
+
+    Slice<T> slice(UZ start, UZ end) const {
+        OK_ASSERT(start <= end);
+        OK_ASSERT(end <= N);
+
+        return Slice<T>{items + start, end - start};
+    }
+
+    Slice<T> slice(UZ start) const {
+        return slice(start, N);
+    }
+
+    Slice<T> slice() const {
+        return slice(0, N);
+    }
+
+    inline T& operator [](UZ idx) {
+        OK_ASSERT(idx < N);
+
+        return items[idx];
+    }
+
+    inline const T& operator [](UZ idx) const {
+        OK_ASSERT(idx < N);
+
+        return items[idx];
+    }
+};
+
+#define OK_LIST_GROW_FACTOR(x) ((((x) + 1) * 3) >> 1)
+
 template <typename T>
 struct List {
-    static List<T> alloc(Allocator* a, size_t cap = List::DEFAULT_CAP);
+    static List<T> alloc(Allocator* a, UZ cap = List::DEFAULT_CAP);
 
-    static constexpr size_t DEFAULT_CAP = 7;
+    static constexpr UZ DEFAULT_CAP = 7;
 
     void push(const T& item);
     void extend(List<T> other);
-    void remove_at(size_t idx);
+    void remove_at(UZ idx);
 
-    List<T> copy(Allocator* a, size_t start, size_t end) const;
+    List<T> copy(Allocator* a, UZ start, UZ end) const;
 
-    inline List<T> copy(Allocator* a, size_t start) const {
+    inline List<T> copy(Allocator* a, UZ start) const {
         return copy(a, start, count);
     }
 
@@ -241,14 +330,14 @@ struct List {
         return copy(a, 0, count);
     }
 
-    void reserve(size_t new_cap);
+    void reserve(UZ new_cap);
 
-    size_t find_index(const T& elem);
+    UZ find_index(const T& elem);
     template <typename F>
-    size_t find_index(F pred);
+    UZ find_index(F pred);
 
-    Slice<T> slice(size_t start, size_t end) const;
-    Slice<T> slice(size_t start) const;
+    Slice<T> slice(UZ start, UZ end) const;
+    Slice<T> slice(UZ start) const;
     Slice<T> slice() const;
 
     template <typename Dest>
@@ -261,32 +350,32 @@ struct List {
         return list;
     }
 
-    inline T& operator [](size_t idx) {
+    inline T& operator [](UZ idx) {
         OK_ASSERT(idx < count);
 
         return items[idx];
     }
 
-    inline const T& operator [](size_t idx) const {
+    inline const T& operator [](UZ idx) const {
         OK_ASSERT(idx < count);
 
         return items[idx];
     }
 
     T* items;
-    size_t count;
-    size_t capacity;
+    UZ count;
+    UZ capacity;
     Allocator* allocator;
 };
 
 template <typename T>
 struct Slice {
-    inline Slice<T> slice(size_t start, size_t end) const {
+    inline Slice<T> slice(UZ start, UZ end) const {
         OK_ASSERT(end >= start);
         return Slice<T>{items + start, end - start};
     }
 
-    inline Slice<T> slice(size_t start) const {
+    inline Slice<T> slice(UZ start) const {
         return slice(start, count);
     }
 
@@ -298,14 +387,14 @@ struct Slice {
         return slice;
     }
 
-    inline const T& operator [](size_t idx) const {
+    inline const T& operator [](UZ idx) const {
         OK_ASSERT(idx < count);
 
         return items[idx];
     }
 
     const T* items;
-    size_t count;
+    UZ count;
 };
 
 // char predicates
@@ -321,32 +410,37 @@ struct String;
 struct StringView {
     StringView() = default;
 
-    constexpr StringView(const char* data, size_t count) : data{data}, count{count} {}
+    constexpr StringView(const char* data, UZ count) : data{data}, count{count} {}
     explicit constexpr StringView(const char* cstr) : StringView{cstr, strlen(cstr)} {}
 
     String to_string(Allocator* a) const;
 
-    inline StringView view(size_t start, size_t end) const {
+    inline StringView view(UZ start, UZ end) const {
         OK_ASSERT(end >= start);
         return StringView{data + start, end - start};
     }
 
-    inline StringView view(size_t start) const {
+    inline StringView view(UZ start) const {
         return view(start, count);
+    }
+
+    inline constexpr auto operator <=>(const StringView& other) const {
+        UZ min_length = min(count, other.count);
+        for (UZ i = 0; i < min_length; ++i) {
+            if (data[i] < other[i]) return -1;
+            if (data[i] > other[i]) return 1;
+        }
+        return 0;
     }
 
     inline bool operator ==(const StringView rhs) const {
         if (count != rhs.count) return false;
 
-        for (size_t i = 0; i < count; i++) {
+        for (UZ i = 0; i < count; i++) {
             if (data[i] != rhs.data[i]) return false;
         }
 
         return true;
-    }
-
-    inline bool operator!=(const StringView & string_view) const {
-        return !(*this == string_view);
     }
 
     bool operator ==(const String& string) const;
@@ -355,39 +449,39 @@ struct StringView {
         return !(*this == string);
     }
 
-    inline const char& operator [](size_t idx) const {
+    inline const char& operator [](UZ idx) const {
         OK_ASSERT(idx < count);
         return data[idx];
     }
 
     const char* data;
-    size_t count;
+    UZ count;
 };
 
 inline namespace literals {
-constexpr StringView operator ""_sv(const char* cstr, size_t len) {
+constexpr StringView operator ""_sv(const char* cstr, UZ len) {
     return StringView{cstr, len};
 }
 };
 
 struct String {
     static constexpr char NULL_CHAR = '\0';
-    static constexpr size_t DEFAULT_CAPACITY = 7;
+    static constexpr UZ DEFAULT_CAPACITY = 7;
 
-    static String alloc(Allocator* a, size_t capacity = DEFAULT_CAPACITY);
+    static String alloc(Allocator* a, UZ capacity = DEFAULT_CAPACITY);
 
-    static String alloc(Allocator* a, const char* data, size_t data_len);
+    static String alloc(Allocator* a, const char* data, UZ data_len);
     static String alloc(Allocator* a, const char* data);
 
-    static String from(List<uint8_t>);
+    static String from(List<U8>);
     static String from(List<char>);
 
-    static String format(Allocator* a, const char* fmt, ...) ATTRIBUTE_PRINTF(2, 3);
+    static String format(Allocator* a, const char* fmt, ...) OK_ATTRIBUTE_PRINTF(2, 3);
 
     void append(StringView);
     void append(String);
 
-    void format_append(const char*, ...) ATTRIBUTE_PRINTF(2, 3);
+    void format_append(const char*, ...) OK_ATTRIBUTE_PRINTF(2, 3);
 
     bool starts_with(StringView);
 
@@ -395,14 +489,14 @@ struct String {
         return reinterpret_cast<const char*>(data.items);
     }
 
-    inline StringView view(size_t start, size_t end) const {
+    inline StringView view(UZ start, UZ end) const {
         OK_ASSERT(start < count());
         OK_ASSERT(end >= start);
 
         return StringView{data.items + start, end - start};
     }
 
-    inline StringView view(size_t start) const {
+    inline StringView view(UZ start) const {
         return view(start, count());
     }
 
@@ -421,15 +515,15 @@ struct String {
         data[data.count - 2] = character;
     }
 
-    inline void reserve(size_t chars) {
-        size_t available_size = count();
+    inline void reserve(UZ chars) {
+        UZ available_size = count();
 
         if (available_size >= chars) return;
 
         data.reserve(chars + 1);
     }
 
-    inline size_t count() const {
+    inline UZ count() const {
         OK_ASSERT(data.count != 0);
         return data.count - 1;
     }
@@ -450,13 +544,13 @@ struct String {
         return !(*this == other);
     }
 
-    inline char& operator [](size_t idx) {
+    inline char& operator [](UZ idx) {
         OK_ASSERT(idx < count());
 
         return data.items[idx];
     }
 
-    inline const char& operator [](size_t idx) const {
+    inline const char& operator [](UZ idx) const {
         OK_ASSERT(idx < count());
 
         return data.items[idx];
@@ -468,25 +562,29 @@ struct String {
 template <template <typename> class Self, typename T>
 struct OptionalBase {
     const T& or_else(const T& other) const {
-        auto* self = cast();
+        auto* self = self_cast();
 
         if (self->has_value()) return self->get_unchecked();
         return other;
     }
 
     T& or_else(T& other) {
-        auto* self = cast();
+        auto* self = self_cast();
 
         if (self->has_value(this)) return self->get_unchecked();
         return other;
     }
 
-    Self<T>* cast() {
+    Self<T>* self_cast() {
         return static_cast<Self<T>*>(this);
     }
 
-    const Self<T>* cast() const {
+    const Self<T>* self_cast() const {
         return static_cast<const Self<T>*>(this);
+    }
+
+    operator bool() const {
+        return self_cast()->has_value();
     }
 };
 
@@ -553,6 +651,15 @@ struct Optional<T*> : public OptionalBase<Optional, T> {
         return get_unchecked();
     }
 
+    template <typename Base>
+    inline Optional<Base*> upcast() {
+        return Optional<Base*>{static_cast<Base*>(value)};
+    }
+
+    template <typename Base>
+    inline Optional<const Base*> upcast() const {
+        return Optional<const Base*>{static_cast<const Base*>(value)};
+    }
 
     T* value;
 
@@ -561,14 +668,14 @@ struct Optional<T*> : public OptionalBase<Optional, T> {
 
 static_assert(sizeof(Optional<int*>) == sizeof(int*));
 
-template <typename A, typename B> 
+template <typename A, typename B>
 struct Pair {
     A a;
     B b;
 };
 
 namespace hash {
-uint64_t fnv1(StringView);
+U64 fnv1(StringView);
 };
 
 template <typename T>
@@ -584,35 +691,35 @@ struct HashPtr {
 // Default hash implementations
 template <typename T>
 struct Hash<HashPtr<T>> {
-    static uint64_t hash(const HashPtr<T>& ptr) {
+    static U64 hash(const HashPtr<T>& ptr) {
         return Hash<T>::hash(*ptr.value);
     }
 };
 
 template <>
-struct Hash<uint32_t> {
-    static uint64_t hash(const uint32_t& val) {
+struct Hash<U32> {
+    static U64 hash(const U32& val) {
         return val;
     }
 };
 
 template <>
-struct Hash<size_t> {
-    static uint64_t hash(const size_t& val) {
+struct Hash<UZ> {
+    static U64 hash(const UZ& val) {
         return val;
     }
 };
 
 template <>
 struct Hash<StringView> {
-    static uint64_t hash(StringView sv) {
+    static U64 hash(StringView sv) {
         return ::ok::hash::fnv1(sv);
     }
 };
 
 template <>
 struct Hash<String> {
-    static uint64_t hash(String string) {
+    static U64 hash(String string) {
         return ::ok::hash::fnv1(string.view());
     }
 };
@@ -627,7 +734,7 @@ bool operator ==(const HashPtr<T>& lhs, const HashPtr<T>& rhs);
 #define OK_TABLE_GROWTH_FACTOR(x) (((x) + 1) * 3)
 
 #define OK_TABLE_FOREACH(tab, key, value, code) do { \
-    for (size_t _tab_i = 0; _tab_i < (tab).capacity; _tab_i++) {\
+    for (UZ _tab_i = 0; _tab_i < (tab).capacity; _tab_i++) {\
     if (OK_TAB_IS_FREE((tab).meta[_tab_i])) continue; \
     auto key = (tab).keys[_tab_i]; \
     auto value = (tab).values[_tab_i]; \
@@ -637,25 +744,25 @@ bool operator ==(const HashPtr<T>& lhs, const HashPtr<T>& rhs);
 
 template <typename K, typename V>
 struct Table {
-    using Meta = uint8_t;
+    using Meta = U8;
 
-    static Table<K, V> alloc(Allocator* a, size_t capacity = Table::DEFAULT_CAPACITY);
+    static Table<K, V> alloc(Allocator* a, UZ capacity = Table::DEFAULT_CAPACITY);
 
     void put(const K& key, const V& value);
     Optional<V> get(const K& key);
     bool has(const K& key);
 
-    static constexpr size_t DEFAULT_CAPACITY = 47;
+    static constexpr UZ DEFAULT_CAPACITY = 47;
 
-    inline uint8_t load_percentage() const {
-        return (uint8_t)((double)(count * 100) / (double)capacity);
+    inline U8 load_percentage() const {
+        return (U8)((double)(count * 100) / (double)capacity);
     }
 
     K* keys;
     V* values;
-    uint8_t* meta;
-    size_t count;
-    size_t capacity;
+    U8* meta;
+    UZ count;
+    UZ capacity;
     Allocator* allocator;
 };
 
@@ -663,24 +770,24 @@ struct Table {
 
 template <typename T>
 struct Set {
-    using Meta = uint8_t;
+    using Meta = U8;
 
-    static constexpr size_t DEFAULT_CAPACITY = 47;
+    static constexpr UZ DEFAULT_CAPACITY = 47;
 
-    static Set<T> alloc(Allocator* a, size_t capacity = DEFAULT_CAPACITY);
+    static Set<T> alloc(Allocator* a, UZ capacity = DEFAULT_CAPACITY);
 
     void put(const T& elem);
     bool has(const T& elem) const;
 
-    inline uint8_t load_percentage() const {
-        return (uint8_t)(100.0 * (double)count / (double)capacity);
+    inline U8 load_percentage() const {
+        return (U8)(100.0 * (double)count / (double)capacity);
     }
 
     Allocator* allocator;
-    size_t capacity;
-    size_t count;
+    UZ capacity;
+    UZ count;
     T* values;
-    uint8_t* meta;
+    U8* meta;
 };
 
 // HASH IMPLEMENTATION
@@ -698,7 +805,7 @@ const Optional<T> Optional<T*>::NONE = Optional<T*>{};
 
 // LIST IMPLEMENTATION
 template <typename T>
-List<T> List<T>::alloc(Allocator* a, size_t cap) {
+List<T> List<T>::alloc(Allocator* a, UZ cap) {
     List<T> list{};
     list.items = a->alloc<T>(cap);
     list.count = 0;
@@ -711,7 +818,7 @@ List<T> List<T>::alloc(Allocator* a, size_t cap) {
 template <typename T>
 void List<T>::push(const T& item) {
     if (count >= capacity) {
-        size_t new_capacity = OK_LIST_GROW_FACTOR(capacity);
+        UZ new_capacity = OK_LIST_GROW_FACTOR(capacity);
         items = allocator->resize<T>(items, capacity, new_capacity);
         capacity = new_capacity;
     }
@@ -720,10 +827,10 @@ void List<T>::push(const T& item) {
 }
 
 template <typename T>
-inline void List<T>::remove_at(size_t idx) {
+inline void List<T>::remove_at(UZ idx) {
     OK_ASSERT(idx < count);
 
-    for (size_t i = idx; i < count - 1; i++) {
+    for (UZ i = idx; i < count - 1; i++) {
         items[i] = items[i + 1];
     }
 
@@ -731,11 +838,11 @@ inline void List<T>::remove_at(size_t idx) {
 }
 
 template <typename T>
-inline List<T> List<T>::copy(Allocator* a, size_t start, size_t end) const {
+inline List<T> List<T>::copy(Allocator* a, UZ start, UZ end) const {
     OK_ASSERT(end >= start);
 
     auto res = List<T>::alloc(a, end - start);
-    for (size_t i = start; i < end; i++) {
+    for (UZ i = start; i < end; i++) {
         res.push(items[i]);
     }
     return res;
@@ -745,13 +852,13 @@ template <typename T>
 inline void List<T>::extend(List<T> other) {
     reserve(capacity + other.capacity);
 
-    for (size_t i = 0; i < other.count; i++) {
+    for (UZ i = 0; i < other.count; i++) {
         push(other.items[i]);
     }
 }
 
 template <typename T>
-inline void List<T>::reserve(size_t new_cap) {
+inline void List<T>::reserve(UZ new_cap) {
     if (new_cap <= capacity) {
         return;
     }
@@ -761,36 +868,36 @@ inline void List<T>::reserve(size_t new_cap) {
 }
 
 template <typename T>
-inline size_t List<T>::find_index(const T& elem) {
-    for (size_t i = 0; i < count; i++) {
+inline UZ List<T>::find_index(const T& elem) {
+    for (UZ i = 0; i < count; i++) {
         if (items[i] == elem) {
             return i;
         }
     }
 
-    return (size_t)-1;
+    return (UZ)-1;
 }
 
 template <typename T>
 template <typename F>
-inline size_t List<T>::find_index(F pred) {
-    for (size_t i = 0; i < count; i++) {
+inline UZ List<T>::find_index(F pred) {
+    for (UZ i = 0; i < count; i++) {
         if (pred(items[i])) {
             return i;
         }
     }
 
-    return (size_t)-1;
+    return (UZ)-1;
 }
 
 template <typename T>
-Slice<T> List<T>::slice(size_t start, size_t end) const {
+Slice<T> List<T>::slice(UZ start, UZ end) const {
     OK_ASSERT(end >= start);
     return Slice<T>{items + start, end - start};
 }
 
 template <typename T>
-Slice<T> List<T>::slice(size_t start) const {
+Slice<T> List<T>::slice(UZ start) const {
     return slice(start, count);
 }
 
@@ -801,7 +908,7 @@ Slice<T> List<T>::slice() const {
 
 // TABLE IMPLEMENTATION
 template <typename K, typename V>
-Table<K, V> Table<K, V>::alloc(Allocator* a, size_t capacity) {
+Table<K, V> Table<K, V>::alloc(Allocator* a, UZ capacity) {
     Table<K, V> tab{};
 
     tab.keys = a->alloc<K>(capacity);
@@ -819,7 +926,7 @@ void Table<K, V>::put(const K& key, const V& value) {
     if (load_percentage() >= 70) {
         auto new_table = Table<K, V>::alloc(allocator, OK_TABLE_GROWTH_FACTOR(capacity));
 
-        for (size_t i = 0; i < capacity; i++) {
+        for (UZ i = 0; i < capacity; i++) {
             if (OK_TAB_IS_OCCUPIED(meta[i])) {
                 new_table.put(keys[i], values[i]);
             }
@@ -828,7 +935,7 @@ void Table<K, V>::put(const K& key, const V& value) {
         *this = new_table;
     }
 
-    uint64_t idx = Hash<K>::hash(key) % capacity;
+    U64 idx = Hash<K>::hash(key) % capacity;
 
     while (true) {
         if (OK_TAB_IS_FREE(meta[idx])) {
@@ -851,8 +958,8 @@ void Table<K, V>::put(const K& key, const V& value) {
 
 template <typename K, typename V>
 Optional<V> Table<K, V>::get(const K& key) {
-    uint64_t idx = Hash<K>::hash(key) % capacity;
-    uint64_t initial_idx = idx;
+    U64 idx = Hash<K>::hash(key) % capacity;
+    U64 initial_idx = idx;
 
     do {
         if (OK_TAB_IS_OCCUPIED(meta[idx]) && keys[idx] == key) {
@@ -867,8 +974,8 @@ Optional<V> Table<K, V>::get(const K& key) {
 
 template <typename K, typename V>
 bool Table<K, V>::has(const K& key) {
-    uint64_t idx = Hash<K>::hash(key) % capacity;
-    uint64_t initial_idx = idx;
+    U64 idx = Hash<K>::hash(key) % capacity;
+    U64 initial_idx = idx;
 
     do {
         if (OK_TAB_IS_OCCUPIED(meta[idx]) && keys[idx] == key) {
@@ -883,7 +990,7 @@ bool Table<K, V>::has(const K& key) {
 
 // SET IMPLEMENTATION
 template <typename T>
-Set<T> Set<T>::alloc(Allocator* a, size_t capacity) {
+Set<T> Set<T>::alloc(Allocator* a, UZ capacity) {
     Set<T> set;
     set.allocator = a;
     set.count = 0;
@@ -898,7 +1005,7 @@ void Set<T>::put(const T& elem) {
     if (load_percentage() >= 70) {
         auto new_set = Set<T>::alloc(allocator, OK_SET_GROWTH_FACTOR(capacity));
 
-        for (size_t i = 0; i < capacity; i++) {
+        for (UZ i = 0; i < capacity; i++) {
             if (OK_TAB_IS_FREE(meta[i])) {
                 continue;
             }
@@ -909,7 +1016,7 @@ void Set<T>::put(const T& elem) {
         *this = new_set;
     }
 
-    uint64_t hash = Hash<T>::hash(elem);
+    U64 hash = Hash<T>::hash(elem);
 
     while (true) {
         if (OK_TAB_IS_FREE(meta[hash])) {
@@ -930,8 +1037,8 @@ void Set<T>::put(const T& elem) {
 
 template <typename T>
 bool Set<T>::has(const T& elem) const {
-    uint64_t hash = Hash<T>::hash(elem);
-    uint64_t idx = hash;
+    U64 hash = Hash<T>::hash(elem);
+    U64 idx = hash;
 
     do {
         if (OK_TAB_IS_OCCUPIED(meta[idx]) && values[idx] == elem) {
@@ -970,39 +1077,17 @@ struct File {
     void seek_start() const;
     off_t seek_end() const;
 
-    Optional<ReadError> read(uint8_t* buf, size_t count);
+    Optional<ReadError> read(U8* buf, UZ count, UZ* n_read);
 
-    Optional<ReadError> read_full(Allocator* a, List<uint8_t>* out);
+    Optional<ReadError> read_full(Allocator* a, List<U8>* out);
 
-    size_t size() const;
+    UZ size() const;
 
     int fd;
     const char* path;
 };
 
 // procedures
-template <typename T>
-const T& max(const T& a) {
-    return a;
-}
-
-template <typename T, typename... Rest>
-const T& max(const T& x, const Rest&... xs) {
-    const T& xs_max = max(xs...);
-    return x > xs_max ? x : xs_max;
-}
-
-template <typename T>
-const T& min(const T& a) {
-    return a;
-}
-
-template <typename T, typename... Rest>
-const T& min(const T& x, const Rest&... xs) {
-    const T& xs_min = min(xs...);
-    return x < xs_min ? x : xs_min;
-}
-
 void println(const char*);
 void println(StringView);
 void println(String);
@@ -1011,12 +1096,12 @@ void eprintln(const char*);
 void eprintln(String);
 void eprintln(StringView);
 
-String to_string(Allocator*, int32_t);
-String to_string(Allocator*, uint32_t);
-String to_string(Allocator*, int64_t);
-String to_string(Allocator*, uint64_t);
+String to_string(Allocator*, S32);
+String to_string(Allocator*, U32);
+String to_string(Allocator*, S64);
+String to_string(Allocator*, U64);
 
-bool parse_int64(StringView, int64_t*);
+bool parse_int64(StringView, S64*);
 
 #ifdef OK_IMPLEMENTATION
 
@@ -1026,8 +1111,8 @@ Allocator* temp_allocator = &_temp_allocator_impl;
 ArenaAllocator _static_allocator_impl{};
 Allocator* static_allocator = &_static_allocator_impl;
 
-static void _init_region(ArenaAllocator::Region* region, size_t size) {
-    region->data = (uint8_t*)OK_ALLOC_PAGE(size);
+static void _init_region(ArenaAllocator::Region* region, UZ size) {
+    region->data = (U8*)OK_ALLOC_PAGE(size);
     OK_ASSERT(region->data != (void*)-1);
     region->size = size;
     region->off = 0;
@@ -1035,7 +1120,7 @@ static void _init_region(ArenaAllocator::Region* region, size_t size) {
 }
 
 // ALLOCATORS IMPLEMENTATION
-void* FixedBufferAllocator::raw_alloc(size_t size) {
+void* FixedBufferAllocator::raw_alloc(UZ size) {
     size = align_to(size, sizeof(void*));
 
     if (buffer == nullptr) {
@@ -1052,16 +1137,16 @@ void* FixedBufferAllocator::raw_alloc(size_t size) {
         return buffer;
     }
 
-    auto* ptr = (uint8_t*)buffer + buffer_off;
+    auto* ptr = (U8*)buffer + buffer_off;
     buffer_off += size;
     return (void*)ptr;
 }
 
-void FixedBufferAllocator::raw_dealloc(void* ptr, size_t size) {
-    if (ptr == (void*)((uint8_t*)buffer + buffer_off)) buffer_off -= size;
+void FixedBufferAllocator::raw_dealloc(void* ptr, UZ size) {
+    if (ptr == (void*)((U8*)buffer + buffer_off)) buffer_off -= size;
 }
 
-ArenaAllocator::Region* ArenaAllocator::alloc_region(size_t region_size) {
+ArenaAllocator::Region* ArenaAllocator::alloc_region(UZ region_size) {
     using Region = ArenaAllocator::Region;
 
     region_size = align_to(region_size, OK_PAGE_ALIGN);
@@ -1070,7 +1155,7 @@ ArenaAllocator::Region* ArenaAllocator::alloc_region(size_t region_size) {
 
     while (current_region) {
         if (current_region->size - current_region->off >= sizeof(Region)) {
-            auto* region = (Region*)((uint8_t*)current_region->data + current_region->off);
+            auto* region = (Region*)((U8*)current_region->data + current_region->off);
 
             _init_region(region, region_size);
 
@@ -1096,14 +1181,14 @@ ArenaAllocator::Region* ArenaAllocator::alloc_region(size_t region_size) {
     return resulting_region;
 }
 
-void* ArenaAllocator::raw_alloc(size_t size) {
+void* ArenaAllocator::raw_alloc(UZ size) {
     ArenaAllocator::Region* region_head = this->head;
 
     size = align_to(size, sizeof(void*));
 
     while (region_head) {
         if (region_head->size - region_head->off >= size) {
-            void* ptr = (void*)((uint8_t*)region_head->data + region_head->off);
+            void* ptr = (void*)((U8*)region_head->data + region_head->off);
             region_head->off += size;
             return ptr;
         }
@@ -1111,22 +1196,22 @@ void* ArenaAllocator::raw_alloc(size_t size) {
         region_head = region_head->next;
     }
 
-    size_t region_size = align_to(size, OK_PAGE_ALIGN);
+    UZ region_size = align_to(size, OK_PAGE_ALIGN);
     region_head = alloc_region(region_size);
     region_head->next = this->head;
     this->head = region_head;
 
-    void* ptr = (void*)((uint8_t*)region_head->data + region_head->off);
+    void* ptr = (void*)((U8*)region_head->data + region_head->off);
     region_head->off += size;
     return ptr;
 }
 
-void ArenaAllocator::raw_dealloc(void* ptr, size_t size) {
+void ArenaAllocator::raw_dealloc(void* ptr, UZ size) {
     OK_UNUSED(ptr);
     OK_UNUSED(size);
 }
 
-void* ArenaAllocator::raw_resize(void* old_ptr, size_t old_size, size_t new_size) {
+void* ArenaAllocator::raw_resize(void* old_ptr, UZ old_size, UZ new_size) {
     auto* new_ptr = raw_alloc(new_size);
     memcpy(new_ptr, old_ptr, old_size);
     return new_ptr;
@@ -1134,7 +1219,7 @@ void* ArenaAllocator::raw_resize(void* old_ptr, size_t old_size, size_t new_size
 
 // STRING IMPLEMENTATION
 
-String String::alloc(Allocator* a, size_t capacity) {
+String String::alloc(Allocator* a, UZ capacity) {
     String s;
     s.data = List<char>::alloc(a, capacity + 1);
     s.data.push(NULL_CHAR);
@@ -1142,16 +1227,16 @@ String String::alloc(Allocator* a, size_t capacity) {
     return s;
 }
 
-String String::alloc(Allocator* a, const char* data, size_t data_len) {
+String String::alloc(Allocator* a, const char* data, UZ data_len) {
     auto s = String::alloc(a, data_len);
 
-    for (size_t i = 0; i < data_len; i++) s.push((char)data[i]);
+    for (UZ i = 0; i < data_len; i++) s.push((char)data[i]);
 
     return s;
 }
 
 String String::alloc(Allocator* a, const char* data) {
-    size_t data_len = strlen((const char*)data);
+    UZ data_len = strlen((const char*)data);
     return String::alloc(a, data, data_len);
 }
 
@@ -1162,7 +1247,7 @@ String String::from(List<char> chars) {
     return s;
 }
 
-String String::from(List<uint8_t> bytes) {
+String String::from(List<U8> bytes) {
     List<char> chars = bytes.cast<char>();
     return String::from(chars);
 }
@@ -1196,12 +1281,12 @@ String String::format(Allocator* a, const char* fmt, ...) {
 }
 
 void String::append(StringView sv) {
-    for (size_t i = 0; i < sv.count; ++i) push(sv.data[i]);
+    for (UZ i = 0; i < sv.count; ++i) push(sv.data[i]);
 }
 
 void String::append(String str) {
-    size_t str_count = str.count();
-    for (size_t i = 0; i < str_count; ++i) push(str.data.items[i]);
+    UZ str_count = str.count();
+    for (UZ i = 0; i < str_count; ++i) push(str.data.items[i]);
 }
 
 void String::format_append(const char* fmt, ...) {
@@ -1216,7 +1301,7 @@ void String::format_append(const char* fmt, ...) {
     }
     va_end(sprintf_args);
 
-    size_t bytes_needed = count() + required_buf_size;
+    UZ bytes_needed = count() + required_buf_size;
     reserve(bytes_needed);
 
     va_start(sprintf_args, fmt);
@@ -1233,7 +1318,7 @@ void String::format_append(const char* fmt, ...) {
 bool String::starts_with(StringView prefix) {
     if (count() < prefix.count) return false;
 
-    for (size_t i = 0; i < prefix.count; i++) {
+    for (UZ i = 0; i < prefix.count; i++) {
         if (data.items[i] != prefix.data[i]) return false;
     }
 
@@ -1304,13 +1389,13 @@ off_t File::seek_end() const {
     return seek_res;
 }
 
-size_t File::size() const {
+UZ File::size() const {
     off_t res = seek_end();
     seek_start();
     return res;
 }
 
-static inline int64_t _read(int fd, void* buffer, size_t count) {
+static inline S64 _read(int fd, void* buffer, UZ count) {
 #if OK_UNIX
     return ::read(fd, buffer, count);
 #elif OK_WINDOWS
@@ -1318,8 +1403,8 @@ static inline int64_t _read(int fd, void* buffer, size_t count) {
 #endif // OK_UNIX
 }
 
-Optional<File::ReadError> File::read(uint8_t* buf, size_t count) {
-    int64_t r = ok::_read(fd, buf, count);
+Optional<File::ReadError> File::read(U8* buf, UZ count, UZ* n_read) {
+    S64 r = ok::_read(fd, buf, count);
 
     if (r < 0) {
         switch (errno) {
@@ -1329,26 +1414,35 @@ Optional<File::ReadError> File::read(uint8_t* buf, size_t count) {
         }
     }
 
+    *n_read = r;
+
     return {};
 }
 
-Optional<File::ReadError> File::read_full(Allocator* a, List<uint8_t>* out) {
-    size_t sz = size();
-    *out = List<uint8_t>::alloc(a, sz);
-    out->count = sz;
-    return read(out->items, sz);
+Optional<File::ReadError> File::read_full(Allocator* a, List<U8>* out) {
+    UZ sz = size();
+    *out = List<U8>::alloc(a, sz);
+
+    UZ n_read;
+    auto err = read(out->items, sz, &n_read);
+
+    if (err.has_value()) return err;
+
+    out->count = n_read;
+
+    return {};
 }
 
 // PROCEDURES IMPLEMENTATION
-String to_string(Allocator* allocator, uint32_t value) {
+String to_string(Allocator* allocator, U32 value) {
     String s = String::alloc(allocator, 10);
 
-    uint32_t value_copy = value;
+    U32 value_copy = value;
     int idx = 0;
 
     while (value_copy /= 10) idx++;
 
-    size_t string_count = idx + 1;
+    UZ string_count = idx + 1;
 
     do {
         char digit = value % 10;
@@ -1362,23 +1456,23 @@ String to_string(Allocator* allocator, uint32_t value) {
     return s;
 }
 
-String to_string(Allocator* allocator, int32_t input_value) {
+String to_string(Allocator* allocator, S32 input_value) {
     String s = String::alloc(allocator, 10);
 
-    uint32_t value = input_value;
+    U32 value = input_value;
     int idx = 0;
 
     if (input_value < 0) {
         s.push('-');
-        value = (uint32_t)-input_value;
+        value = (U32)-input_value;
         idx = 1;
     }
 
-    uint32_t value_copy = value;
+    U32 value_copy = value;
 
     while (value_copy /= 10) idx++;
 
-    size_t string_count = idx + 1;
+    UZ string_count = idx + 1;
 
     do {
         char digit = value % 10;
@@ -1392,15 +1486,15 @@ String to_string(Allocator* allocator, int32_t input_value) {
     return s;
 }
 
-String to_string(Allocator* allocator, uint64_t value) {
+String to_string(Allocator* allocator, U64 value) {
     String s = String::alloc(allocator, 10);
 
-    uint64_t value_copy = value;
+    U64 value_copy = value;
     int idx = 0;
 
     while (value_copy /= 10) idx++;
 
-    size_t string_count = idx + 1;
+    UZ string_count = idx + 1;
 
     do {
         char digit = value % 10;
@@ -1414,10 +1508,10 @@ String to_string(Allocator* allocator, uint64_t value) {
     return s;
 }
 
-String to_string(Allocator* allocator, int64_t input_value) {
+String to_string(Allocator* allocator, S64 input_value) {
     String s = String::alloc(allocator, 10);
 
-    uint64_t value = input_value;
+    U64 value = input_value;
     int idx = 0;
 
     if (input_value < 0) {
@@ -1426,11 +1520,11 @@ String to_string(Allocator* allocator, int64_t input_value) {
         idx = 1;
     }
 
-    uint64_t value_copy = value;
+    U64 value_copy = value;
 
     while (value_copy /= 10) idx++;
 
-    size_t string_count = idx + 1;
+    UZ string_count = idx + 1;
 
     do {
         char digit = value % 10;
@@ -1444,17 +1538,17 @@ String to_string(Allocator* allocator, int64_t input_value) {
     return s;
 }
 
-bool parse_int64(StringView source, int64_t* out) {
+bool parse_int64(StringView source, S64* out) {
     if (source.count == 0) return false;
 
-    int64_t result = 0;
-    size_t coef = 1;
+    S64 result = 0;
+    UZ coef = 1;
 
     for (intptr_t i = source.count - 1; i > 0; --i) {
         auto c = source[i];
         if (!is_digit(c)) return false;
 
-        uint8_t digit = c - '0';
+        U8 digit = c - '0';
         result += digit * coef;
         coef *= 10;
     }
@@ -1510,17 +1604,17 @@ bool is_alpha(char c) {
 
 // HASHES IMPLEMENTATION
 namespace hash {
-uint64_t fnv1(StringView sv) {
-    constexpr const uint64_t fnv_offset_basis = 0xCBF29CE484222325;
-    constexpr const uint64_t fnv_prime = 0x100000001B3;
+U64 fnv1(StringView sv) {
+    constexpr const U64 fnv_offset_basis = 0xCBF29CE484222325;
+    constexpr const U64 fnv_prime = 0x100000001B3;
 
-    uint64_t hash = fnv_offset_basis;
+    U64 hash = fnv_offset_basis;
 
-    for (size_t i = 0; i < sv.count; ++i) {
+    for (UZ i = 0; i < sv.count; ++i) {
         hash *= fnv_prime;
 
-        uint8_t byte = sv.data[i];
-        hash ^= (uint64_t)byte;
+        U8 byte = sv.data[i];
+        hash ^= (U64)byte;
     }
 
     return hash;

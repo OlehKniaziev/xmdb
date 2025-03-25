@@ -42,6 +42,30 @@ SourceLocation locate_token(StringView source, Token token) {
     };
 }
 
+Optional<ExprSelect*> parse_select_expr(Parser* p) {
+    TRY(p->expect(Token::KW_SELECT));
+
+    auto exprs = ok::List<Expr*>::alloc(p->arena);
+
+    while (true) {
+        auto expr = p->expression();
+        TRY(expr);
+
+        exprs.push(expr.value);
+
+        if (!p->try_expect(Token::COMMA)) break;
+    }
+
+    TRY(p->expect(Token::KW_FROM));
+
+    auto table_expr = p->expression();
+    TRY(table_expr);
+
+    TRY(p->expect(Token::SEMICOLON));
+
+    return ExprSelect::alloc(p->arena, exprs.slice(), table_expr.value);
+}
+
 Optional<Expr*> parse_expression_prim(Parser* parser) {
     auto token = parser->get_cur_token_or_signal_eof();
     if (!token.has_value()) return {};
@@ -73,6 +97,8 @@ Optional<Expr*> parse_expression_prim(Parser* parser) {
         ++parser->pos;
         return Expr::null_literal;
     }
+    case Token::KW_SELECT: return parse_select_expr(parser).upcast<Expr>();
+
     default: OK_TODO();
     }
 }
@@ -87,34 +113,6 @@ Parser::Parser(ok::ArenaAllocator* arena, StringView source) : arena{arena}, sou
     }
 
     this->tokens = tokens.slice();
-}
-
-Optional<SelectStmt*> Parser::select_stmt() {
-    TRY(expect(Token::KW_SELECT));
-
-    auto exprs = ok::List<Expr*>::alloc(arena);
-
-    while (true) {
-        auto expr = expression();
-        if (!expr.has_value()) return {};
-
-        exprs.push(expr.value);
-
-        if (!try_expect(Token::COMMA)) break;
-    }
-
-    TRY(expect(Token::KW_FROM));
-
-    auto table_expr = expression();
-    if (!table_expr.has_value()) return {};
-
-    auto* select_stmt = arena->alloc<SelectStmt>();
-    select_stmt->exprs = exprs.slice();
-    select_stmt->table = table_expr.value;
-
-    TRY(expect(Token::SEMICOLON));
-
-    return select_stmt;
 }
 
 Optional<UseStmt*> Parser::use_stmt() {

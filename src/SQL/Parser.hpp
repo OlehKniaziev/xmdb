@@ -14,7 +14,7 @@ struct Parser {
 
     explicit Parser(ok::ArenaAllocator*, StringView);
 
-    Optional<SelectStmt*> select_stmt();
+    Optional<Stmt*> stmt();
     Optional<UseStmt*> use_stmt();
     Optional<InsertStmt*> insert_stmt();
     Optional<UpdateStmt*> update_stmt();

@@ -84,21 +84,22 @@ TEST(SQLParser, binary_expression) {
     EXPECT_EQ(eq_eq_rhs->right->type, Expr::INTEGER_LIT);
 }
 
-TEST(SQLParser, select_stmt) {
+TEST(SQLParser, select_expr) {
     ok::ArenaAllocator arena{};
     auto source = "SELECT id, name FROM test;"_sv;
     Parser parser{&arena, source};
 
-    auto select = parser.select_stmt();
-    EXPECT_TRUE(select.has_value());
+    auto select = parser.expression();
+    ASSERT_TRUE(select.has_value());
+    ASSERT_TRUE(select.value->type == Expr::SELECT);
 
-    auto select_stmt = select.value;
+    auto select_expr = static_cast<ExprSelect*>(select.value);
 
-    EXPECT_EQ(select_stmt->exprs.count, 2);
-    EXPECT_EQ(select_stmt->exprs[0]->type, Expr::IDENT);
-    EXPECT_EQ(select_stmt->exprs[1]->type, Expr::IDENT);
+    EXPECT_EQ(select_expr->exprs.count, 2);
+    EXPECT_EQ(select_expr->exprs[0]->type, Expr::IDENT);
+    EXPECT_EQ(select_expr->exprs[1]->type, Expr::IDENT);
 
-    EXPECT_EQ(select_stmt->table->type, Expr::IDENT);
+    EXPECT_EQ(select_expr->table->type, Expr::IDENT);
 }
 
 TEST(SQLParser, use_stmt) {
@@ -300,12 +301,12 @@ TEST(SQLParser, token_mismatch_error) {
     auto source = "not_select error FROM parser_errors"_sv;
     Parser parser{&arena, source};
 
-    auto opt_stmt = parser.select_stmt();
+    auto opt_stmt = parser.delete_stmt();
     EXPECT_FALSE(opt_stmt.has_value());
     EXPECT_TRUE(parser.error.has_value());
 
     auto error = parser.error.value;
-    EXPECT_EQ(error.message, "expected a token of type SELECT, but got identifier instead"_sv);
+    EXPECT_EQ(error.message, "expected a token of type DELETE, but got identifier instead"_sv);
 
     auto expected_location = xmdb::SourceLocation{1, 1, (uint32_t) strlen("not_select")};
     EXPECT_EQ(error.location, expected_location);
