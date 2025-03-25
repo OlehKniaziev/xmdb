@@ -42,7 +42,7 @@ SourceLocation locate_token(StringView source, Token token) {
     };
 }
 
-Optional<ExprSelect*> parse_select_expr(Parser* p) {
+Optional<SelectExpr*> parse_select_expr(Parser* p) {
     TRY(p->expect(Token::KW_SELECT));
 
     auto exprs = ok::List<Expr*>::alloc(p->arena);
@@ -63,7 +63,7 @@ Optional<ExprSelect*> parse_select_expr(Parser* p) {
 
     TRY(p->expect(Token::SEMICOLON));
 
-    return ExprSelect::alloc(p->arena, exprs.slice(), table_expr.value);
+    return SelectExpr::alloc(p->arena, exprs.slice(), table_expr.value);
 }
 
 Optional<Expr*> parse_expression_prim(Parser* parser) {
@@ -73,17 +73,17 @@ Optional<Expr*> parse_expression_prim(Parser* parser) {
     switch (token.value.type) {
     case Token::IDENT: {
         ++parser->pos;
-        return ExprIdentifier::alloc(parser->arena, token.value.data);
+        return IdentifierExpr::alloc(parser->arena, token.value.data);
     }
     case Token::INTEGER: {
         ++parser->pos;
         int64_t integer;
         OK_ASSERT(ok::parse_int64(token.value.data, &integer));
-        return ExprInteger::alloc(parser->arena, integer);
+        return IntegerExpr::alloc(parser->arena, integer);
     }
     case Token::STRING: {
         ++parser->pos;
-        return ExprString::alloc(parser->arena, token.value.data.to_string(parser->arena));
+        return StringExpr::alloc(parser->arena, token.value.data.to_string(parser->arena));
     }
     case Token::KW_TRUE: {
         ++parser->pos;
@@ -319,21 +319,21 @@ Optional<Expr*> Parser::expression() {
         auto rhs = expression();
         TRY(rhs);
 
-        return ExprBinaryOp::alloc(arena, ExprBinaryOp::Kind::EQ, lhs.value, rhs.value);
+        return BinaryOpExpr::alloc(arena, BinaryOpExpr::Kind::EQ, lhs.value, rhs.value);
     }
     case Token::LT: {
         ++pos;
         auto rhs = expression();
         TRY(rhs);
 
-        return ExprBinaryOp::alloc(arena, ExprBinaryOp::Kind::LT, lhs.value, rhs.value);
+        return BinaryOpExpr::alloc(arena, BinaryOpExpr::Kind::LT, lhs.value, rhs.value);
     }
     case Token::GT: {
         ++pos;
         auto rhs = expression();
         TRY(rhs);
 
-        return ExprBinaryOp::alloc(arena, ExprBinaryOp::Kind::GT, lhs.value, rhs.value);
+        return BinaryOpExpr::alloc(arena, BinaryOpExpr::Kind::GT, lhs.value, rhs.value);
     }
     default: return lhs;
     }

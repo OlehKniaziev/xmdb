@@ -38,9 +38,9 @@ struct Expr {
     Type type;
 };
 
-struct ExprIdentifier : public Expr {
-    static ExprIdentifier* alloc(ok::Allocator* allocator, ok::StringView value) {
-        auto* expr = allocator->alloc<ExprIdentifier>();
+struct IdentifierExpr : public Expr {
+    static IdentifierExpr* alloc(ok::Allocator* allocator, ok::StringView value) {
+        auto* expr = allocator->alloc<IdentifierExpr>();
         expr->type = IDENT;
         expr->value = value.to_string(allocator);
         return expr;
@@ -49,9 +49,9 @@ struct ExprIdentifier : public Expr {
     ok::String value;
 };
 
-struct ExprInteger : public Expr {
-    static ExprInteger* alloc(ok::Allocator* allocator, int64_t value) {
-        auto* expr = allocator->alloc<ExprInteger>();
+struct IntegerExpr : public Expr {
+    static IntegerExpr* alloc(ok::Allocator* allocator, int64_t value) {
+        auto* expr = allocator->alloc<IntegerExpr>();
         expr->type = INTEGER_LIT;
         expr->value = value;
         return expr;
@@ -60,9 +60,9 @@ struct ExprInteger : public Expr {
     int64_t value;
 };
 
-struct ExprString : public Expr {
-    static ExprString* alloc(ok::Allocator* allocator, ok::String value) {
-        auto* expr = allocator->alloc<ExprString>();
+struct StringExpr : public Expr {
+    static StringExpr* alloc(ok::Allocator* allocator, ok::String value) {
+        auto* expr = allocator->alloc<StringExpr>();
         expr->type = STRING_LIT;
         expr->value = value;
         return expr;
@@ -71,15 +71,15 @@ struct ExprString : public Expr {
     ok::String value;
 };
 
-struct ExprBinaryOp : public Expr {
+struct BinaryOpExpr : public Expr {
     enum class Kind : uint8_t {
         EQ,
         GT,
         LT,
     };
 
-    static ExprBinaryOp* alloc(ok::Allocator* allocator, Kind kind, Expr* left, Expr* right) {
-        auto* expr = allocator->alloc<ExprBinaryOp>();
+    static BinaryOpExpr* alloc(ok::Allocator* allocator, Kind kind, Expr* left, Expr* right) {
+        auto* expr = allocator->alloc<BinaryOpExpr>();
         expr->type = BINARY_OP;
         expr->kind = kind;
         expr->left = left;
@@ -92,9 +92,9 @@ struct ExprBinaryOp : public Expr {
     Expr* right;
 };
 
-struct ExprSelect : public Expr {
-    static ExprSelect* alloc(ok::Allocator* allocator, ok::Slice<Expr*> exprs, Expr* table) {
-        auto* stmt = allocator->alloc<ExprSelect>();
+struct SelectExpr : public Expr {
+    static SelectExpr* alloc(ok::Allocator* allocator, ok::Slice<Expr*> exprs, Expr* table) {
+        auto* stmt = allocator->alloc<SelectExpr>();
         stmt->type = SELECT;
         stmt->exprs = exprs;
         stmt->table = table;
