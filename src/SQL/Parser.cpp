@@ -1,12 +1,6 @@
 #include "Parser.hpp"
 #include <cstddef>
 
-#define TRY(x)                                                                                                         \
-    do {                                                                                                               \
-        auto _x = (x);                                                                                                 \
-        if (!_x.has_value()) return {};                                                                                \
-    } while (0)
-
 #define SET_TOKEN_MISMATCH(got, ...)                                                                                   \
     do {                                                                                                               \
         Token::Type expected_arr[] = {__VA_ARGS__};                                                                    \
@@ -113,6 +107,25 @@ Parser::Parser(ok::ArenaAllocator* arena, StringView source) : arena{arena}, sou
     }
 
     this->tokens = tokens.slice();
+}
+
+Optional<Stmt*> Parser::stmt() {
+    auto cur_token = get_cur_token_or_signal_eof();
+    TRY(cur_token);
+
+    switch (cur_token.value.type) {
+    case Token::KW_DELETE: return delete_stmt().upcast<Stmt>();
+    case Token::KW_INSERT: return insert_stmt().upcast<Stmt>();
+    case Token::KW_UPDATE: return update_stmt().upcast<Stmt>();
+    case Token::KW_DROP: return drop_stmt().upcast<Stmt>();
+    case Token::KW_CREATE: return create_stmt().upcast<Stmt>();
+    case Token::KW_USE: return use_stmt().upcast<Stmt>();
+    default: {
+        auto expr = expression();
+        TRY(expr);
+        return ExprStmt::alloc(arena, expr.value);
+    }
+    }
 }
 
 Optional<UseStmt*> Parser::use_stmt() {
@@ -337,6 +350,16 @@ Optional<Expr*> Parser::expression() {
     }
     default: return lhs;
     }
+}
+
+Optional<Query> Parser::query() {
+    auto stmts = ok::List<Stmt*>::alloc(arena);
+    while (!is_eof()) {
+        auto stmt_opt = stmt();
+        TRY(stmt_opt);
+        stmts.push(stmt_opt.value);
+    }
+    return Query{stmts.slice()};
 }
 
 bool Parser::cur_token_is(Token::Type token_type) const {

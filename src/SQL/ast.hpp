@@ -78,18 +78,18 @@ struct BinaryOpExpr : public Expr {
         LT,
     };
 
-    static BinaryOpExpr* alloc(ok::Allocator* allocator, Kind kind, Expr* left, Expr* right) {
+    static BinaryOpExpr* alloc(ok::Allocator* allocator, Kind kind, Expr* lhs, Expr* rhs) {
         auto* expr = allocator->alloc<BinaryOpExpr>();
         expr->type = BINARY_OP;
         expr->kind = kind;
-        expr->left = left;
-        expr->right = right;
+        expr->lhs = lhs;
+        expr->rhs = rhs;
         return expr;
     }
 
     Kind kind;
-    Expr* left;
-    Expr* right;
+    Expr* lhs;
+    Expr* rhs;
 };
 
 struct SelectExpr : public Expr {
@@ -228,6 +228,10 @@ struct CreateTableStmt : public CreateStmt {
 
     ok::Slice<ok::String> column_names;
     ok::Slice<ok::String> column_types;
+};
+
+struct Query {
+    ok::Slice<Stmt*> stmts;
 };
 }; // namespace xmdb
 
