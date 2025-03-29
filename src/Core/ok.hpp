@@ -78,7 +78,9 @@
 #define OK_WINDOWS 0
 
 #include <sys/mman.h>
+#include <sys/wait.h>
 #include <unistd.h>
+#include <spawn.h>
 
 #define OK_ALLOC_PAGE(sz) (mmap(NULL, (sz), PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANON, -1, 0))
 #define OK_DEALLOC_PAGE(page, size) (munmap((page), (size)))
@@ -204,6 +206,14 @@ struct Allocator {
         dealloc<T>(ptr, old_size);
         return new_ptr;
     }
+
+    inline char* strdup(const char* cstr) {
+        UZ len = strlen(cstr);
+        char* result = alloc<char>(len + 1);
+        memcpy((void*)result, cstr, len * sizeof(char));
+        result[len] = '\0';
+        return result;
+    }
 };
 
 extern Allocator* temp_allocator;
@@ -220,8 +230,12 @@ struct FixedBufferAllocator : public Allocator {
     UZ buffer_off;
 };
 
-static inline uintptr_t align_to(uintptr_t size, uintptr_t align) {
+static inline uintptr_t align_up(uintptr_t size, uintptr_t align) {
     return size + ((align - (size & (align - 1))) & (align - 1));
+}
+
+static inline uintptr_t align_down(uintptr_t size, uintptr_t align) {
+    return size - (size & (align - 1));
 }
 
 struct ArenaAllocator : public Allocator {
@@ -276,42 +290,86 @@ struct ArenaAllocator : public Allocator {
 template <typename T>
 struct Slice;
 
-template <typename T, UZ N>
-struct Array {
-    T items[N];
+template <typename Self, typename T>
+struct ArrayBase {
+    Slice<T> slice(UZ start, UZ end);
+    Slice<T> slice(UZ start);
+    Slice<T> slice();
+    Slice<const T> slice(UZ start, UZ end) const;
+    Slice<const T> slice(UZ start) const;
+    Slice<const T> slice() const;
 
-    Slice<T> slice(UZ start, UZ end) const {
-        OK_ASSERT(start <= end);
-        OK_ASSERT(end <= N);
+    UZ find_index(const T& elem) const {
+        auto* self = self_cast();
+        UZ count = self->get_count();
+        const T* items = self->get_items();
 
-        return Slice<T>{items + start, end - start};
+        for (UZ i = 0; i < count; i++) {
+            if (items[i] == elem) {
+                return i;
+            }
+        }
+
+        return (UZ)-1;
     }
 
-    Slice<T> slice(UZ start) const {
-        return slice(start, N);
-    }
+    template <typename F>
+    UZ find_index(F pred) const {
+        auto* self = self_cast();
+        UZ count = self->get_count();
+        const T* items = self->get_items();
 
-    Slice<T> slice() const {
-        return slice(0, N);
+        for (UZ i = 0; i < count; i++) {
+            if (pred(items[i])) {
+                return i;
+            }
+        }
+
+        return (UZ)-1;
     }
 
     inline T& operator [](UZ idx) {
-        OK_ASSERT(idx < N);
-
-        return items[idx];
+        auto* self = self_cast();
+        OK_ASSERT(idx < self->get_count());
+        return self->get_items()[idx];
     }
 
     inline const T& operator [](UZ idx) const {
-        OK_ASSERT(idx < N);
+        auto* self = self_cast();
+        OK_ASSERT(idx < self->get_count());
+        return self->get_items()[idx];
+    }
 
-        return items[idx];
+    Self* self_cast() {
+        return static_cast<Self*>(this);
+    }
+
+    const Self* self_cast() const {
+        return static_cast<const Self*>(this);
+    }
+};
+
+template <typename T, UZ N>
+struct Array : public ArrayBase<Array<T, N>, T> {
+    T items[N];
+
+    UZ get_count() const {
+        return N;
+    }
+
+    T* get_items() {
+        return items;
+    }
+
+    const T* get_items() const {
+        return items;
     }
 };
 
 #define OK_LIST_GROW_FACTOR(x) ((((x) + 1) * 3) >> 1)
 
 template <typename T>
-struct List {
+struct List : public ArrayBase<List<T>, T> {
     static List<T> alloc(Allocator* a, UZ cap = List::DEFAULT_CAP);
 
     static constexpr UZ DEFAULT_CAP = 7;
@@ -336,9 +394,17 @@ struct List {
     template <typename F>
     UZ find_index(F pred);
 
-    Slice<T> slice(UZ start, UZ end) const;
-    Slice<T> slice(UZ start) const;
-    Slice<T> slice() const;
+    UZ get_count() const {
+        return count;
+    }
+
+    T* get_items() {
+        return items;
+    }
+
+    const T* get_items() const {
+        return items;
+    }
 
     template <typename Dest>
     inline List<Dest> cast() {
@@ -355,18 +421,6 @@ struct List {
         return items[--count];
     }
 
-    inline T& operator [](UZ idx) {
-        OK_ASSERT(idx < count);
-
-        return items[idx];
-    }
-
-    inline const T& operator [](UZ idx) const {
-        OK_ASSERT(idx < count);
-
-        return items[idx];
-    }
-
     T* items;
     UZ count;
     UZ capacity;
@@ -374,31 +428,45 @@ struct List {
 };
 
 template <typename T>
-struct Slice {
-    inline Slice<T> slice(UZ start, UZ end) const {
-        OK_ASSERT(end >= start);
-        return Slice<T>{items + start, end - start};
+struct Slice : public ArrayBase<Slice<T>, T> {
+    Slice() = default;
+    Slice(T* items, UZ count) : items{items}, count{count} {}
+
+    UZ get_count() const {
+        return count;
     }
 
-    inline Slice<T> slice(UZ start) const {
-        return slice(start, count);
+    T* get_items() {
+        return items;
+    }
+
+    const T* get_items() const {
+        return items;
+    }
+
+    inline Slice<T> copy(Allocator* allocator) const {
+        T* ptr = allocator->alloc<T>(count);
+        memcpy((void*)ptr, items, count * sizeof(T));
+        return Slice<T>{ptr, count};
     }
 
     template <typename Dest>
-    inline Slice<Dest> cast() const {
+    inline Slice<const Dest> cast() const {
         Slice<Dest> slice;
         slice.items = (const Dest*)items;
         slice.count = count;
         return slice;
     }
 
-    inline const T& operator [](UZ idx) const {
-        OK_ASSERT(idx < count);
-
-        return items[idx];
+    template <typename Dest>
+    inline Slice<Dest> cast() {
+        Slice<Dest> slice;
+        slice.items = (Dest*)items;
+        slice.count = count;
+        return slice;
     }
 
-    const T* items;
+    T* items;
     UZ count;
 };
 
@@ -416,7 +484,7 @@ struct StringView {
     StringView() = default;
 
     constexpr StringView(const char* data, UZ count) : data{data}, count{count} {}
-    explicit constexpr StringView(const char* cstr) : StringView{cstr, strlen(cstr)} {}
+    explicit StringView(const char* cstr) : StringView{cstr, strlen(cstr)} {}
 
     String to_string(Allocator* a) const;
 
@@ -509,7 +577,7 @@ struct String {
         return view(0, count());
     }
 
-    inline String copy(Allocator* a) {
+    inline String copy(Allocator* a) const {
         String s;
         s.data = data.copy(a);
         return s;
@@ -588,7 +656,7 @@ struct OptionalBase {
         return static_cast<const Self<T>*>(this);
     }
 
-    operator bool() const {
+    explicit operator bool() const {
         return self_cast()->has_value();
     }
 };
@@ -684,12 +752,21 @@ U64 fnv1(StringView);
 };
 
 template <typename T>
-struct Hash {};
+struct Hash {
+    static U64 hash(const T& value) {
+        return value.ok_hash_value();
+    }
+};
 
 template <typename T>
 struct HashPtr {
     HashPtr(const T* v) : value{v} {}
     HashPtr(T* v) : value{v} {}
+
+    inline bool operator ==(const T* ptr) const {
+        return *value == *ptr;
+    }
+
     const T* value;
 };
 
@@ -802,6 +879,206 @@ struct Set {
     U8* meta;
 };
 
+// SUBPROCESS API
+struct Command {
+    enum class ExecError {
+        TOO_BIG,
+        ACCESS_DENIED,
+        PROCESS_LIMIT_EXCEEDED,
+        INVALID_EXECUTABLE,
+        IO,
+        LOOP,
+        TOO_MANY_FILES,
+        EXECUTABLE_NOT_FOUND,
+        KERNEL_OUT_OF_MEMORY,
+        INVALID_PATH,
+        BUSY,
+        TERMINATED_BY_SIGNAL,
+        STOPPED,
+        PROCESS_OPEN_FILE_LIMIT_REACHED,
+        SYSTEM_OPEN_FILE_LIMIT_REACHED,
+        OUT_OF_SPACE,
+    };
+
+    static Command alloc(Allocator* allocator, const char* name) {
+        Command cmd;
+        cmd.allocator = allocator;
+        cmd.name = name;
+        cmd.args = List<char*>::alloc(allocator);
+        cmd.envs = List<char*>::alloc(allocator);
+
+        char* name_copy = allocator->strdup(name);
+        cmd.args.push(name_copy);
+
+        return cmd;
+    }
+
+    Command& arg(const char* arg) {
+        if (arg != nullptr) {
+            char* arg_copy = allocator->strdup(arg);
+            args.push(arg_copy);
+        } else {
+            args.push(nullptr);
+        }
+
+        return *this;
+    }
+
+    Command& env(const char* env) {
+        if (env != nullptr) {
+            char* env_copy = allocator->strdup(env);
+            envs.push(env_copy);
+        } else {
+            envs.push(nullptr);
+        }
+
+        return *this;
+    }
+
+    Command& set_stdin(StringView data) {
+        Slice<U8> data_as_slice{(U8*)data.data, data.count};
+        stdin_data = data_as_slice.copy(allocator);
+        return *this;
+    }
+
+
+    Command& set_stdin(Slice<U8> data) {
+        stdin_data = data.copy(allocator);
+        return *this;
+    }
+
+    Optional<ExecError> exec() {
+#if OK_UNIX
+        Optional<ExecError> exec_err{};
+        pid_t child_pid;
+
+        posix_spawn_file_actions_t actions{};
+        posix_spawnattr_t attributes{};
+
+        int stdin_fds[2];
+        UZ stdin_write_count;
+
+        int spawn_ret;
+        int child_status;
+        pid_t wait_ret;
+
+        arg(nullptr);
+        env(nullptr);
+
+        if (pipe(stdin_fds) < -1) {
+            switch (errno) {
+            case EMFILE: exec_err = ExecError::PROCESS_OPEN_FILE_LIMIT_REACHED; goto cleanup;
+            case ENFILE: exec_err = ExecError::SYSTEM_OPEN_FILE_LIMIT_REACHED; goto cleanup;
+            case EFAULT: OK_UNREACHABLE();
+            default: OK_PANIC_FMT("unhandled error %d", errno);
+            }
+        }
+
+        OK_ASSERT(posix_spawn_file_actions_init(&actions) == 0);
+
+        // Close the write end
+        OK_ASSERT(posix_spawn_file_actions_addclose(&actions, stdin_fds[1]) == 0);
+        // Map the read end to stdin
+        OK_ASSERT(posix_spawn_file_actions_adddup2(&actions, stdin_fds[0], STDIN_FILENO) == 0);
+
+        spawn_ret = posix_spawnp(&child_pid, name, &actions, &attributes, args.items, envs.items);
+
+        if (spawn_ret != 0) {
+            switch (spawn_ret) {
+            case E2BIG:    exec_err = ExecError::TOO_BIG; goto cleanup;
+
+            case EPERM:
+            case EACCES:   exec_err = ExecError::ACCESS_DENIED; goto cleanup;
+
+            case EAGAIN:   exec_err = ExecError::PROCESS_LIMIT_EXCEEDED; goto cleanup;
+
+            case ENOEXEC:
+            case ELIBBAD:
+            case EISDIR:
+            case EINVAL:   exec_err = ExecError::INVALID_EXECUTABLE; goto cleanup;
+
+            case EIO:      exec_err = ExecError::IO; goto cleanup;
+            case ELOOP:    exec_err = ExecError::LOOP; goto cleanup;
+            case ENFILE:   exec_err = ExecError::TOO_MANY_FILES; goto cleanup;
+            case ENOENT:   exec_err = ExecError::EXECUTABLE_NOT_FOUND; goto cleanup;
+            case ENOMEM:   exec_err = ExecError::KERNEL_OUT_OF_MEMORY; goto cleanup;
+            case ENOTDIR:  exec_err = ExecError::INVALID_PATH; goto cleanup;
+            case ETXTBSY:  exec_err = ExecError::BUSY; goto cleanup;
+            case EFAULT:   OK_UNREACHABLE();
+            default:       OK_PANIC_FMT("unhandled error %d", spawn_ret);
+            }
+        }
+
+        stdin_write_count = 0;
+        while (stdin_write_count < stdin_data.count) {
+            U8* data = stdin_data.items + stdin_write_count;
+            UZ data_count = stdin_data.count - stdin_write_count;
+
+            SZ write_count = write(stdin_fds[1], data, data_count);
+            if (write_count < 0) {
+                switch (errno) {
+                case EFBIG:  exec_err = ExecError::TOO_BIG; goto cleanup;
+                case EIO:    exec_err = ExecError::IO; goto cleanup;
+                case ENOSPC: exec_err = ExecError::OUT_OF_SPACE; goto cleanup;
+                case EPERM:  exec_err = ExecError::ACCESS_DENIED; goto cleanup;
+                case EPIPE:
+                case EBADFD:
+                case EDESTADDRREQ:
+                case EAGAIN:
+                case EDQUOT:
+                case EINVAL:
+                case EINTR:
+                    OK_UNREACHABLE();
+                default: OK_PANIC_FMT("unhandled error %d", errno);
+                }
+            }
+
+            stdin_write_count += write_count;
+        }
+
+        OK_ASSERT(close(stdin_fds[1]) == 0);
+
+        wait_ret = waitpid(child_pid, &child_status, 0);
+        if (wait_ret == (pid_t)-1) OK_UNREACHABLE();
+
+        if (WIFEXITED(child_status)) {
+            exit_code = WEXITSTATUS(child_status);
+            goto cleanup;
+        }
+
+        if (WIFSIGNALED(child_status)) {
+            term_signal_num = WTERMSIG(child_status);
+            exec_err = ExecError::TERMINATED_BY_SIGNAL;
+            goto cleanup;
+        }
+
+        if (WIFSTOPPED(child_status)) {
+            stop_signal_num = WSTOPSIG(child_status);
+            exec_err = ExecError::STOPPED;
+            goto cleanup;
+        }
+
+cleanup:
+        posix_spawn_file_actions_destroy(&actions);
+
+        return exec_err;
+#else
+        OK_TODO();
+#endif // OS guard
+    }
+
+    Allocator* allocator;
+    const char* name;
+    List<char*> args;
+    List<char*> envs;
+
+    int exit_code;
+    int term_signal_num;
+    int stop_signal_num;
+
+    Slice<U8> stdin_data{};
+};
+
 // HASH IMPLEMENTATION
 template <typename T>
 bool operator ==(const HashPtr<T>& lhs, const HashPtr<T>& rhs) {
@@ -814,6 +1091,53 @@ const Optional<T> Optional<T>::NONE = Optional<T>{};
 
 template <typename T>
 const Optional<T> Optional<T*>::NONE = Optional<T*>{};
+
+// ARRAY BASE IMPLEMENTATION
+template <typename Self, typename T>
+Slice<T> ArrayBase<Self, T>::slice(UZ start, UZ end) {
+    auto* self = self_cast();
+    UZ count = self->get_count();
+
+    OK_ASSERT(end >= start);
+    OK_ASSERT(end <= count);
+
+    return Slice<T>{self->get_items(), end - start};
+}
+
+template <typename Self, typename T>
+Slice<T> ArrayBase<Self, T>::slice(UZ start) {
+    auto* self = self_cast();
+    return slice(start, self->get_count());
+}
+
+template <typename Self, typename T>
+Slice<T> ArrayBase<Self, T>::slice() {
+    auto* self = self_cast();
+    return slice(0, self->get_count());
+}
+
+template <typename Self, typename T>
+Slice<const T> ArrayBase<Self, T>::slice(UZ start, UZ end) const {
+    auto* self = self_cast();
+    UZ count = self->get_count();
+
+    OK_ASSERT(end >= start);
+    OK_ASSERT(end <= count);
+
+    return Slice<const T>{self->get_items(), end - start};
+}
+
+template <typename Self, typename T>
+Slice<const T> ArrayBase<Self, T>::slice(UZ start) const {
+    auto* self = self_cast();
+    return slice(start, self->get_count());
+}
+
+template <typename Self, typename T>
+Slice<const T> ArrayBase<Self, T>::slice() const {
+    auto* self = self_cast();
+    return slice(0, self->get_count());
+}
 
 // LIST IMPLEMENTATION
 template <typename T>
@@ -877,45 +1201,6 @@ inline void List<T>::reserve(UZ new_cap) {
 
     items = allocator->resize<T>(items, capacity, new_cap);
     capacity = new_cap;
-}
-
-template <typename T>
-inline UZ List<T>::find_index(const T& elem) {
-    for (UZ i = 0; i < count; i++) {
-        if (items[i] == elem) {
-            return i;
-        }
-    }
-
-    return (UZ)-1;
-}
-
-template <typename T>
-template <typename F>
-inline UZ List<T>::find_index(F pred) {
-    for (UZ i = 0; i < count; i++) {
-        if (pred(items[i])) {
-            return i;
-        }
-    }
-
-    return (UZ)-1;
-}
-
-template <typename T>
-Slice<T> List<T>::slice(UZ start, UZ end) const {
-    OK_ASSERT(end >= start);
-    return Slice<T>{items + start, end - start};
-}
-
-template <typename T>
-Slice<T> List<T>::slice(UZ start) const {
-    return slice(start, count);
-}
-
-template <typename T>
-Slice<T> List<T>::slice() const {
-    return slice(0, count);
 }
 
 // TABLE IMPLEMENTATION
@@ -1168,11 +1453,11 @@ static void _init_region(ArenaAllocator::Region* region, UZ size) {
 
 // ALLOCATORS IMPLEMENTATION
 void* FixedBufferAllocator::raw_alloc(UZ size) {
-    size = align_to(size, sizeof(void*));
+    size = align_up(size, sizeof(void*));
 
     if (buffer == nullptr) {
         buffer_size = max(size, OK_PAGE_SIZE * FixedBufferAllocator::DEFAULT_PAGE_COUNT);
-        buffer_size = align_to(buffer_size, OK_PAGE_ALIGN);
+        buffer_size = align_up(buffer_size, OK_PAGE_ALIGN);
         buffer = OK_ALLOC_PAGE(buffer_size);
         buffer_off = 0;
     }
@@ -1196,7 +1481,7 @@ void FixedBufferAllocator::raw_dealloc(void* ptr, UZ size) {
 ArenaAllocator::Region* ArenaAllocator::alloc_region(UZ region_size) {
     using Region = ArenaAllocator::Region;
 
-    region_size = align_to(region_size, OK_PAGE_ALIGN);
+    region_size = align_up(region_size, OK_PAGE_ALIGN);
 
     Region* current_region = region_pool;
 
@@ -1206,7 +1491,7 @@ ArenaAllocator::Region* ArenaAllocator::alloc_region(UZ region_size) {
 
             _init_region(region, region_size);
 
-            current_region->off += align_to(sizeof(Region), sizeof(void*));
+            current_region->off += align_up(sizeof(Region), sizeof(void*));
 
             return region;
         }
@@ -1218,7 +1503,7 @@ ArenaAllocator::Region* ArenaAllocator::alloc_region(UZ region_size) {
 
     current_region->data = OK_ALLOC_PAGE(OK_PAGE_SIZE);
     current_region->size = OK_PAGE_SIZE;
-    current_region->off = align_to(sizeof(Region), sizeof(void*));
+    current_region->off = align_up(sizeof(Region), sizeof(void*));
     current_region->next = region_pool;
 
     this->region_pool = current_region;
@@ -1231,7 +1516,7 @@ ArenaAllocator::Region* ArenaAllocator::alloc_region(UZ region_size) {
 void* ArenaAllocator::raw_alloc(UZ size) {
     ArenaAllocator::Region* region_head = this->head;
 
-    size = align_to(size, sizeof(void*));
+    size = align_up(size, sizeof(void*));
 
     while (region_head) {
         if (region_head->size - region_head->off >= size) {
@@ -1243,7 +1528,7 @@ void* ArenaAllocator::raw_alloc(UZ size) {
         region_head = region_head->next;
     }
 
-    UZ region_size = align_to(size, OK_PAGE_ALIGN);
+    UZ region_size = align_up(size, OK_PAGE_ALIGN);
     region_head = alloc_region(region_size);
     region_head->next = this->head;
     this->head = region_head;
@@ -1405,7 +1690,7 @@ Optional<File::OpenError> File::open(File* out, const char* path) {
         case ENXIO:        return OpenError::IS_SOCKET;
         case EOVERFLOW:    return OpenError::FILE_TOO_BIG;
         case EROFS:        return OpenError::READONLY_FILE;
-        case EFAULT:       OK_PANIC_FMT("Parameter 'path' (%p) is not mapped to the current process", path);
+        case EFAULT:       OK_PANIC_FMT("Parameter 'path' (%p) is not mapped to the current process", (void*)path);
         default:           OK_UNREACHABLE();
         }
     }
@@ -1456,7 +1741,7 @@ Optional<File::ReadError> File::read(U8* buf, UZ count, UZ* n_read) {
     if (r < 0) {
         switch (errno) {
         case EIO: return ReadError::IO_ERROR;
-        case EFAULT: OK_PANIC_FMT("The buffer (%p) is mapped outside the current process", buf);
+        case EFAULT: OK_PANIC_FMT("The buffer (%p) is mapped outside the current process", (void*)buf);
         default: OK_UNREACHABLE();
         }
     }

@@ -35,6 +35,12 @@ struct Expr {
     static Expr* false_literal;
     static Expr* null_literal;
 
+    U64 ok_hash_value() const;
+
+    bool operator ==(const Expr&) const;
+
+    ok::String to_string(ok::Allocator*) const;
+
     Type type;
 };
 

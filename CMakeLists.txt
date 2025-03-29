@@ -7,6 +7,8 @@ set(CMAKE_CXX_STANDARD 20)
 
 include_directories(SYSTEM src)
 
+add_compile_options(-Wall -Wextra -Werror -g -O0)
+
 add_subdirectory(src/Core)
 add_subdirectory(src/SQL)
 add_subdirectory(src/Server)
@@ -25,34 +27,33 @@ file(GLOB test_files "tests/*-test.cpp")
 
 include(GoogleTest)
 
+# For Windows: Prevent overriding the parent project's compiler/linker settings
+set(gtest_force_shared_crt ON CACHE BOOL "" FORCE)
+
 foreach(test_file ${test_files})
   string(REGEX REPLACE "^.*/tests/(.*)\\.cpp$" "\\1" test_exe_name ${test_file})
 
   add_executable(
-          ${test_exe_name}
-          ${test_file}
+    ${test_exe_name}
+    ${test_file}
   )
 
   target_include_directories(
-          ${test_exe_name}
-          PUBLIC
-          ${XMDB_SRC_DIR}
+    ${test_exe_name}
+    PUBLIC
+    ${XMDB_SRC_DIR}
   )
 
   target_link_libraries(
-          ${test_exe_name}
-          GTest::gtest_main
+    ${test_exe_name}
+    GTest::gtest_main
   )
 
   target_link_libraries(
-          ${test_exe_name}
-          LibCore
-          LibSQL::shared
+    ${test_exe_name}
+    LibCore
+    LibSQL::shared
   )
 
   gtest_discover_tests(${test_exe_name})
-
 endforeach()
-
-# For Windows: Prevent overriding the parent project's compiler/linker settings
-# set(gtest_force_shared_crt ON CACHE BOOL "" FORCE)
