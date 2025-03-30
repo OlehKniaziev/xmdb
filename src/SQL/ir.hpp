@@ -450,11 +450,12 @@ struct IrContext {
     }
 
     Allocator* allocator;
-    U8 active_db_id = 0;
     List<DBSchema> database_schemas;
     List<U32> table_stack;
     List<Namespace> namespace_stack;
     IREmitter ir_emitter;
+    U32 active_db_id = 0;
+    Optional<String> error{};
 };
 
 bool ir_compile_query(Query*, IrContext*);
