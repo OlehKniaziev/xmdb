@@ -323,7 +323,7 @@ static inline bool is_stmt_graph_optimizable(Stmt* stmt) {
     }
 }
 
-static void to_string(ok::String* string, StmtGraph* g, U32 node_idx) {
+static void to_string(ok::String* string, StmtGraph* g, U32 node_idx, bool type_only = false) {
     auto* node = &g->nodes[node_idx];
 
     if (node->type() == StmtGraphNode::LEAF) {
@@ -334,9 +334,19 @@ static void to_string(ok::String* string, StmtGraph* g, U32 node_idx) {
 
     const char* node_type_str = stmt_graph_node_types_pretty[node->type()];
 
-    for (UZ i = 0; i < node->edges.count; ++i) {
+    string->format_append("\"%s\"", node_type_str);
+
+    if (type_only) {
+        string->push(';');
+        return;
+    }
+
+    string->append(" -> "_sv);
+    to_string(string, g, node->edges[0], true);
+
+    for (UZ i = 1; i < node->edges.count; ++i) {
         string->format_append("\"%s\" -> ", node_type_str);
-        to_string(string, g, node->edges[i]);
+        to_string(string, g, node->edges[i], true);
     }
 }
 
@@ -416,6 +426,8 @@ void compile_graph(StmtGraph* graph, IrContext* ctx) {
     }
 
     dot_src.push('}');
+
+    ok::println(dot_src);
 
     auto dot = ok::Command::alloc(ctx->allocator, "dot");
 
@@ -525,6 +537,13 @@ String stringify_ir(Allocator* allocator, IREmitter* emitter) {
             auto rhs_name = emitter->strings[rhs_instr.operand1];
 
             buffer.format_append("%s := %s %s %s", var_name.cstr(), operator_name, lhs_name.cstr(), rhs_name.cstr());
+            break;
+        }
+        case IRInstruction::CREATE_TABLE: {
+            String table_name = emitter->strings[instr.operand1];
+            auto table_schema = emitter->schemas[instr.operand2];
+
+            buffer.format_append("%s %s <schema at %p>", operator_name, table_name.cstr(), (void*)table_schema);
             break;
         }
         default: OK_PANIC_FMT("don't know how to print the '%s' operator", operator_name);
