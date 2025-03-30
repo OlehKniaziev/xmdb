@@ -37,7 +37,8 @@ SourceLocation locate_token(StringView source, Token token) {
 }
 
 Optional<SelectExpr*> parse_select_expr(Parser* p) {
-    TRY(p->expect(Token::KW_SELECT));
+    Optional<Token> select_token = p->expect(Token::KW_SELECT);
+    TRY(select_token);
 
     auto exprs = ok::List<Expr*>::alloc(p->arena);
 
@@ -57,7 +58,7 @@ Optional<SelectExpr*> parse_select_expr(Parser* p) {
 
     TRY(p->expect(Token::SEMICOLON));
 
-    return SelectExpr::alloc(p->arena, exprs.slice(), table_expr.value);
+    return SelectExpr::alloc(p->arena, select_token.value, exprs.slice(), table_expr.value);
 }
 
 Optional<Expr*> parse_expression_prim(Parser* parser) {
@@ -67,29 +68,30 @@ Optional<Expr*> parse_expression_prim(Parser* parser) {
     switch (token.value.type) {
     case Token::IDENT: {
         ++parser->pos;
-        return IdentifierExpr::alloc(parser->arena, token.value.data);
+        return IdentifierExpr::alloc(parser->arena, token.value, token.value.data);
     }
     case Token::INTEGER: {
         ++parser->pos;
         int64_t integer;
         OK_ASSERT(ok::parse_int64(token.value.data, &integer));
-        return IntegerExpr::alloc(parser->arena, integer);
+        return IntegerExpr::alloc(parser->arena, token.value, integer);
     }
     case Token::STRING: {
         ++parser->pos;
-        return StringExpr::alloc(parser->arena, token.value.data.to_string(parser->arena));
+        String value = token.value.data.to_string(parser->arena);
+        return StringExpr::alloc(parser->arena, token.value, value);
     }
     case Token::KW_TRUE: {
         ++parser->pos;
-        return Expr::true_literal;
+        return Expr::alloc_true(parser->arena, token.value);
     }
     case Token::KW_FALSE: {
         ++parser->pos;
-        return Expr::false_literal;
+        return Expr::alloc_false(parser->arena, token.value);
     }
     case Token::KW_NULL: {
         ++parser->pos;
-        return Expr::null_literal;
+        return Expr::alloc_null(parser->arena, token.value);
     }
     case Token::KW_SELECT: return parse_select_expr(parser).upcast<Expr>();
 
@@ -332,21 +334,21 @@ Optional<Expr*> Parser::expression() {
         auto rhs = expression();
         TRY(rhs);
 
-        return BinaryOpExpr::alloc(arena, BinaryOpExpr::Kind::EQ, lhs.value, rhs.value);
+        return BinaryOpExpr::alloc(arena, token.value, BinaryOpExpr::Kind::EQ, lhs.value, rhs.value);
     }
     case Token::LT: {
         ++pos;
         auto rhs = expression();
         TRY(rhs);
 
-        return BinaryOpExpr::alloc(arena, BinaryOpExpr::Kind::LT, lhs.value, rhs.value);
+        return BinaryOpExpr::alloc(arena, token.value, BinaryOpExpr::Kind::LT, lhs.value, rhs.value);
     }
     case Token::GT: {
         ++pos;
         auto rhs = expression();
         TRY(rhs);
 
-        return BinaryOpExpr::alloc(arena, BinaryOpExpr::Kind::GT, lhs.value, rhs.value);
+        return BinaryOpExpr::alloc(arena, token.value, BinaryOpExpr::Kind::GT, lhs.value, rhs.value);
     }
     default: return lhs;
     }

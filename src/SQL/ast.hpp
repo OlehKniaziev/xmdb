@@ -2,6 +2,7 @@
 #define XMDB_AST_H_
 
 #include <Core/ok.hpp>
+#include "Lexer.hpp"
 
 namespace xmdb::SQL {
 struct Stmt {
@@ -31,9 +32,26 @@ struct Expr {
         SELECT,
     };
 
-    static Expr* true_literal;
-    static Expr* false_literal;
-    static Expr* null_literal;
+    static Expr* alloc_true(ok::Allocator* allocator, Token token) {
+        Expr* expr = allocator->alloc<Expr>();
+        expr->type = TRUE_LIT;
+        expr->token = token;
+        return expr;
+    }
+
+    static Expr* alloc_false(ok::Allocator* allocator, Token token) {
+        Expr* expr = allocator->alloc<Expr>();
+        expr->type = FALSE_LIT;
+        expr->token = token;
+        return expr;
+    }
+
+    static Expr* alloc_null(ok::Allocator* allocator, Token token) {
+        Expr* expr = allocator->alloc<Expr>();
+        expr->type = NULL_LIT;
+        expr->token = token;
+        return expr;
+    }
 
     U64 ok_hash_value() const;
 
@@ -42,12 +60,14 @@ struct Expr {
     ok::String to_string(ok::Allocator*) const;
 
     Type type;
+    Token token;
 };
 
 struct IdentifierExpr : public Expr {
-    static IdentifierExpr* alloc(ok::Allocator* allocator, ok::StringView value) {
+    static IdentifierExpr* alloc(ok::Allocator* allocator, Token token, ok::StringView value) {
         auto* expr = allocator->alloc<IdentifierExpr>();
         expr->type = IDENT;
+        expr->token = token;
         expr->value = value.to_string(allocator);
         return expr;
     }
@@ -56,9 +76,10 @@ struct IdentifierExpr : public Expr {
 };
 
 struct IntegerExpr : public Expr {
-    static IntegerExpr* alloc(ok::Allocator* allocator, int64_t value) {
+    static IntegerExpr* alloc(ok::Allocator* allocator, Token token, int64_t value) {
         auto* expr = allocator->alloc<IntegerExpr>();
         expr->type = INTEGER_LIT;
+        expr->token = token;
         expr->value = value;
         return expr;
     }
@@ -67,9 +88,10 @@ struct IntegerExpr : public Expr {
 };
 
 struct StringExpr : public Expr {
-    static StringExpr* alloc(ok::Allocator* allocator, ok::String value) {
+    static StringExpr* alloc(ok::Allocator* allocator, Token token, ok::String value) {
         auto* expr = allocator->alloc<StringExpr>();
         expr->type = STRING_LIT;
+        expr->token = token;
         expr->value = value;
         return expr;
     }
@@ -84,9 +106,10 @@ struct BinaryOpExpr : public Expr {
         LT,
     };
 
-    static BinaryOpExpr* alloc(ok::Allocator* allocator, Kind kind, Expr* lhs, Expr* rhs) {
+    static BinaryOpExpr* alloc(ok::Allocator* allocator, Token token, Kind kind, Expr* lhs, Expr* rhs) {
         auto* expr = allocator->alloc<BinaryOpExpr>();
         expr->type = BINARY_OP;
+        expr->token = token;
         expr->kind = kind;
         expr->lhs = lhs;
         expr->rhs = rhs;
@@ -99,12 +122,13 @@ struct BinaryOpExpr : public Expr {
 };
 
 struct SelectExpr : public Expr {
-    static SelectExpr* alloc(ok::Allocator* allocator, ok::Slice<Expr*> exprs, Expr* table) {
-        auto* stmt = allocator->alloc<SelectExpr>();
-        stmt->type = SELECT;
-        stmt->exprs = exprs;
-        stmt->table = table;
-        return stmt;
+    static SelectExpr* alloc(ok::Allocator* allocator, Token token, ok::Slice<Expr*> exprs, Expr* table) {
+        auto* expr = allocator->alloc<SelectExpr>();
+        expr->type = SELECT;
+        expr->token = token;
+        expr->exprs = exprs;
+        expr->table = table;
+        return expr;
     }
 
     ok::Slice<Expr*> exprs;
