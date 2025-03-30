@@ -18,6 +18,7 @@ struct Stmt {
     };
 
     Type type;
+    Token token;
 };
 
 struct Expr {
@@ -136,9 +137,10 @@ struct SelectExpr : public Expr {
 };
 
 struct ExprStmt : public Stmt {
-    static ExprStmt* alloc(ok::Allocator* allocator, Expr* expr) {
+    static ExprStmt* alloc(ok::Allocator* allocator, Token token, Expr* expr) {
         auto* stmt = allocator->alloc<ExprStmt>();
         stmt->type = EXPR;
+        stmt->token = token;
         stmt->expr = expr;
         return stmt;
     }
@@ -147,9 +149,10 @@ struct ExprStmt : public Stmt {
 };
 
 struct UseStmt : public Stmt {
-    static UseStmt* alloc(ok::Allocator* allocator, ok::StringView database) {
+    static UseStmt* alloc(ok::Allocator* allocator, Token token, ok::StringView database) {
         auto* stmt = allocator->alloc<UseStmt>();
         stmt->type = USE;
+        stmt->token = token;
         stmt->database = database.to_string(allocator);
         return stmt;
     }
@@ -158,10 +161,11 @@ struct UseStmt : public Stmt {
 };
 
 struct InsertStmt : public Stmt {
-    static InsertStmt* alloc(ok::Allocator* allocator, Expr* table, ok::Slice<ok::String> columns,
+    static InsertStmt* alloc(ok::Allocator* allocator, Token token, Expr* table, ok::Slice<ok::String> columns,
                                 ok::Slice<Expr*> values, ok::Slice<uint32_t> values_counts) {
         auto* stmt = allocator->alloc<InsertStmt>();
         stmt->type = INSERT;
+        stmt->token = token;
         stmt->table = table;
         stmt->columns = columns;
         stmt->values = values;
@@ -176,10 +180,11 @@ struct InsertStmt : public Stmt {
 };
 
 struct UpdateStmt : public Stmt {
-    static UpdateStmt* alloc(ok::Allocator* allocator, Expr* table, ok::Slice<ok::String> columns,
+    static UpdateStmt* alloc(ok::Allocator* allocator, Token token, Expr* table, ok::Slice<ok::String> columns,
                                 ok::Slice<Expr*> values, ok::Optional<Expr*> filter) {
         auto* stmt = allocator->alloc<UpdateStmt>();
         stmt->type = UPDATE;
+        stmt->token = token;
         stmt->table = table;
         stmt->columns = columns;
         stmt->values = values;
@@ -194,9 +199,10 @@ struct UpdateStmt : public Stmt {
 };
 
 struct DeleteStmt : public Stmt {
-    static DeleteStmt* alloc(ok::Allocator* allocator, Expr* table, ok::Optional<Expr*> filter) {
+    static DeleteStmt* alloc(ok::Allocator* allocator, Token token, Expr* table, ok::Optional<Expr*> filter) {
         auto* stmt = allocator->alloc<DeleteStmt>();
         stmt->type = DELETE;
+        stmt->token = token;
         stmt->table = table;
         stmt->filter = filter;
         return stmt;
@@ -212,9 +218,10 @@ struct DropStmt : public Stmt {
         DATABASE,
     };
 
-    static DropStmt* alloc(ok::Allocator* allocator, Target target, ok::String name) {
+    static DropStmt* alloc(ok::Allocator* allocator, Token token, Target target, ok::String name) {
         auto* stmt = allocator->alloc<DropStmt>();
         stmt->type = DROP;
+        stmt->token = token;
         stmt->target = target;
         stmt->name = name;
         return stmt;
@@ -235,9 +242,10 @@ struct CreateStmt : public Stmt {
 };
 
 struct CreateDatabaseStmt : public CreateStmt {
-    static CreateDatabaseStmt* alloc(ok::Allocator* allocator, ok::String name) {
+    static CreateDatabaseStmt* alloc(ok::Allocator* allocator, Token token, ok::String name) {
         auto* stmt = allocator->alloc<CreateDatabaseStmt>();
         stmt->type = CREATE;
+        stmt->token = token;
         stmt->target = Target::DATABASE;
         stmt->name = name;
         return stmt;
@@ -245,10 +253,11 @@ struct CreateDatabaseStmt : public CreateStmt {
 };
 
 struct CreateTableStmt : public CreateStmt {
-    static CreateTableStmt* alloc(ok::Allocator* allocator, ok::String name, ok::Slice<ok::String> column_names,
+    static CreateTableStmt* alloc(ok::Allocator* allocator, Token token, ok::String name, ok::Slice<ok::String> column_names,
                                      ok::Slice<ok::String> column_types) {
         auto* stmt = allocator->alloc<CreateTableStmt>();
         stmt->type = CREATE;
+        stmt->token = token;
         stmt->target = Target::TABLE;
         stmt->name = name;
         stmt->column_names = column_names;

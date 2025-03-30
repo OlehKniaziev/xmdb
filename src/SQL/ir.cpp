@@ -16,7 +16,8 @@ static inline bool compile_use_stmt(UseStmt* stmt, IrContext* ctx) {
         }
     }
 
-    ctx->error = String::format(ctx->allocator, "cannot find database '" OK_SV_FMT "'", OK_SV_ARG(db_name));
+    String error_message = String::format(ctx->allocator, "cannot find database '" OK_SV_FMT "'", OK_SV_ARG(db_name));
+    ctx->error_on(stmt->token, error_message);
     return false;
 }
 
@@ -48,7 +49,8 @@ static Optional<U32> compile_ident(IdentifierExpr* ident, IrContext* ctx) {
         OK_ASSERT(table_schema.has_value());
 
         if (!table_schema.value->find_column(column_name, nullptr)) {
-            ctx->error = String::format(ctx->allocator, "cannot find column '%s'", ident->value.cstr());
+            String error_message = String::format(ctx->allocator, "cannot find column '%s'", ident->value.cstr());
+            ctx->error_on(ident->token, error_message);
             return {};
         }
 
@@ -58,7 +60,8 @@ static Optional<U32> compile_ident(IdentifierExpr* ident, IrContext* ctx) {
         StringView table_name = ident->value.view();
 
         if (!ctx->get_table_schema(ctx->active_db_id, table_name, nullptr)) {
-            ctx->error = String::format(ctx->allocator, "cannot find table '%s'", ident->value.cstr());
+            String error_message = String::format(ctx->allocator, "cannot find table '%s'", ident->value.cstr());
+            ctx->error_on(ident->token, error_message);
             return {};
         }
 
@@ -93,7 +96,7 @@ static Optional<U32> compile_expr(Expr* expr, IrContext* ctx) {
     }
 }
 
-static inline bool parse_type(StringView input, IrContext* ctx, ColumnType* out) {
+static inline bool parse_type(StringView input, Token where, IrContext* ctx, ColumnType* out) {
     if (input == "int"_sv) {
         *out = ColumnType::INTEGER;
         return true;
@@ -104,7 +107,8 @@ static inline bool parse_type(StringView input, IrContext* ctx, ColumnType* out)
         return true;
     }
 
-    ctx->error = String::format(ctx->allocator, "'" OK_SV_FMT "' is not a valid column type", OK_SV_ARG(input));
+    String error_message = String::format(ctx->allocator, "'" OK_SV_FMT "' is not a valid column type", OK_SV_ARG(input));
+    ctx->error_on(where, error_message);
     return false;
 }
 
@@ -112,7 +116,8 @@ static inline bool compile_create_stmt(CreateStmt* stmt, IrContext* ctx) {
     if (stmt->target == CreateStmt::Target::DATABASE) {
         for (UZ i = 0; i < ctx->database_schemas.count; ++i) {
             if (ctx->database_schemas[i].name == stmt->name) {
-                ctx->error = String::format(ctx->allocator, "database '%s' already exists", stmt->name.cstr());
+                String error_message = String::format(ctx->allocator, "database '%s' already exists", stmt->name.cstr());
+                ctx->error_on(stmt->token, error_message);
                 return false;
             }
         }
@@ -124,7 +129,8 @@ static inline bool compile_create_stmt(CreateStmt* stmt, IrContext* ctx) {
     OK_ASSERT(stmt->target == CreateStmt::Target::TABLE);
 
     if (ctx->get_table_schema(ctx->active_db_id, stmt->name.view(), nullptr)) {
-        ctx->error = String::format(ctx->allocator, "table '%s' already exists", stmt->name.cstr());
+        String error_message = String::format(ctx->allocator, "table '%s' already exists", stmt->name.cstr());
+        ctx->error_on(stmt->token, error_message);
         return false;
     }
 
@@ -135,7 +141,7 @@ static inline bool compile_create_stmt(CreateStmt* stmt, IrContext* ctx) {
     for (UZ i = 0; i < create_table_stmt->column_names.count; ++i) {
         String column_type_string = create_table_stmt->column_types[i];
         ColumnType column_type;
-        TRY(parse_type(column_type_string.view(), ctx, &column_type));
+        TRY(parse_type(column_type_string.view(), stmt->token, ctx, &column_type));
 
         String column_name = create_table_stmt->column_names[i];
         table_schema->column_names.push(column_name.copy(ctx->allocator));
@@ -159,12 +165,14 @@ static inline bool compile_drop_stmt(DropStmt* stmt, IrContext* ctx) {
             }
         }
 
-        ctx->error = String::format(ctx->allocator, "database '%s' does not exist", stmt->name.cstr());
+        String error_message = String::format(ctx->allocator, "database '%s' does not exist", stmt->name.cstr());
+        ctx->error_on(stmt->token, error_message);
         return false;
     }
     case DropStmt::Target::TABLE: {
         if (!ctx->get_table_schema(ctx->active_db_id, name, nullptr)) {
-            ctx->error = String::format(ctx->allocator, "table '%s' does not exist", stmt->name.cstr());
+            String error_message = String::format(ctx->allocator, "table '%s' does not exist", stmt->name.cstr());
+            ctx->error_on(stmt->token, error_message);
             return false;
         }
 
@@ -472,6 +480,7 @@ Optional<U32> compile_graph_node(StmtGraph* g, U32 node_id, IrContext* ctx) {
     case StmtGraphNode::SELECT: {
         OK_ASSERT(node->edges.count != 0);
         auto table_node_edge = node->edges[node->edges.count - 1];
+        StmtGraphNode table_node = g->nodes[table_node_edge];
 
         auto table_node_id = compile_graph_node(g, table_node_edge, ctx);
         TRY(table_node_id);
@@ -479,7 +488,8 @@ Optional<U32> compile_graph_node(StmtGraph* g, U32 node_id, IrContext* ctx) {
         Optional<TableSchema*> table_schema = ctx->get_table_schema_by_id(table_node_id.value);
 
         if (!table_schema) {
-            ctx->error = String::alloc(ctx->allocator, "expression is not a table");
+            String error_message = String::alloc(ctx->allocator, "expression is not a table");
+            ctx->error_on(table_node.value->token, error_message);
             return {};
         }
 

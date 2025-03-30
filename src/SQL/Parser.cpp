@@ -12,30 +12,6 @@ using namespace ok::literals;
 
 namespace xmdb::SQL {
 namespace {
-SourceLocation locate_token(StringView source, Token token) {
-    OK_ASSERT((uintptr_t) token.data.data >= (uintptr_t) source.data);
-
-    ptrdiff_t token_offset = token.data.data - source.data;
-
-    uint32_t line = 1;
-    uint32_t column = 1;
-    for (ptrdiff_t i = 0; i < token_offset; ++i) {
-        // TODO: support DOS-style newlines
-        if (source[i] == '\n') {
-            line++;
-            column = 1;
-        } else {
-            column++;
-        }
-    }
-
-    return SourceLocation{
-            .line = line,
-            .column = column,
-            .length = (uint32_t) token.data.count,
-    };
-}
-
 Optional<SelectExpr*> parse_select_expr(Parser* p) {
     Optional<Token> select_token = p->expect(Token::KW_SELECT);
     TRY(select_token);
@@ -125,22 +101,24 @@ Optional<Stmt*> Parser::stmt() {
     default: {
         auto expr = expression();
         TRY(expr);
-        return ExprStmt::alloc(arena, expr.value);
+        return ExprStmt::alloc(arena, expr.value->token, expr.value);
     }
     }
 }
 
 Optional<UseStmt*> Parser::use_stmt() {
-    TRY(expect(Token::KW_USE));
+    Optional<Token> use_token = expect(Token::KW_USE);
+    TRY(use_token);
 
     auto database = expect(Token::IDENT);
     TRY(database);
 
-    return UseStmt::alloc(arena, database.value.data);
+    return UseStmt::alloc(arena, use_token.value, database.value.data);
 }
 
 Optional<InsertStmt*> Parser::insert_stmt() {
-    TRY(expect(Token::KW_INSERT));
+    Optional<Token> insert_token = expect(Token::KW_INSERT);
+    TRY(insert_token);
     TRY(expect(Token::KW_INTO));
 
     auto table_expr = expression();
@@ -185,11 +163,12 @@ Optional<InsertStmt*> Parser::insert_stmt() {
         if (!try_expect(Token::COMMA)) break;
     }
 
-    return InsertStmt::alloc(arena, table_expr.value, columns.slice(), values.slice(), values_counts.slice());
+    return InsertStmt::alloc(arena, insert_token.value, table_expr.value, columns.slice(), values.slice(), values_counts.slice());
 }
 
 Optional<UpdateStmt*> Parser::update_stmt() {
-    TRY(expect(Token::KW_UPDATE));
+    Optional<Token> update_token = expect(Token::KW_UPDATE);
+    TRY(update_token);
 
     auto table_expr = expression();
     TRY(table_expr);
@@ -225,11 +204,12 @@ Optional<UpdateStmt*> Parser::update_stmt() {
 
     TRY(expect(Token::SEMICOLON));
 
-    return UpdateStmt::alloc(arena, table_expr.value, columns.slice(), values.slice(), filter_expr);
+    return UpdateStmt::alloc(arena, update_token.value, table_expr.value, columns.slice(), values.slice(), filter_expr);
 }
 
 Optional<DeleteStmt*> Parser::delete_stmt() {
-    TRY(expect(Token::KW_DELETE));
+    Optional<Token> delete_token = expect(Token::KW_DELETE);
+    TRY(delete_token);
     TRY(expect(Token::KW_FROM));
 
     auto table_expr = expression();
@@ -245,11 +225,12 @@ Optional<DeleteStmt*> Parser::delete_stmt() {
 
     TRY(expect(Token::SEMICOLON));
 
-    return DeleteStmt::alloc(arena, table_expr.value, filter_expr);
+    return DeleteStmt::alloc(arena, delete_token.value, table_expr.value, filter_expr);
 }
 
 Optional<DropStmt*> Parser::drop_stmt() {
-    TRY(expect(Token::KW_DROP));
+    Optional<Token> drop_token = expect(Token::KW_DROP);
+    TRY(drop_token);
 
     DropStmt::Target drop_target;
 
@@ -269,11 +250,11 @@ Optional<DropStmt*> Parser::drop_stmt() {
 
     TRY(expect(Token::SEMICOLON));
 
-    return DropStmt::alloc(arena, drop_target, name.value.data.to_string(arena));
+    return DropStmt::alloc(arena, drop_token.value, drop_target, name.value.data.to_string(arena));
 }
 
 Optional<CreateStmt*> Parser::create_stmt() {
-    TRY(expect(Token::KW_CREATE));
+    Optional<Token> create_token = expect(Token::KW_CREATE);
 
     CreateStmt* stmt;
 
@@ -281,7 +262,7 @@ Optional<CreateStmt*> Parser::create_stmt() {
         auto name = expect(Token::IDENT);
         TRY(name);
 
-        stmt = CreateDatabaseStmt::alloc(arena, name.value.data.to_string(arena));
+        stmt = CreateDatabaseStmt::alloc(arena, create_token.value, name.value.data.to_string(arena));
     } else if (try_expect(Token::KW_TABLE)) {
         auto name = expect(Token::IDENT);
         TRY(name);
@@ -306,7 +287,7 @@ Optional<CreateStmt*> Parser::create_stmt() {
 
         TRY(expect(Token::R_PAREN));
 
-        stmt = CreateTableStmt::alloc(arena, name.value.data.to_string(arena), column_names.slice(),
+        stmt = CreateTableStmt::alloc(arena, create_token.value, name.value.data.to_string(arena), column_names.slice(),
                                       column_types.slice());
     } else {
         auto token = get_cur_token_or_signal_eof();

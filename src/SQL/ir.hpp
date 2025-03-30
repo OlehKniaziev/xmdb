@@ -366,7 +366,12 @@ struct DBSchema {
 };
 
 struct IrContext {
-    explicit IrContext(Allocator* allocator) : allocator{allocator}, ir_emitter{allocator} {
+    struct Error {
+        SourceLocation location;
+        String message;
+    };
+
+    explicit IrContext(Allocator* allocator, StringView source) : allocator{allocator}, source{source}, ir_emitter{allocator} {
         auto default_schema = DBSchema::alloc_default(ok::static_allocator);
         database_schemas = List<DBSchema>::alloc(allocator);
         database_schemas.push(default_schema);
@@ -449,13 +454,20 @@ struct IrContext {
         if (prev_ns == NS_TABLE) table_stack.pop();
     }
 
+    inline void error_on(Token token, String message) {
+        Error error;
+        error.location = locate_token(source, token);
+        error.message = message;
+    }
+
     Allocator* allocator;
+    StringView source; // used only for error reporting
     List<DBSchema> database_schemas;
     List<U32> table_stack;
     List<Namespace> namespace_stack;
     IREmitter ir_emitter;
     U32 active_db_id = 0;
-    Optional<String> error{};
+    Optional<Error> error{};
 };
 
 bool ir_compile_query(Query*, IrContext*);

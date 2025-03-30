@@ -18,7 +18,7 @@ TEST(ir, basic) {
     auto query = parser.query();
     ASSERT_TRUE(query.has_value());
 
-    IrContext ir_ctx{&arena};
+    IrContext ir_ctx{&arena, source};
 
     ASSERT_TRUE(ir_compile_query(&query.value, &ir_ctx));
 }
