@@ -36,7 +36,7 @@ struct TableSchema {
     inline bool find_column(StringView name, ColumnType* out_type) const {
         for (UZ i = 0; i < column_names.count; ++i) {
             if (column_names[i].has_value() && column_names[i].value == name) {
-                *out_type = column_types[i];
+                if (out_type != nullptr) *out_type = column_types[i];
                 return true;
             }
         }
@@ -87,6 +87,10 @@ struct IRInstruction {
 
         TARGET_MAX,
     };
+
+    inline bool is_table_generating() const {
+        return op == FETCH_TABLE || op == EMIT_QUERY;
+    }
 
     Operator op;
     U32 operand1;
@@ -390,6 +394,18 @@ struct IrContext {
         return &db_schema->table_schemas[table_schema_id.value];
     }
 
+    inline Optional<TableSchema*> get_table_schema_by_id(U32 id) {
+        IRInstruction instruction = ir_emitter.instructions[id];
+
+        if (instruction.is_table_generating()) {
+            U32 schema_id = instruction.operand3;
+            OK_ASSERT(ir_emitter.schemas.count > schema_id);
+            return ir_emitter.schemas[schema_id];
+        }
+
+        return {};
+    }
+
     inline Optional<TableSchema*> get_table_schema(U8 db_schema_id, U24 table_schema_id) {
         auto* db_schema = &database_schemas[db_schema_id];
         return &db_schema->table_schemas[table_schema_id];
@@ -408,7 +424,7 @@ struct IrContext {
         NS_TABLE,
     };
 
-    inline U32 current_table_location() const {
+    inline U32 current_table_id() const {
         OK_ASSERT(table_stack.count != 0);
         return table_stack[table_stack.count - 1];
     }
@@ -423,8 +439,8 @@ struct IrContext {
         namespace_stack.push(ns);
     }
 
-    inline void push_table(U32 table) {
-        table_stack.push(table);
+    inline void push_table(U32 table_id) {
+        table_stack.push(table_id);
         namespace_stack.push(NS_TABLE);
     }
 

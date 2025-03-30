@@ -5,43 +5,65 @@
 using namespace ok::literals;
 
 namespace xmdb::SQL {
-static inline void compile_use_stmt(UseStmt* stmt, IrContext* ctx) {
+static inline bool compile_use_stmt(UseStmt* stmt, IrContext* ctx) {
     auto db_name = stmt->database.view();
-    ctx->ir_emitter.use_database(db_name);
+
+    for (UZ i = 0; i < ctx->database_schemas.count; ++i) {
+        if (ctx->database_schemas[i].name == db_name) {
+            ctx->active_db_id = i;
+            ctx->ir_emitter.use_database(db_name);
+            return true;
+        }
+    }
+
+    OK_PANIC_FMT("cannot find database '" OK_SV_FMT "'", OK_SV_ARG(db_name));
 }
 
-static U32 compile_expr(Expr*, IrContext*);
+static Optional<U32> compile_expr(Expr*, IrContext*);
 
-static inline U32 compile_binop(BinaryOpExpr* binop, IrContext* ctx) {
+static inline Optional<U32> compile_binop(BinaryOpExpr* binop, IrContext* ctx) {
     auto lhs = compile_expr(binop->lhs, ctx);
+    TRY(lhs);
     auto rhs = compile_expr(binop->rhs, ctx);
+    TRY(rhs);
 
     IREmitter* e = &ctx->ir_emitter;
 
     switch (binop->kind) {
-    case BinaryOpExpr::Kind::EQ: return e->eq(lhs, rhs);
-    case BinaryOpExpr::Kind::GT: return e->gt(lhs, rhs);
-    case BinaryOpExpr::Kind::LT: return e->lt(lhs, rhs);
+    case BinaryOpExpr::Kind::EQ: return e->eq(lhs.value, rhs.value);
+    case BinaryOpExpr::Kind::GT: return e->gt(lhs.value, rhs.value);
+    case BinaryOpExpr::Kind::LT: return e->lt(lhs.value, rhs.value);
     default: OK_UNREACHABLE();
     }
 }
 
-static U32 compile_ident(IdentifierExpr* ident, IrContext* ctx) {
+static Optional<U32> compile_ident(IdentifierExpr* ident, IrContext* ctx) {
     switch (ctx->current_namespace()) {
     case IrContext::NS_TABLE: {
-        U32 table_location = ctx->current_table_location();
-        auto column_name = ident->value.view();
+        U32 table_location = ctx->current_table_id();
+        StringView column_name = ident->value.view();
+
+        Optional<TableSchema*> table_schema = ctx->get_table_schema_by_id(table_location);
+        OK_ASSERT(table_schema.has_value());
+
+        if (!table_schema.value->find_column(column_name, nullptr))
+            OK_PANIC_FMT("cannot find column '%s'", ident->value.cstr());
+
         return ctx->ir_emitter.fetch_column(table_location, column_name);
     }
     case IrContext::NS_GLOBAL: {
-        auto table_name = ident->value.view();
+        StringView table_name = ident->value.view();
+
+        if (!ctx->get_table_schema(ctx->active_db_id, table_name, nullptr))
+            OK_PANIC_FMT("cannot find table '%s'", ident->value.cstr());
+
         return ctx->ir_emitter.fetch_table(table_name);
     }
     default: OK_UNREACHABLE();
     }
 }
 
-static U32 compile_expr(Expr* expr, IrContext* ctx) {
+static Optional<U32> compile_expr(Expr* expr, IrContext* ctx) {
     auto* e = &ctx->ir_emitter;
 
     switch (expr->type) {
@@ -82,9 +104,19 @@ static inline bool parse_type(StringView input, ColumnType* out) {
 
 static inline bool compile_create_stmt(CreateStmt* stmt, IrContext* ctx) {
     if (stmt->target == CreateStmt::Target::DATABASE) {
+        for (UZ i = 0; i < ctx->database_schemas.count; ++i) {
+            if (ctx->database_schemas[i].name == stmt->name)
+                OK_PANIC_FMT("database '%s' already exists", stmt->name.cstr());
+        }
+
         ctx->ir_emitter.create_database(stmt->name.view());
         return true;
     }
+
+    OK_ASSERT(stmt->target == CreateStmt::Target::TABLE);
+
+    if (ctx->get_table_schema(ctx->active_db_id, stmt->name.view(), nullptr))
+        OK_PANIC_FMT("table '%s' already exists", stmt->name.cstr());
 
     auto* create_table_stmt = static_cast<CreateTableStmt*>(stmt);
 
@@ -105,12 +137,29 @@ static inline bool compile_create_stmt(CreateStmt* stmt, IrContext* ctx) {
     return true;
 }
 
-static inline void compile_drop_stmt(DropStmt* stmt, IrContext* ctx) {
+static inline bool compile_drop_stmt(DropStmt* stmt, IrContext* ctx) {
     auto name = stmt->name.view();
 
     switch (stmt->target) {
-    case DropStmt::Target::DATABASE: ctx->ir_emitter.drop_database(name); return;
-    case DropStmt::Target::TABLE: ctx->ir_emitter.drop_table(name); return;
+    case DropStmt::Target::DATABASE: {
+        for (UZ i = 0; i < ctx->database_schemas.count; ++i) {
+            if (ctx->database_schemas[i].name == name) {
+                ctx->ir_emitter.drop_database(name);
+                return true;
+            }
+        }
+
+        OK_PANIC_FMT("database '%s' does not exist", stmt->name.cstr());
+        break;
+    }
+    case DropStmt::Target::TABLE: {
+        if (!ctx->get_table_schema(ctx->active_db_id, name, nullptr))
+            OK_PANIC_FMT("table '%s' does not exist", stmt->name.cstr());
+
+        ctx->ir_emitter.drop_table(name);
+        return true;
+    }
+    default: OK_UNREACHABLE();
     }
 }
 
@@ -118,8 +167,7 @@ static inline bool compile_unoptimizable_stmt(Stmt* stmt, IrContext* ctx) {
     switch (stmt->type) {
     case Stmt::USE: {
         auto* use = static_cast<UseStmt*>(stmt);
-        compile_use_stmt(use, ctx);
-        return true;
+        return compile_use_stmt(use, ctx);
     }
     case Stmt::CREATE: {
         auto* create = static_cast<CreateStmt*>(stmt);
@@ -127,8 +175,7 @@ static inline bool compile_unoptimizable_stmt(Stmt* stmt, IrContext* ctx) {
     }
     case Stmt::DROP: {
         auto* drop = static_cast<DropStmt*>(stmt);
-        compile_drop_stmt(drop, ctx);
-        return true;
+        return compile_drop_stmt(drop, ctx);
     }
     default: OK_UNREACHABLE();
     }
@@ -359,18 +406,19 @@ static void to_string(ok::String* string, StmtGraph* g, U32 node_idx, bool type_
     }
 }
 
-U32 compile_graph_node(StmtGraph* g, U32 node_id, IrContext* ctx) {
+Optional<U32> compile_graph_node(StmtGraph* g, U32 node_id, IrContext* ctx) {
     auto* node = &g->nodes[node_id];
     if (node->is_visited()) return node->ir_id;
 
     node->make_visited();
 
-    auto* e = &ctx->ir_emitter;
+    IREmitter* e = &ctx->ir_emitter;
 
     switch (node->type()) {
     case StmtGraphNode::LEAF: {
         auto expr_id = compile_expr(node->value, ctx);
-        node->ir_id = expr_id;
+        TRY(expr_id);
+        node->ir_id = expr_id.value;
         return node->ir_id;
     }
     case StmtGraphNode::EQ: {
@@ -378,9 +426,11 @@ U32 compile_graph_node(StmtGraph* g, U32 node_id, IrContext* ctx) {
         auto rhs_node = node->edges[1];
 
         auto lhs = compile_graph_node(g, lhs_node, ctx);
+        TRY(lhs);
         auto rhs = compile_graph_node(g, rhs_node, ctx);
+        TRY(rhs);
 
-        node->ir_id = e->eq(lhs, rhs);
+        node->ir_id = e->eq(lhs.value, rhs.value);
         return node->ir_id;
     }
     case StmtGraphNode::LT: {
@@ -388,9 +438,11 @@ U32 compile_graph_node(StmtGraph* g, U32 node_id, IrContext* ctx) {
         auto rhs_node = node->edges[1];
 
         auto lhs = compile_graph_node(g, lhs_node, ctx);
+        TRY(lhs);
         auto rhs = compile_graph_node(g, rhs_node, ctx);
+        TRY(rhs);
 
-        node->ir_id = e->lt(lhs, rhs);
+        node->ir_id = e->lt(lhs.value, rhs.value);
         return node->ir_id;
     }
     case StmtGraphNode::GT: {
@@ -398,9 +450,11 @@ U32 compile_graph_node(StmtGraph* g, U32 node_id, IrContext* ctx) {
         auto rhs_node = node->edges[1];
 
         auto lhs = compile_graph_node(g, lhs_node, ctx);
+        TRY(lhs);
         auto rhs = compile_graph_node(g, rhs_node, ctx);
+        TRY(rhs);
 
-        node->ir_id = e->gt(lhs, rhs);
+        node->ir_id = e->gt(lhs.value, rhs.value);
         return node->ir_id;
     }
     case StmtGraphNode::SELECT: {
@@ -408,14 +462,21 @@ U32 compile_graph_node(StmtGraph* g, U32 node_id, IrContext* ctx) {
         auto table_node_edge = node->edges[node->edges.count - 1];
 
         auto table_node_id = compile_graph_node(g, table_node_edge, ctx);
+        TRY(table_node_id);
+
+        Optional<TableSchema*> table_schema = ctx->get_table_schema_by_id(table_node_id.value);
+
+        if (!table_schema)
+            OK_PANIC("expression is not a table");
 
         UZ columns_count = node->edges.count - 1;
 
-        ctx->push_table(table_node_id);
+        ctx->push_table(table_node_id.value);
         {
             for (UZ i = 0; i < node->edges.count - 1; ++i) {
                 auto expr_node = compile_graph_node(g, node->edges[i], ctx);
-                ctx->ir_emitter.emit_column(expr_node, "dummy"_sv); // FIXME
+                TRY(expr_node);
+                ctx->ir_emitter.emit_column(expr_node.value, "dummy"_sv); // FIXME
             }
         }
         ctx->pop_namespace();
@@ -427,7 +488,7 @@ U32 compile_graph_node(StmtGraph* g, U32 node_id, IrContext* ctx) {
     }
 }
 
-static inline void compile_graph(StmtGraph* graph, IrContext* ctx) {
+static inline bool compile_graph(StmtGraph* graph, IrContext* ctx) {
     auto dot_src = ok::String::alloc(ctx->allocator, "digraph { graph [dpi=200]; ");
 
     for (UZ i = 0; i < graph->nodes.count; ++i) {
@@ -443,7 +504,7 @@ static inline void compile_graph(StmtGraph* graph, IrContext* ctx) {
 
     OK_ASSERT(!err.has_value());
 
-    compile_graph_node(graph, graph->root_node_index, ctx);
+    return (bool)compile_graph_node(graph, graph->root_node_index, ctx);
 }
 
 static const char* ir_operator_names[IRInstruction::OP_MAX] = {
@@ -593,7 +654,7 @@ bool ir_compile_query(Query* q, IrContext* ctx) {
 
         if (is_stmt_graph_optimizable(stmt)) {
             StmtGraph g = build_statement_graph(ctx->allocator, stmt);
-            compile_graph(&g, ctx);
+            TRY(compile_graph(&g, ctx));
         } else {
             TRY(compile_unoptimizable_stmt(stmt, ctx));
         }
