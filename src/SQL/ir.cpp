@@ -105,6 +105,15 @@ static inline bool compile_create_stmt(CreateStmt* stmt, IrContext* ctx) {
     return true;
 }
 
+static inline void compile_drop_stmt(DropStmt* stmt, IrContext* ctx) {
+    auto name = stmt->name.view();
+
+    switch (stmt->target) {
+    case DropStmt::Target::DATABASE: ctx->ir_emitter.drop_database(name); return;
+    case DropStmt::Target::TABLE: ctx->ir_emitter.drop_table(name); return;
+    }
+}
+
 static inline bool compile_unoptimizable_stmt(Stmt* stmt, IrContext* ctx) {
     switch (stmt->type) {
     case Stmt::USE: {
@@ -117,9 +126,9 @@ static inline bool compile_unoptimizable_stmt(Stmt* stmt, IrContext* ctx) {
         return compile_create_stmt(create, ctx);
     }
     case Stmt::DROP: {
-        OK_TODO();
-        // auto* drop = static_cast<DropStmt*>(stmt);
-        // return compile_drop_stmt(drop, ctx);
+        auto* drop = static_cast<DropStmt*>(stmt);
+        compile_drop_stmt(drop, ctx);
+        return true;
     }
     default: OK_UNREACHABLE();
     }
@@ -418,7 +427,7 @@ U32 compile_graph_node(StmtGraph* g, U32 node_id, IrContext* ctx) {
     }
 }
 
-void compile_graph(StmtGraph* graph, IrContext* ctx) {
+static inline void compile_graph(StmtGraph* graph, IrContext* ctx) {
     auto dot_src = ok::String::alloc(ctx->allocator, "digraph { graph [dpi=200]; ");
 
     for (UZ i = 0; i < graph->nodes.count; ++i) {
@@ -426,8 +435,6 @@ void compile_graph(StmtGraph* graph, IrContext* ctx) {
     }
 
     dot_src.push('}');
-
-    ok::println(dot_src);
 
     auto dot = ok::Command::alloc(ctx->allocator, "dot");
 
@@ -448,9 +455,14 @@ static const char* ir_operator_names[IRInstruction::OP_MAX] = {
     [IRInstruction::EMIT_COLUMN] = "EmitColumn",
     [IRInstruction::EMIT_QUERY] = "EmitQuery",
     [IRInstruction::USE_DATABASE] = "UseDatabase",
-    [IRInstruction::CREATE_DATABASE] = "CreateDatabase",
-    [IRInstruction::CREATE_TABLE] = "CreateTable",
+    [IRInstruction::CREATE] = "Create",
+    [IRInstruction::DROP] = "Drop",
     [IRInstruction::CONST] = "Const",
+};
+
+static const char* ir_target_names[IRInstruction::TARGET_MAX] = {
+    [IRInstruction::TARGET_TABLE] = "Table",
+    [IRInstruction::TARGET_DATABASE] = "Database",
 };
 
 String stringify_ir(Allocator* allocator, IREmitter* emitter) {
@@ -458,16 +470,18 @@ String stringify_ir(Allocator* allocator, IREmitter* emitter) {
 
     Slice<IRInstruction> instructions = emitter->instructions.slice();
 
+    UZ ip = instructions.count;
+    U32 ip_padding = 1;
+    while (ip /= 10) ++ip_padding;
+
+    printf("instruction padding: %u\n", ip_padding);
+
     for (UZ i = 0; i < instructions.count; ++i) {
         IRInstruction instr = instructions[i];
 
         const char* operator_name = ir_operator_names[instr.op];
 
-        UZ ip = i;
-        U32 ip_padding = 0;
-        while (ip /= 10) ip_padding++;
-
-        buffer.format_append("[%*zu] ", ip_padding, i);
+        buffer.format_append("[%-*zu] ", ip_padding, i);
 
         switch (instr.op) {
         case IRInstruction::CONST: {
@@ -477,17 +491,17 @@ String stringify_ir(Allocator* allocator, IREmitter* emitter) {
             switch (instr.operand2) {
             case IRInstruction::CONST_INT: {
                 S64 integer = emitter->integers[instr.operand3];
-                constant = ok::to_string(allocator, integer);
+                constant = ok::to_string(ok::temp_allocator, integer);
                 break;
             }
             case IRInstruction::CONST_STRING: {
                 String string = emitter->strings[instr.operand3];
-                constant = String::format(allocator, "\"%s\"", string.cstr());
+                constant = String::format(ok::temp_allocator, "\"%s\"", string.cstr());
                 break;
             }
-            case IRInstruction::CONST_TRUE: constant = String::alloc(allocator, "TRUE"); break;
-            case IRInstruction::CONST_FALSE: constant = String::alloc(allocator, "FALSE"); break;
-            case IRInstruction::CONST_NULL: constant = String::alloc(allocator, "NULL"); break;
+            case IRInstruction::CONST_TRUE: constant = String::alloc(ok::temp_allocator, "TRUE"); break;
+            case IRInstruction::CONST_FALSE: constant = String::alloc(ok::temp_allocator, "FALSE"); break;
+            case IRInstruction::CONST_NULL: constant = String::alloc(ok::temp_allocator, "NULL"); break;
             default: OK_UNREACHABLE();
             }
 
@@ -527,6 +541,8 @@ String stringify_ir(Allocator* allocator, IREmitter* emitter) {
             buffer.format_append("%s := %s %u", var_name.cstr(), operator_name, column_count);
             break;
         }
+        case IRInstruction::LT:
+        case IRInstruction::GT:
         case IRInstruction::EQ: {
             String var_name = emitter->strings[instr.operand1];
 
@@ -539,11 +555,27 @@ String stringify_ir(Allocator* allocator, IREmitter* emitter) {
             buffer.format_append("%s := %s %s %s", var_name.cstr(), operator_name, lhs_name.cstr(), rhs_name.cstr());
             break;
         }
-        case IRInstruction::CREATE_TABLE: {
-            String table_name = emitter->strings[instr.operand1];
-            auto table_schema = emitter->schemas[instr.operand2];
+        case IRInstruction::CREATE: {
+            U32 target = instr.operand1;
+            const char* target_name = ir_target_names[target];
+            String name = emitter->strings[instr.operand2];
 
-            buffer.format_append("%s %s <schema at %p>", operator_name, table_name.cstr(), (void*)table_schema);
+            if (target == IRInstruction::TARGET_TABLE) {
+                auto table_schema = emitter->schemas[instr.operand3];
+                buffer.format_append("%s%s %s <schema at %p>", operator_name, target_name, name.cstr(), (void*)table_schema);
+            } else if (target == IRInstruction::TARGET_DATABASE) {
+                buffer.format_append("%s%s %s", operator_name, target_name, name.cstr());
+            } else {
+                OK_PANIC_FMT("invalid target '%s' for 'CREATE' statement", target_name);
+            }
+
+            break;
+        }
+        case IRInstruction::DROP: {
+            const char* target_name = ir_target_names[instr.operand1];
+            String name = emitter->strings[instr.operand2];
+
+            buffer.format_append("%s%s %s", operator_name, target_name, name.cstr());
             break;
         }
         default: OK_PANIC_FMT("don't know how to print the '%s' operator", operator_name);

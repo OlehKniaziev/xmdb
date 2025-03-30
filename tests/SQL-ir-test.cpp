@@ -11,7 +11,8 @@ TEST(ir, basic) {
         column1 int,
         column2 text
     );
-    SELECT column1, column1 = column2, column1, column2 FROM MyTable;)sql"_sv;
+    SELECT column1 = column1, column2 > TRUE, column1 = column2, column1, column2 FROM MyTable;
+    DROP TABLE MyTable;)sql"_sv;
     Parser parser{&arena, source};
 
     auto query = parser.query();

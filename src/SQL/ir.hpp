@@ -62,8 +62,9 @@ struct IRInstruction {
 
         USE_DATABASE,
 
-        CREATE_DATABASE,
-        CREATE_TABLE,
+        CREATE,
+
+        DROP,
 
         CONST,
 
@@ -76,6 +77,15 @@ struct IRInstruction {
         CONST_TRUE,
         CONST_FALSE,
         CONST_NULL,
+
+        CONST_MAX,
+    };
+
+    enum Target : U32 {
+        TARGET_TABLE,
+        TARGET_DATABASE,
+
+        TARGET_MAX,
     };
 
     Operator op;
@@ -157,8 +167,9 @@ struct IREmitter {
         auto db_name = add_string(name);
 
         IRInstruction instr;
-        instr.op = IRInstruction::CREATE_DATABASE;
-        instr.operand1 = db_name;
+        instr.op = IRInstruction::CREATE;
+        instr.operand1 = IRInstruction::TARGET_DATABASE;
+        instr.operand2 = db_name;
         instructions.push(instr);
     }
 
@@ -167,9 +178,30 @@ struct IREmitter {
         auto table_schema = add_schema(schema);
 
         IRInstruction instr;
-        instr.op = IRInstruction::CREATE_TABLE;
-        instr.operand1 = table_name;
-        instr.operand2 = table_schema;
+        instr.op = IRInstruction::CREATE;
+        instr.operand1 = IRInstruction::TARGET_TABLE;
+        instr.operand2 = table_name;
+        instr.operand3 = table_schema;
+        instructions.push(instr);
+    }
+
+    void drop_database(StringView name) {
+        auto db_name = add_string(name);
+
+        IRInstruction instr;
+        instr.op = IRInstruction::DROP;
+        instr.operand1 = IRInstruction::TARGET_DATABASE;
+        instr.operand2 = db_name;
+        instructions.push(instr);
+    }
+
+    void drop_table(StringView name) {
+        auto table_name = add_string(name);
+
+        IRInstruction instr;
+        instr.op = IRInstruction::DROP;
+        instr.operand1 = IRInstruction::TARGET_TABLE;
+        instr.operand2 = table_name;
         instructions.push(instr);
     }
 
