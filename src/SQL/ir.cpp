@@ -1,58 +1,47 @@
 #include <Core/util.hpp>
 
-#include "sema.hpp"
+#include "ir.hpp"
 
 using namespace ok::literals;
 
 namespace xmdb::SQL {
-static inline bool check_use_stmt(UseStmt* stmt, SemaContext* ctx) {
-    for (UZ i = 0; i < ctx->database_schemas.count; ++i) {
-        if (stmt->database == ctx->database_schemas[i].name) {
-            ctx->active_db_id = i;
-            return true;
-        }
-    }
-
-    OK_PANIC_FMT("Cannot find database %s\n", stmt->database.cstr());
+static inline void compile_use_stmt(UseStmt* stmt, IrContext* ctx) {
+    auto db_name = stmt->database.view();
+    ctx->ir_emitter.use_database(db_name);
 }
 
-static Optional<U32> check_expr(Expr* expr, SemaContext* ctx);
+static U32 compile_expr(Expr*, IrContext*);
 
-static inline Optional<U32> check_binop(BinaryOpExpr* binop, SemaContext* ctx) {
-    auto lhs = check_expr(binop->lhs, ctx);
-    TRY(lhs);
-    auto rhs = check_expr(binop->rhs, ctx);
-    TRY(rhs);
+static inline U32 compile_binop(BinaryOpExpr* binop, IrContext* ctx) {
+    auto lhs = compile_expr(binop->lhs, ctx);
+    auto rhs = compile_expr(binop->rhs, ctx);
 
     IREmitter* e = &ctx->ir_emitter;
 
     switch (binop->kind) {
-    case BinaryOpExpr::Kind::EQ: return e->eq(lhs.value, rhs.value);
-    case BinaryOpExpr::Kind::GT: return e->gt(lhs.value, rhs.value);
-    case BinaryOpExpr::Kind::LT: return e->lt(lhs.value, rhs.value);
-    default: OK_TODO();
+    case BinaryOpExpr::Kind::EQ: return e->eq(lhs, rhs);
+    case BinaryOpExpr::Kind::GT: return e->gt(lhs, rhs);
+    case BinaryOpExpr::Kind::LT: return e->lt(lhs, rhs);
+    default: OK_UNREACHABLE();
     }
 }
 
-static Optional<U32> check_ident(IdentifierExpr* ident, SemaContext* ctx) {
+static U32 compile_ident(IdentifierExpr* ident, IrContext* ctx) {
     switch (ctx->current_namespace()) {
-    case SemaContext::NS_TABLE: {
+    case IrContext::NS_TABLE: {
         U32 table_location = ctx->current_table_location();
         auto column_name = ident->value.view();
         return ctx->ir_emitter.fetch_column(table_location, column_name);
     }
-    case SemaContext::NS_GLOBAL: {
+    case IrContext::NS_GLOBAL: {
         auto table_name = ident->value.view();
-        auto table_schema = ctx->get_table_schema(ctx->active_db_id, table_name, nullptr);
-        if (!table_schema.has_value()) OK_PANIC_FMT("cannot find table %s", ident->value.cstr());
-
         return ctx->ir_emitter.fetch_table(table_name);
     }
-    default: OK_TODO();
+    default: OK_UNREACHABLE();
     }
 }
 
-static Optional<U32> check_expr(Expr* expr, SemaContext* ctx) {
+static U32 compile_expr(Expr* expr, IrContext* ctx) {
     auto* e = &ctx->ir_emitter;
 
     switch (expr->type) {
@@ -67,16 +56,13 @@ static Optional<U32> check_expr(Expr* expr, SemaContext* ctx) {
     case Expr::TRUE_LIT: return e->constant_true();
     case Expr::FALSE_LIT: return e->constant_false();
     case Expr::NULL_LIT: return e->constant_null();
-    case Expr::BINARY_OP: {
-        auto* binop = static_cast<BinaryOpExpr*>(expr);
-        return check_binop(binop, ctx);
-    }
     case Expr::IDENT: {
         auto* ident = static_cast<IdentifierExpr*>(expr);
-        return check_ident(ident, ctx);
+        return compile_ident(ident, ctx);
     }
+    case Expr::BINARY_OP:
     case Expr::SELECT: OK_UNREACHABLE();
-    default: OK_TODO();
+    default: OK_UNREACHABLE();
     }
 }
 
@@ -94,8 +80,11 @@ static inline bool parse_type(StringView input, ColumnType* out) {
     OK_TODO();
 }
 
-static inline bool check_create_stmt(CreateStmt* stmt, SemaContext* ctx) {
-    if (stmt->target != CreateStmt::Target::TABLE) OK_TODO();
+static inline bool compile_create_stmt(CreateStmt* stmt, IrContext* ctx) {
+    if (stmt->target == CreateStmt::Target::DATABASE) {
+        ctx->ir_emitter.create_database(stmt->name.view());
+        return true;
+    }
 
     auto* create_table_stmt = static_cast<CreateTableStmt*>(stmt);
 
@@ -111,24 +100,28 @@ static inline bool check_create_stmt(CreateStmt* stmt, SemaContext* ctx) {
         table_schema->column_types.push(column_type);
     }
 
+    ctx->ir_emitter.create_table(create_table_stmt->name.view(), table_schema);
+
     return true;
 }
 
-static inline bool check_stmt(Stmt* stmt, SemaContext* ctx) {
+static inline bool compile_unoptimizable_stmt(Stmt* stmt, IrContext* ctx) {
     switch (stmt->type) {
     case Stmt::USE: {
         auto* use = static_cast<UseStmt*>(stmt);
-        return check_use_stmt(use, ctx);
-    }
-    case Stmt::EXPR: {
-        auto* expr = static_cast<ExprStmt*>(stmt);
-        return (bool)check_expr(expr->expr, ctx);
+        compile_use_stmt(use, ctx);
+        return true;
     }
     case Stmt::CREATE: {
         auto* create = static_cast<CreateStmt*>(stmt);
-        return check_create_stmt(create, ctx);
+        return compile_create_stmt(create, ctx);
     }
-    default: OK_TODO();
+    case Stmt::DROP: {
+        OK_TODO();
+        // auto* drop = static_cast<DropStmt*>(stmt);
+        // return compile_drop_stmt(drop, ctx);
+    }
+    default: OK_UNREACHABLE();
     }
 }
 
@@ -311,7 +304,7 @@ static StmtGraph build_statement_graph(Allocator* allocator, Stmt* stmt) {
         return build_expr_stmt_graph(allocator, expr);
     }
 
-    default: OK_PANIC_FMT("cannot build a graph for statement %d", stmt->type);
+    default: OK_UNREACHABLE();
     }
 }
 
@@ -321,8 +314,12 @@ static inline bool is_stmt_graph_optimizable(Stmt* stmt) {
     case Stmt::DROP:
     case Stmt::CREATE:
         return false;
-    default:
+    case Stmt::EXPR:
+    case Stmt::UPDATE:
+    case Stmt::DELETE:
+    case Stmt::INSERT:
         return true;
+    default: OK_UNREACHABLE();
     }
 }
 
@@ -343,7 +340,7 @@ static void to_string(ok::String* string, StmtGraph* g, U32 node_idx) {
     }
 }
 
-Optional<U32> check_graph_node(StmtGraph* g, U32 node_id, SemaContext* ctx) {
+U32 compile_graph_node(StmtGraph* g, U32 node_id, IrContext* ctx) {
     auto* node = &g->nodes[node_id];
     if (node->is_visited()) return node->ir_id;
 
@@ -353,62 +350,53 @@ Optional<U32> check_graph_node(StmtGraph* g, U32 node_id, SemaContext* ctx) {
 
     switch (node->type()) {
     case StmtGraphNode::LEAF: {
-        auto expr_id = check_expr(node->value, ctx);
-        TRY(expr_id);
-        node->ir_id = expr_id.value;
+        auto expr_id = compile_expr(node->value, ctx);
+        node->ir_id = expr_id;
         return node->ir_id;
     }
     case StmtGraphNode::EQ: {
         auto lhs_node = node->edges[0];
         auto rhs_node = node->edges[1];
 
-        auto lhs = check_graph_node(g, lhs_node, ctx);
-        TRY(lhs);
-        auto rhs = check_graph_node(g, rhs_node, ctx);
-        TRY(rhs);
+        auto lhs = compile_graph_node(g, lhs_node, ctx);
+        auto rhs = compile_graph_node(g, rhs_node, ctx);
 
-        node->ir_id = e->eq(lhs.value, rhs.value);
+        node->ir_id = e->eq(lhs, rhs);
         return node->ir_id;
     }
     case StmtGraphNode::LT: {
         auto lhs_node = node->edges[0];
         auto rhs_node = node->edges[1];
 
-        auto lhs = check_graph_node(g, lhs_node, ctx);
-        TRY(lhs);
-        auto rhs = check_graph_node(g, rhs_node, ctx);
-        TRY(rhs);
+        auto lhs = compile_graph_node(g, lhs_node, ctx);
+        auto rhs = compile_graph_node(g, rhs_node, ctx);
 
-        node->ir_id = e->lt(lhs.value, rhs.value);
+        node->ir_id = e->lt(lhs, rhs);
         return node->ir_id;
     }
     case StmtGraphNode::GT: {
         auto lhs_node = node->edges[0];
         auto rhs_node = node->edges[1];
 
-        auto lhs = check_graph_node(g, lhs_node, ctx);
-        TRY(lhs);
-        auto rhs = check_graph_node(g, rhs_node, ctx);
-        TRY(rhs);
+        auto lhs = compile_graph_node(g, lhs_node, ctx);
+        auto rhs = compile_graph_node(g, rhs_node, ctx);
 
-        node->ir_id = e->gt(lhs.value, rhs.value);
+        node->ir_id = e->gt(lhs, rhs);
         return node->ir_id;
     }
     case StmtGraphNode::SELECT: {
         OK_ASSERT(node->edges.count != 0);
         auto table_node_edge = node->edges[node->edges.count - 1];
 
-        auto table_node_id = check_graph_node(g, table_node_edge, ctx);
-        TRY(table_node_id);
+        auto table_node_id = compile_graph_node(g, table_node_edge, ctx);
 
         UZ columns_count = node->edges.count - 1;
 
-        ctx->push_table(table_node_id.value);
+        ctx->push_table(table_node_id);
         {
             for (UZ i = 0; i < node->edges.count - 1; ++i) {
-                auto expr_node = check_graph_node(g, node->edges[i], ctx);
-                TRY(expr_node);
-                ctx->ir_emitter.emit_column(expr_node.value, "dummy"_sv); // FIXME
+                auto expr_node = compile_graph_node(g, node->edges[i], ctx);
+                ctx->ir_emitter.emit_column(expr_node, "dummy"_sv); // FIXME
             }
         }
         ctx->pop_namespace();
@@ -420,7 +408,7 @@ Optional<U32> check_graph_node(StmtGraph* g, U32 node_id, SemaContext* ctx) {
     }
 }
 
-bool check_graph(StmtGraph* graph, SemaContext* ctx) {
+void compile_graph(StmtGraph* graph, IrContext* ctx) {
     auto dot_src = ok::String::alloc(ctx->allocator, "digraph { graph [dpi=200]; ");
 
     for (UZ i = 0; i < graph->nodes.count; ++i) {
@@ -436,7 +424,7 @@ bool check_graph(StmtGraph* graph, SemaContext* ctx) {
 
     OK_ASSERT(!err.has_value());
 
-    return (bool)check_graph_node(graph, graph->root_node_index, ctx);
+    compile_graph_node(graph, graph->root_node_index, ctx);
 }
 
 static const char* ir_operator_names[IRInstruction::OP_MAX] = {
@@ -448,6 +436,8 @@ static const char* ir_operator_names[IRInstruction::OP_MAX] = {
     [IRInstruction::EMIT_COLUMN] = "EmitColumn",
     [IRInstruction::EMIT_QUERY] = "EmitQuery",
     [IRInstruction::USE_DATABASE] = "UseDatabase",
+    [IRInstruction::CREATE_DATABASE] = "CreateDatabase",
+    [IRInstruction::CREATE_TABLE] = "CreateTable",
     [IRInstruction::CONST] = "Const",
 };
 
@@ -465,7 +455,7 @@ String stringify_ir(Allocator* allocator, IREmitter* emitter) {
         U32 ip_padding = 0;
         while (ip /= 10) ip_padding++;
 
-        buffer.format_append("[%*zu]", ip_padding, i);
+        buffer.format_append("[%*zu] ", ip_padding, i);
 
         switch (instr.op) {
         case IRInstruction::CONST: {
@@ -504,7 +494,6 @@ String stringify_ir(Allocator* allocator, IREmitter* emitter) {
             String column_name = emitter->strings[instr.operand3];
 
             auto table_instr = emitter->instructions[instr.operand2];
-            OK_ASSERT(table_instr.op == IRInstruction::FETCH_TABLE);
             String table_name = emitter->strings[table_instr.operand1];
 
             buffer.format_append("%s := %s %s \"%s\"", var_name.cstr(), operator_name, table_name.cstr(), column_name.cstr());
@@ -512,7 +501,7 @@ String stringify_ir(Allocator* allocator, IREmitter* emitter) {
         }
         case IRInstruction::EMIT_COLUMN: {
             auto column_instr = emitter->instructions[instr.operand1];
-            OK_ASSERT(column_instr.op == IRInstruction::FETCH_COLUMN);
+
             String column_name = emitter->strings[column_instr.operand1];
             String out_name = emitter->strings[instr.operand2];
 
@@ -526,6 +515,18 @@ String stringify_ir(Allocator* allocator, IREmitter* emitter) {
             buffer.format_append("%s := %s %u", var_name.cstr(), operator_name, column_count);
             break;
         }
+        case IRInstruction::EQ: {
+            String var_name = emitter->strings[instr.operand1];
+
+            auto lhs_instr = emitter->instructions[instr.operand2];
+            auto lhs_name = emitter->strings[lhs_instr.operand1];
+
+            auto rhs_instr = emitter->instructions[instr.operand3];
+            auto rhs_name = emitter->strings[rhs_instr.operand1];
+
+            buffer.format_append("%s := %s %s %s", var_name.cstr(), operator_name, lhs_name.cstr(), rhs_name.cstr());
+            break;
+        }
         default: OK_PANIC_FMT("don't know how to print the '%s' operator", operator_name);
         }
 
@@ -535,22 +536,20 @@ String stringify_ir(Allocator* allocator, IREmitter* emitter) {
     return buffer;
 }
 
-bool sema_check_query(Query* q, SemaContext* ctx) {
+bool ir_compile_query(Query* q, IrContext* ctx) {
     for (UZ i = 0; i < q->stmts.count; ++i) {
         auto* stmt = q->stmts[i];
 
         if (is_stmt_graph_optimizable(stmt)) {
             StmtGraph g = build_statement_graph(ctx->allocator, stmt);
-            TRY(check_graph(&g, ctx));
+            compile_graph(&g, ctx);
         } else {
-            TRY(check_stmt(stmt, ctx));
+            TRY(compile_unoptimizable_stmt(stmt, ctx));
         }
     }
 
-#if 0
     auto ir_string = stringify_ir(ctx->allocator, &ctx->ir_emitter);
     ok::println(ir_string);
-#endif
 
     return true;
 }

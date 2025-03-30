@@ -1,5 +1,5 @@
-#ifndef XMDB_SEMA_HPP
-#define XMDB_SEMA_HPP
+#ifndef XMDB_IR_HPP
+#define XMDB_IR_HPP
 
 #include <Core/ok.hpp>
 #include <Core/util.hpp>
@@ -27,16 +27,44 @@ enum class ColumnType {
     BOOLEAN,
 };
 
+struct TableSchema {
+    explicit TableSchema(Allocator* a) {
+        column_names = List<Optional<String>>::alloc(a);
+        column_types = List<ColumnType>::alloc(a);
+    }
+
+    inline bool find_column(StringView name, ColumnType* out_type) const {
+        for (UZ i = 0; i < column_names.count; ++i) {
+            if (column_names[i].has_value() && column_names[i].value == name) {
+                *out_type = column_types[i];
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    List<Optional<String>> column_names;
+    List<ColumnType> column_types;
+};
+
 struct IRInstruction {
     enum Operator : U32 {
         EQ,
         GT,
         LT,
+
         FETCH_COLUMN,
         FETCH_TABLE,
+
         EMIT_COLUMN,
         EMIT_QUERY,
+
         USE_DATABASE,
+
+        CREATE_DATABASE,
+        CREATE_TABLE,
+
         CONST,
 
         OP_MAX,
@@ -63,6 +91,7 @@ struct IREmitter {
         instructions = List<IRInstruction>::alloc(allocator);
         strings = List<String>::alloc(allocator);
         integers = List<S64>::alloc(allocator);
+        schemas = List<TableSchema*>::alloc(allocator);
     }
 
     inline U32 gen_temp() {
@@ -85,6 +114,11 @@ struct IREmitter {
     inline U32 add_int(S64 integer) {
         integers.push(integer);
         return integers.count - 1;
+    }
+
+    inline U32 add_schema(TableSchema* schema) {
+        schemas.push(schema);
+        return schemas.count - 1;
     }
 
     inline U32 add_instruction(IRInstruction instr) {
@@ -119,8 +153,29 @@ struct IREmitter {
         return add_instruction(instr);
     }
 
+    void create_database(StringView name) {
+        auto db_name = add_string(name);
+
+        IRInstruction instr;
+        instr.op = IRInstruction::CREATE_DATABASE;
+        instr.operand1 = db_name;
+        instructions.push(instr);
+    }
+
+    void create_table(StringView name, TableSchema* schema) {
+        auto table_name = add_string(name);
+        auto table_schema = add_schema(schema);
+
+        IRInstruction instr;
+        instr.op = IRInstruction::CREATE_TABLE;
+        instr.operand1 = table_name;
+        instr.operand2 = table_schema;
+        instructions.push(instr);
+    }
+
     U32 use_database(StringView name) {
         auto db_name = add_string(name);
+
         IRInstruction instr;
         instr.op = IRInstruction::USE_DATABASE;
         instr.operand1 = db_name;
@@ -235,30 +290,12 @@ struct IREmitter {
 
     Allocator* allocator;
     U32 temps_count = 0;
-    ok::List<IRInstruction> instructions;
-    ok::List<String> strings;
-    ok::List<S64> integers;
-};
-
-struct TableSchema {
-    explicit TableSchema(Allocator* a) {
-        column_names = List<Optional<String>>::alloc(a);
-        column_types = List<ColumnType>::alloc(a);
-    }
-
-    inline bool find_column(StringView name, ColumnType* out_type) const {
-        for (UZ i = 0; i < column_names.count; ++i) {
-            if (column_names[i].has_value() && column_names[i].value == name) {
-                *out_type = column_types[i];
-                return true;
-            }
-        }
-
-        return false;
-    }
-
-    List<Optional<String>> column_names;
-    List<ColumnType> column_types;
+    List<IRInstruction> instructions;
+    List<String> strings;
+    List<S64> integers;
+    // FIXME: instead of maintaining it's own list, the IREmitter structure should re-use indices
+    // into the 'table_schemas' array of some 'DBSchema' object
+    List<TableSchema*> schemas;
 };
 
 struct DBSchema {
@@ -292,8 +329,8 @@ struct DBSchema {
     Table<String, U32> table_schemas_index;
 };
 
-struct SemaContext {
-    explicit SemaContext(Allocator* allocator) : allocator{allocator}, ir_emitter{allocator} {
+struct IrContext {
+    explicit IrContext(Allocator* allocator) : allocator{allocator}, ir_emitter{allocator} {
         auto default_schema = DBSchema::alloc_default(ok::static_allocator);
         database_schemas = List<DBSchema>::alloc(allocator);
         database_schemas.push(default_schema);
@@ -336,7 +373,6 @@ struct SemaContext {
 
     enum Namespace : U8 {
         NS_GLOBAL,
-        NS_SCHEMA,
         NS_TABLE,
     };
 
@@ -373,7 +409,7 @@ struct SemaContext {
     IREmitter ir_emitter;
 };
 
-bool sema_check_query(Query*, SemaContext*);
+bool ir_compile_query(Query*, IrContext*);
 };
 
-#endif // XMDB_SEMA_HPP
+#endif // XMDB_IR_HPP

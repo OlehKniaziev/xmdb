@@ -4,8 +4,7 @@ add_library(LibSQL
         Lexer.cpp
         Parser.cpp
         constructor_linux.cpp
-        sema.cpp
-        sema.hpp)
+        ir.cpp)
 
 set_property(TARGET LibSQL PROPERTY POSITION_INDEPENDENT_CODE 1)
 
