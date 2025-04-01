@@ -479,7 +479,8 @@ struct IrContext {
     Optional<Error> error{};
 };
 
-bool ir_compile_query(Query*, IrContext*);
+bool ir_compile_query(Query *, IrContext *);
+String stringify_ir(Allocator *, IREmitter *);
 };
 
 #endif // XMDB_IR_HPP

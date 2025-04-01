@@ -520,6 +520,7 @@ Optional<U32> compile_graph_node(StmtGraph* g, U32 node_id, IrContext* ctx) {
 }
 
 static inline bool compile_graph(StmtGraph* graph, IrContext* ctx) {
+#if 0
     auto dot_src = ok::String::alloc(ctx->allocator, "digraph { graph [dpi=200]; ");
 
     for (UZ i = 0; i < graph->nodes.count; ++i) {
@@ -534,7 +535,7 @@ static inline bool compile_graph(StmtGraph* graph, IrContext* ctx) {
     auto err = dot.exec();
 
     OK_ASSERT(!err.has_value());
-
+#endif
     return (bool)compile_graph_node(graph, graph->root_node_index, ctx);
 }
 
@@ -565,8 +566,6 @@ String stringify_ir(Allocator* allocator, IREmitter* emitter) {
     UZ ip = instructions.count;
     U32 ip_padding = 1;
     while (ip /= 10) ++ip_padding;
-
-    printf("instruction padding: %u\n", ip_padding);
 
     for (UZ i = 0; i < instructions.count; ++i) {
         IRInstruction instr = instructions[i];
@@ -691,9 +690,6 @@ bool ir_compile_query(Query* q, IrContext* ctx) {
             TRY(compile_unoptimizable_stmt(stmt, ctx));
         }
     }
-
-    auto ir_string = stringify_ir(ctx->allocator, &ctx->ir_emitter);
-    ok::println(ir_string);
 
     return true;
 }
