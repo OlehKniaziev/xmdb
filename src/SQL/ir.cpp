@@ -48,7 +48,7 @@ static Optional<U32> compile_ident(IdentifierExpr* ident, IrContext* ctx) {
         Optional<TableSchema*> table_schema = ctx->get_table_schema_by_id(table_location);
         OK_ASSERT(table_schema.has_value());
 
-        if (!table_schema.value->find_column(column_name, nullptr)) {
+        if (!table_schema.value->find_column(column_name)) {
             String error_message = String::format(ctx->allocator, "cannot find column '%s'", ident->value.cstr());
             ctx->error_on(ident->token, error_message);
             return {};
@@ -136,7 +136,8 @@ static inline bool compile_create_stmt(CreateStmt* stmt, IrContext* ctx) {
 
     auto* create_table_stmt = static_cast<CreateTableStmt*>(stmt);
 
-    auto* table_schema = ctx->alloc_table_schema(ctx->active_db_id, stmt->name, nullptr);
+    TableSchema* table_schema = ctx->alloc_table_schema(ctx->active_db_id, stmt->name, true);
+    OK_ASSERT(table_schema->column_types.has_value());
 
     for (UZ i = 0; i < create_table_stmt->column_names.count; ++i) {
         String column_type_string = create_table_stmt->column_types[i];
@@ -145,7 +146,7 @@ static inline bool compile_create_stmt(CreateStmt* stmt, IrContext* ctx) {
 
         String column_name = create_table_stmt->column_names[i];
         table_schema->column_names.push(column_name.copy(ctx->allocator));
-        table_schema->column_types.push(column_type);
+        table_schema->column_types.value.push(column_type);
     }
 
     ctx->ir_emitter.create_table(create_table_stmt->name.view(), table_schema);
@@ -495,17 +496,23 @@ Optional<U32> compile_graph_node(StmtGraph* g, U32 node_id, IrContext* ctx) {
 
         UZ columns_count = node->edges.count - 1;
 
+        TableSchema *query_schema = ctx->alloc_table_schema(ctx->active_db_id, {}, false);
+
         ctx->push_table(table_node_id.value);
         {
             for (UZ i = 0; i < node->edges.count - 1; ++i) {
                 auto expr_node = compile_graph_node(g, node->edges[i], ctx);
                 TRY(expr_node);
                 ctx->ir_emitter.emit_column(expr_node.value, "dummy"_sv); // FIXME
+
+                String column_name = String::alloc(ctx->allocator, "dummy");
+
+                query_schema->column_names.push(column_name);
             }
         }
         ctx->pop_namespace();
 
-        node->ir_id = ctx->ir_emitter.emit_query(columns_count);
+        node->ir_id = ctx->ir_emitter.emit_query(columns_count, query_schema);
         return node->ir_id;
     }
     default: OK_TODO();
@@ -622,8 +629,9 @@ String stringify_ir(Allocator* allocator, IREmitter* emitter) {
         case IRInstruction::EMIT_QUERY: {
             String var_name = emitter->strings[instr.operand1];
             U32 column_count = instr.operand2;
+            TableSchema *query_schema = emitter->schemas[instr.operand3];
 
-            buffer.format_append("%s := %s %u", var_name.cstr(), operator_name, column_count);
+            buffer.format_append("%s := %s %u <schema at %p>", var_name.cstr(), operator_name, column_count, (void*)query_schema);
             break;
         }
         case IRInstruction::LT:

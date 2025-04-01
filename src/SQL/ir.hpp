@@ -28,24 +28,30 @@ enum class ColumnType {
 };
 
 struct TableSchema {
-    explicit TableSchema(Allocator* a) {
-        column_names = List<Optional<String>>::alloc(a);
-        column_types = List<ColumnType>::alloc(a);
+    static TableSchema untyped(Allocator *a) {
+        TableSchema schema;
+        schema.column_names = List<Optional<String>>::alloc(a);
+        schema.column_types = {};
+        return schema;
     }
 
-    inline bool find_column(StringView name, ColumnType* out_type) const {
+    static TableSchema typed(Allocator* a) {
+        TableSchema schema = TableSchema::untyped(a);
+        schema.column_types = List<ColumnType>::alloc(a);
+        return schema;
+    }
+
+    inline bool find_column(StringView name) const {
         for (UZ i = 0; i < column_names.count; ++i) {
-            if (column_names[i].has_value() && column_names[i].value == name) {
-                if (out_type != nullptr) *out_type = column_types[i];
+            if (column_names[i].has_value() && column_names[i].value == name)
                 return true;
-            }
         }
 
         return false;
     }
 
     List<Optional<String>> column_names;
-    List<ColumnType> column_types;
+    Optional<List<ColumnType>> column_types;
 };
 
 struct IRInstruction {
@@ -256,13 +262,15 @@ struct IREmitter {
         instructions.push(instr);
     }
 
-    U32 emit_query(U32 columns_count) {
+    U32 emit_query(U32 columns_count, TableSchema* schema) {
         auto temp_name = gen_temp();
+        auto query_schema = add_schema(schema);
 
         IRInstruction instr;
         instr.op = IRInstruction::EMIT_QUERY;
         instr.operand1 = temp_name;
         instr.operand2 = columns_count;
+        instr.operand3 = query_schema;
         return add_instruction(instr);
     }
 
@@ -347,14 +355,16 @@ struct DBSchema {
         return schema;
     }
 
-    inline TableSchema* alloc_table_schema(Optional<String> name) {
+    inline TableSchema* alloc_table_schema(Optional<String> name, bool typed) {
         if (name) {
             OK_ASSERT(!table_schemas_index.has(name.value)); // FIXME
             table_schemas_index.put(name.value, table_schema_count);
         }
 
         TableSchema* schema = &table_schemas[table_schema_count++];
-        *schema = TableSchema{allocator};
+        if (typed) *schema = TableSchema::typed(allocator);
+        else *schema = TableSchema::untyped(allocator);
+
         return schema;
     }
 
@@ -416,11 +426,10 @@ struct IrContext {
         return &db_schema->table_schemas[table_schema_id];
     }
 
-    inline TableSchema* alloc_table_schema(U8 db_schema_id, Optional<String> table_name, U24* out_schema_id) {
-        auto* db_schema = &database_schemas[db_schema_id];
-        auto* table_schema = db_schema->alloc_table_schema(table_name);
-        if (out_schema_id != nullptr)
-            *out_schema_id = (U24)db_schema_id << 16 | ((U24)db_schema->table_schema_count - 1);
+    inline TableSchema* alloc_table_schema(U8 db_schema_id, Optional<String> table_name, bool typed) {
+        DBSchema* db_schema = &database_schemas[db_schema_id];
+        TableSchema* table_schema = db_schema->alloc_table_schema(table_name, typed);
+
         return table_schema;
     }
 
