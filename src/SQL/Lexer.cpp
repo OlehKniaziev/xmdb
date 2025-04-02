@@ -4,7 +4,7 @@ namespace xmdb::SQL {
 TokenTable token_table{};
 
 StringView token_types_pretty[] = {
-#define X(str, tok) [Token::tok] = StringView{str},
+#define X(str, tok) StringView{str},
         XMDB_ENUM_SQL_TOKENS
 #undef X
 };

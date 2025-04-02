@@ -2,6 +2,8 @@
 #define XMDB_SQLPARSER_H_
 
 #include <Core/SourceLocation.hpp>
+#include <Core/util.hpp>
+
 #include "Lexer.hpp"
 #include "ast.hpp"
 
@@ -23,6 +25,8 @@ struct Parser {
     Optional<CreateStmt*> create_stmt();
 
     Optional<Expr*> expression();
+
+    Optional<Query> query();
 
     bool cur_token_is(Token::Type) const;
     bool try_expect(Token::Type);

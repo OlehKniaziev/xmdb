@@ -2,6 +2,8 @@
 #define XMDB_SQLLEXER_H_
 
 #include <Core/ok.hpp>
+#include <Core/SourceLocation.hpp>
+#include <cstddef>
 
 using ok::Optional;
 using ok::String;
@@ -55,6 +57,32 @@ struct Token {
     Type type;
     StringView data;
 };
+
+static inline SourceLocation locate_token(StringView source, Token token) {
+    OK_ASSERT((uintptr_t) token.data.data >= (uintptr_t) source.data);
+
+    ptrdiff_t token_offset = token.data.data - source.data;
+
+    uint32_t line = 1;
+    uint32_t column = 1;
+    for (ptrdiff_t i = 0; i < token_offset; ++i) {
+        // TODO: support DOS-style newlines
+        if (source[i] == '\n') {
+            line++;
+            column = 1;
+        } else {
+            column++;
+        }
+    }
+
+    return SourceLocation{
+        .line = line,
+        .column = column,
+        .length = (uint32_t) token.data.count,
+    };
+}
+
+
 
 inline StringView token_type_to_string_view(Token::Type type) {
     return token_types_pretty[type];

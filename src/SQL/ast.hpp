@@ -2,6 +2,7 @@
 #define XMDB_AST_H_
 
 #include <Core/ok.hpp>
+#include "Lexer.hpp"
 
 namespace xmdb::SQL {
 struct Stmt {
@@ -17,6 +18,7 @@ struct Stmt {
     };
 
     Type type;
+    Token token;
 };
 
 struct Expr {
@@ -31,17 +33,42 @@ struct Expr {
         SELECT,
     };
 
-    static Expr* true_literal;
-    static Expr* false_literal;
-    static Expr* null_literal;
+    static Expr* alloc_true(ok::Allocator* allocator, Token token) {
+        Expr* expr = allocator->alloc<Expr>();
+        expr->type = TRUE_LIT;
+        expr->token = token;
+        return expr;
+    }
+
+    static Expr* alloc_false(ok::Allocator* allocator, Token token) {
+        Expr* expr = allocator->alloc<Expr>();
+        expr->type = FALSE_LIT;
+        expr->token = token;
+        return expr;
+    }
+
+    static Expr* alloc_null(ok::Allocator* allocator, Token token) {
+        Expr* expr = allocator->alloc<Expr>();
+        expr->type = NULL_LIT;
+        expr->token = token;
+        return expr;
+    }
+
+    U64 ok_hash_value() const;
+
+    bool operator ==(const Expr&) const;
+
+    ok::String to_string(ok::Allocator*) const;
 
     Type type;
+    Token token;
 };
 
 struct IdentifierExpr : public Expr {
-    static IdentifierExpr* alloc(ok::Allocator* allocator, ok::StringView value) {
+    static IdentifierExpr* alloc(ok::Allocator* allocator, Token token, ok::StringView value) {
         auto* expr = allocator->alloc<IdentifierExpr>();
         expr->type = IDENT;
+        expr->token = token;
         expr->value = value.to_string(allocator);
         return expr;
     }
@@ -50,9 +77,10 @@ struct IdentifierExpr : public Expr {
 };
 
 struct IntegerExpr : public Expr {
-    static IntegerExpr* alloc(ok::Allocator* allocator, int64_t value) {
+    static IntegerExpr* alloc(ok::Allocator* allocator, Token token, int64_t value) {
         auto* expr = allocator->alloc<IntegerExpr>();
         expr->type = INTEGER_LIT;
+        expr->token = token;
         expr->value = value;
         return expr;
     }
@@ -61,9 +89,10 @@ struct IntegerExpr : public Expr {
 };
 
 struct StringExpr : public Expr {
-    static StringExpr* alloc(ok::Allocator* allocator, ok::String value) {
+    static StringExpr* alloc(ok::Allocator* allocator, Token token, ok::String value) {
         auto* expr = allocator->alloc<StringExpr>();
         expr->type = STRING_LIT;
+        expr->token = token;
         expr->value = value;
         return expr;
     }
@@ -78,27 +107,29 @@ struct BinaryOpExpr : public Expr {
         LT,
     };
 
-    static BinaryOpExpr* alloc(ok::Allocator* allocator, Kind kind, Expr* left, Expr* right) {
+    static BinaryOpExpr* alloc(ok::Allocator* allocator, Token token, Kind kind, Expr* lhs, Expr* rhs) {
         auto* expr = allocator->alloc<BinaryOpExpr>();
         expr->type = BINARY_OP;
+        expr->token = token;
         expr->kind = kind;
-        expr->left = left;
-        expr->right = right;
+        expr->lhs = lhs;
+        expr->rhs = rhs;
         return expr;
     }
 
     Kind kind;
-    Expr* left;
-    Expr* right;
+    Expr* lhs;
+    Expr* rhs;
 };
 
 struct SelectExpr : public Expr {
-    static SelectExpr* alloc(ok::Allocator* allocator, ok::Slice<Expr*> exprs, Expr* table) {
-        auto* stmt = allocator->alloc<SelectExpr>();
-        stmt->type = SELECT;
-        stmt->exprs = exprs;
-        stmt->table = table;
-        return stmt;
+    static SelectExpr* alloc(ok::Allocator* allocator, Token token, ok::Slice<Expr*> exprs, Expr* table) {
+        auto* expr = allocator->alloc<SelectExpr>();
+        expr->type = SELECT;
+        expr->token = token;
+        expr->exprs = exprs;
+        expr->table = table;
+        return expr;
     }
 
     ok::Slice<Expr*> exprs;
@@ -106,9 +137,10 @@ struct SelectExpr : public Expr {
 };
 
 struct ExprStmt : public Stmt {
-    static ExprStmt* alloc(ok::Allocator* allocator, Expr* expr) {
+    static ExprStmt* alloc(ok::Allocator* allocator, Token token, Expr* expr) {
         auto* stmt = allocator->alloc<ExprStmt>();
         stmt->type = EXPR;
+        stmt->token = token;
         stmt->expr = expr;
         return stmt;
     }
@@ -117,9 +149,10 @@ struct ExprStmt : public Stmt {
 };
 
 struct UseStmt : public Stmt {
-    static UseStmt* alloc(ok::Allocator* allocator, ok::StringView database) {
+    static UseStmt* alloc(ok::Allocator* allocator, Token token, ok::StringView database) {
         auto* stmt = allocator->alloc<UseStmt>();
         stmt->type = USE;
+        stmt->token = token;
         stmt->database = database.to_string(allocator);
         return stmt;
     }
@@ -128,10 +161,11 @@ struct UseStmt : public Stmt {
 };
 
 struct InsertStmt : public Stmt {
-    static InsertStmt* alloc(ok::Allocator* allocator, Expr* table, ok::Slice<ok::String> columns,
+    static InsertStmt* alloc(ok::Allocator* allocator, Token token, Expr* table, ok::Slice<ok::String> columns,
                                 ok::Slice<Expr*> values, ok::Slice<uint32_t> values_counts) {
         auto* stmt = allocator->alloc<InsertStmt>();
         stmt->type = INSERT;
+        stmt->token = token;
         stmt->table = table;
         stmt->columns = columns;
         stmt->values = values;
@@ -146,10 +180,11 @@ struct InsertStmt : public Stmt {
 };
 
 struct UpdateStmt : public Stmt {
-    static UpdateStmt* alloc(ok::Allocator* allocator, Expr* table, ok::Slice<ok::String> columns,
+    static UpdateStmt* alloc(ok::Allocator* allocator, Token token, Expr* table, ok::Slice<ok::String> columns,
                                 ok::Slice<Expr*> values, ok::Optional<Expr*> filter) {
         auto* stmt = allocator->alloc<UpdateStmt>();
         stmt->type = UPDATE;
+        stmt->token = token;
         stmt->table = table;
         stmt->columns = columns;
         stmt->values = values;
@@ -164,9 +199,10 @@ struct UpdateStmt : public Stmt {
 };
 
 struct DeleteStmt : public Stmt {
-    static DeleteStmt* alloc(ok::Allocator* allocator, Expr* table, ok::Optional<Expr*> filter) {
+    static DeleteStmt* alloc(ok::Allocator* allocator, Token token, Expr* table, ok::Optional<Expr*> filter) {
         auto* stmt = allocator->alloc<DeleteStmt>();
         stmt->type = DELETE;
+        stmt->token = token;
         stmt->table = table;
         stmt->filter = filter;
         return stmt;
@@ -182,9 +218,10 @@ struct DropStmt : public Stmt {
         DATABASE,
     };
 
-    static DropStmt* alloc(ok::Allocator* allocator, Target target, ok::String name) {
+    static DropStmt* alloc(ok::Allocator* allocator, Token token, Target target, ok::String name) {
         auto* stmt = allocator->alloc<DropStmt>();
         stmt->type = DROP;
+        stmt->token = token;
         stmt->target = target;
         stmt->name = name;
         return stmt;
@@ -205,9 +242,10 @@ struct CreateStmt : public Stmt {
 };
 
 struct CreateDatabaseStmt : public CreateStmt {
-    static CreateDatabaseStmt* alloc(ok::Allocator* allocator, ok::String name) {
+    static CreateDatabaseStmt* alloc(ok::Allocator* allocator, Token token, ok::String name) {
         auto* stmt = allocator->alloc<CreateDatabaseStmt>();
         stmt->type = CREATE;
+        stmt->token = token;
         stmt->target = Target::DATABASE;
         stmt->name = name;
         return stmt;
@@ -215,10 +253,11 @@ struct CreateDatabaseStmt : public CreateStmt {
 };
 
 struct CreateTableStmt : public CreateStmt {
-    static CreateTableStmt* alloc(ok::Allocator* allocator, ok::String name, ok::Slice<ok::String> column_names,
+    static CreateTableStmt* alloc(ok::Allocator* allocator, Token token, ok::String name, ok::Slice<ok::String> column_names,
                                      ok::Slice<ok::String> column_types) {
         auto* stmt = allocator->alloc<CreateTableStmt>();
         stmt->type = CREATE;
+        stmt->token = token;
         stmt->target = Target::TABLE;
         stmt->name = name;
         stmt->column_names = column_names;
@@ -228,6 +267,10 @@ struct CreateTableStmt : public CreateStmt {
 
     ok::Slice<ok::String> column_names;
     ok::Slice<ok::String> column_types;
+};
+
+struct Query {
+    ok::Slice<Stmt*> stmts;
 };
 }; // namespace xmdb
 

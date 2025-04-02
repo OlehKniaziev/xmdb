@@ -48,8 +48,8 @@ TEST(SQLParser, binary_expression) {
 
     auto gt_bin = static_cast<BinaryOpExpr*>(gt.value);
     ASSERT_EQ(gt_bin->kind, BinaryOpExpr::Kind::GT);
-    EXPECT_EQ(gt_bin->left->type, Expr::INTEGER_LIT);
-    EXPECT_EQ(gt_bin->right->type, Expr::INTEGER_LIT);
+    EXPECT_EQ(gt_bin->lhs->type, Expr::INTEGER_LIT);
+    EXPECT_EQ(gt_bin->rhs->type, Expr::INTEGER_LIT);
 
     auto lt = parser.expression();
     ASSERT_TRUE(lt.has_value());
@@ -57,8 +57,8 @@ TEST(SQLParser, binary_expression) {
 
     auto lt_bin = static_cast<BinaryOpExpr*>(lt.value);
     ASSERT_EQ(lt_bin->kind, BinaryOpExpr::Kind::LT);
-    EXPECT_EQ(lt_bin->left->type, Expr::INTEGER_LIT);
-    EXPECT_EQ(lt_bin->right->type, Expr::IDENT);
+    EXPECT_EQ(lt_bin->lhs->type, Expr::INTEGER_LIT);
+    EXPECT_EQ(lt_bin->rhs->type, Expr::IDENT);
 
     auto eq = parser.expression();
     ASSERT_TRUE(eq.has_value());
@@ -66,8 +66,8 @@ TEST(SQLParser, binary_expression) {
 
     auto eq_bin = static_cast<BinaryOpExpr*>(eq.value);
     ASSERT_EQ(eq_bin->kind, BinaryOpExpr::Kind::EQ);
-    EXPECT_EQ(eq_bin->left->type, Expr::INTEGER_LIT);
-    EXPECT_EQ(eq_bin->right->type, Expr::STRING_LIT);
+    EXPECT_EQ(eq_bin->lhs->type, Expr::INTEGER_LIT);
+    EXPECT_EQ(eq_bin->rhs->type, Expr::STRING_LIT);
 
     auto eq_eq = parser.expression();
     ASSERT_TRUE(eq_eq.has_value());
@@ -75,13 +75,13 @@ TEST(SQLParser, binary_expression) {
 
     auto eq_eq_bin = static_cast<BinaryOpExpr*>(eq_eq.value);
     ASSERT_EQ(eq_eq_bin->kind, BinaryOpExpr::Kind::EQ);
-    EXPECT_EQ(eq_eq_bin->left->type, Expr::INTEGER_LIT);
-    EXPECT_EQ(eq_eq_bin->right->type, Expr::BINARY_OP);
+    EXPECT_EQ(eq_eq_bin->lhs->type, Expr::INTEGER_LIT);
+    EXPECT_EQ(eq_eq_bin->rhs->type, Expr::BINARY_OP);
 
-    auto eq_eq_rhs = static_cast<BinaryOpExpr*>(eq_eq_bin->right);
+    auto eq_eq_rhs = static_cast<BinaryOpExpr*>(eq_eq_bin->rhs);
     ASSERT_EQ(eq_eq_rhs->kind, BinaryOpExpr::Kind::EQ);
-    EXPECT_EQ(eq_eq_rhs->left->type, Expr::INTEGER_LIT);
-    EXPECT_EQ(eq_eq_rhs->right->type, Expr::INTEGER_LIT);
+    EXPECT_EQ(eq_eq_rhs->lhs->type, Expr::INTEGER_LIT);
+    EXPECT_EQ(eq_eq_rhs->rhs->type, Expr::INTEGER_LIT);
 }
 
 TEST(SQLParser, select_expr) {
@@ -275,6 +275,25 @@ TEST(SQLParser, create_table_stmt) {
 
     EXPECT_EQ(create_table->column_types[0], "int"_sv);
     EXPECT_EQ(create_table->column_types[1], "text"_sv);
+}
+
+TEST(SQLParser, query) {
+    ok::ArenaAllocator arena{};
+    auto source = R"sql(CREATE TABLE MyTable (
+        column1 int,
+        column2 text
+    );
+    SELECT column1 FROM MyTable;)sql"_sv;
+    Parser parser{&arena, source};
+
+    auto query = parser.query();
+    ASSERT_TRUE(query.has_value());
+    ASSERT_EQ(query.value.stmts.count, 2);
+    ASSERT_EQ(query.value.stmts[0]->type, Stmt::CREATE);
+    ASSERT_EQ(query.value.stmts[1]->type, Stmt::EXPR);
+
+    auto select_expr = static_cast<ExprStmt*>(query.value.stmts[1]);
+    ASSERT_EQ(select_expr->type, Expr::SELECT);
 }
 
 TEST(SQLParser, eof_error) {
