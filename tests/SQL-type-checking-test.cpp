@@ -21,6 +21,6 @@ TEST(type_checking, basic) {
 
     ASSERT_TRUE(ir_compile_query(&query.value, &ir_ctx));
 
-    TypingContext typing_ctx = new_typing_context(&arena);
+    TypingContext typing_ctx = new_typing_context(&arena, source);
     ASSERT_TRUE(type_check_ir(&ir_ctx.ir_emitter, &typing_ctx));
 }

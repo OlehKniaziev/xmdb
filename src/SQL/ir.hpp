@@ -111,6 +111,7 @@ static_assert(sizeof(IRInstruction) == sizeof(U32) * 4);
 struct IREmitter {
     explicit IREmitter(Allocator* allocator) : allocator{allocator} {
         instructions = List<IRInstruction>::alloc(allocator);
+        tokens = List<Token>::alloc(allocator);
         strings = List<String>::alloc(allocator);
         integers = List<S64>::alloc(allocator);
         schemas = List<TableSchema*>::alloc(allocator);
@@ -148,7 +149,9 @@ struct IREmitter {
         return instructions.count - 1;
     }
 
-    U32 eq(U32 lhs, U32 rhs) {
+    U32 eq(Token token, U32 lhs, U32 rhs) {
+        tokens.push(token);
+
         IRInstruction instr;
         instr.op = IRInstruction::EQ;
         instr.operand1 = gen_temp();
@@ -157,7 +160,9 @@ struct IREmitter {
         return add_instruction(instr);
     }
 
-    U32 lt(U32 lhs, U32 rhs) {
+    U32 lt(Token token, U32 lhs, U32 rhs) {
+        tokens.push(token);
+
         IRInstruction instr;
         instr.op = IRInstruction::LT;
         instr.operand1 = gen_temp();
@@ -166,7 +171,9 @@ struct IREmitter {
         return add_instruction(instr);
     }
 
-    U32 gt(U32 lhs, U32 rhs) {
+    U32 gt(Token token, U32 lhs, U32 rhs) {
+        tokens.push(token);
+
         IRInstruction instr;
         instr.op = IRInstruction::GT;
         instr.operand1 = gen_temp();
@@ -175,7 +182,9 @@ struct IREmitter {
         return add_instruction(instr);
     }
 
-    void create_database(StringView name) {
+    void create_database(Token token, StringView name) {
+        tokens.push(token);
+
         auto db_name = add_string(name);
 
         IRInstruction instr;
@@ -185,7 +194,9 @@ struct IREmitter {
         instructions.push(instr);
     }
 
-    void create_table(StringView name, TableSchema* schema) {
+    void create_table(Token token, StringView name, TableSchema* schema) {
+        tokens.push(token);
+
         auto table_name = add_string(name);
         auto table_schema = add_schema(schema);
 
@@ -197,7 +208,9 @@ struct IREmitter {
         instructions.push(instr);
     }
 
-    void drop_database(StringView name) {
+    void drop_database(Token token, StringView name) {
+        tokens.push(token);
+
         auto db_name = add_string(name);
 
         IRInstruction instr;
@@ -207,7 +220,9 @@ struct IREmitter {
         instructions.push(instr);
     }
 
-    void drop_table(StringView name) {
+    void drop_table(Token token, StringView name) {
+        tokens.push(token);
+
         auto table_name = add_string(name);
 
         IRInstruction instr;
@@ -217,7 +232,9 @@ struct IREmitter {
         instructions.push(instr);
     }
 
-    U32 use_database(StringView name) {
+    U32 use_database(Token token, StringView name) {
+        tokens.push(token);
+
         auto db_name = add_string(name);
 
         IRInstruction instr;
@@ -226,20 +243,27 @@ struct IREmitter {
         return add_instruction(instr);
     }
 
-    U32 fetch_table(StringView name) {
+    U32 fetch_table(Token token, StringView name, TableSchema *schema) {
+        tokens.push(token);
+
         auto table_name = add_string(name);
 
         auto table_var_name_string = String::format(allocator, OK_SV_FMT "_table", OK_SV_ARG(name));
         auto table_var_name = add_string(table_var_name_string);
 
+        U32 table_schema = add_schema(schema);
+
         IRInstruction instr;
         instr.op = IRInstruction::FETCH_TABLE;
         instr.operand1 = table_var_name;
         instr.operand2 = table_name;
+        instr.operand3 = table_schema;
         return add_instruction(instr);
     }
 
-    U32 fetch_column(U32 table, StringView column) {
+    U32 fetch_column(Token token, U32 table, StringView column) {
+        tokens.push(token);
+
         auto column_name = add_string(column);
 
         auto column_var_name_string = String::format(allocator, OK_SV_FMT "_column", OK_SV_ARG(column));
@@ -253,7 +277,9 @@ struct IREmitter {
         return add_instruction(instr);
     }
 
-    void emit_column(U32 column_location, StringView column_name) {
+    void emit_column(Token token, U32 column_location, StringView column_name) {
+        tokens.push(token);
+
         auto column_name_id = add_string(column_name);
 
         IRInstruction instr;
@@ -267,7 +293,9 @@ struct IREmitter {
     // FIXME(oleh): we don't need the table schema here, since we can derive the column names and
     // types during the type checking stage purely from `EmitColumn` instructions, having provided
     // the column count of the emitted query
-    U32 emit_query(U32 columns_count, TableSchema* schema) {
+    U32 emit_query(Token token, U32 columns_count, TableSchema* schema) {
+        tokens.push(token);
+
         auto temp_name = gen_temp();
         auto query_schema = add_schema(schema);
 
@@ -279,7 +307,9 @@ struct IREmitter {
         return add_instruction(instr);
     }
 
-    U32 constant(S64 integer) {
+    U32 constant(Token token, S64 integer) {
+        tokens.push(token);
+
         auto temp = gen_temp();
         auto integer_operand = add_int(integer);
 
@@ -291,7 +321,9 @@ struct IREmitter {
         return add_instruction(instr);
     }
 
-    U32 constant(StringView sv) {
+    U32 constant(Token token, StringView sv) {
+        tokens.push(token);
+
         auto temp = gen_temp();
         auto string_operand = add_string(sv);
 
@@ -303,11 +335,13 @@ struct IREmitter {
         return add_instruction(instr);
     }
 
-    U32 constant(String string) {
-        return constant(string.view());
+    U32 constant(Token token, String string) {
+        return constant(token, string.view());
     }
 
-    U32 constant_true() {
+    U32 constant_true(Token token) {
+        tokens.push(token);
+
         auto temp = gen_temp();
 
         IRInstruction instr;
@@ -317,7 +351,9 @@ struct IREmitter {
         return add_instruction(instr);
     }
 
-    U32 constant_false() {
+    U32 constant_false(Token token) {
+        tokens.push(token);
+
         auto temp = gen_temp();
 
         IRInstruction instr;
@@ -327,7 +363,9 @@ struct IREmitter {
         return add_instruction(instr);
     }
 
-    U32 constant_null() {
+    U32 constant_null(Token token) {
+        tokens.push(token);
+
         auto temp = gen_temp();
 
         IRInstruction instr;
@@ -340,6 +378,7 @@ struct IREmitter {
     Allocator* allocator;
     U32 temps_count = 0;
     List<IRInstruction> instructions;
+    List<Token> tokens;
     List<String> strings;
     List<S64> integers;
     // FIXME: instead of maintaining it's own list, the IREmitter structure should re-use indices

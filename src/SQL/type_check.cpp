@@ -28,6 +28,11 @@ static inline bool types_are_equal(Type lhs, Type rhs) {
     return true;
 }
 
+static void error_on(TypingContext *ctx, Token token, String message) {
+    SourceLocation source_location = locate_token(ctx->source, token);
+    ctx->error = TypingContextError { .location = source_location, .message = message };
+}
+
 static Type const_to_type_table[IRInstruction::CONST_MAX] = {
     [IRInstruction::CONST_INT] = TYPE_INT,
     [IRInstruction::CONST_STRING] = TYPE_STRING,
@@ -62,11 +67,20 @@ static inline bool type_check_ir_instruction(U32 ip, IREmitter *ir_emitter, Typi
     case IRInstruction::GT:
     case IRInstruction::EQ: {
         Type lhs_type = ctx->ir_instruction_types.get(instr.operand2).get();
-        if (!type_is_comparable(lhs_type)) OK_PANIC_FMT("type '%s' is not comparable", type_to_string_table[lhs_type]);
+        if (!type_is_comparable(lhs_type)) {
+            Token token = ir_emitter->tokens[ip];
+            String message = String::format(ctx->allocator, "type '%s' is not comparable", type_to_string_table[lhs_type]);
+            error_on(ctx, token, message);
+            return false;
+        }
         Type rhs_type = ctx->ir_instruction_types.get(instr.operand3).get();
 
-        if (!types_are_equal(lhs_type, rhs_type))
-            OK_PANIC_FMT("cannot compare lhs of type '%s' to rhs of type '%s'", type_to_string_table[lhs_type], type_to_string_table[rhs_type]);
+        if (!types_are_equal(lhs_type, rhs_type)) {
+            Token token = ir_emitter->tokens[ip];
+            String message = String::format(ctx->allocator, "cannot compare lhs of type '%s' to rhs of type '%s'", type_to_string_table[lhs_type], type_to_string_table[rhs_type]);
+            error_on(ctx, token, message);
+            return false;
+        }
 
         ctx->ir_instruction_types.put(ip, {TYPE_BOOL});
         return true;
@@ -156,12 +170,13 @@ bool type_check_ir(IREmitter *ir_emitter, TypingContext *ctx) {
     return true;
 }
 
-TypingContext new_typing_context(Allocator *allocator) {
+TypingContext new_typing_context(Allocator *allocator, StringView source) {
     TypingContext ctx;
     ctx.allocator = allocator;
     ctx.ir_instruction_types = Table<U32, Type>::alloc(allocator);
     ctx.table_types = Table<U32, TypedTableSchema>::alloc(allocator);
     ctx.emitted_columns = List<U32>::alloc(allocator);
+    ctx.source = source;
     return ctx;
 }
 }; // namespace xmdb::SQL

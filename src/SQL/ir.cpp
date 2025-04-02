@@ -11,7 +11,7 @@ static inline bool compile_use_stmt(UseStmt* stmt, IrContext* ctx) {
     for (UZ i = 0; i < ctx->database_schemas.count; ++i) {
         if (ctx->database_schemas[i].name == db_name) {
             ctx->active_db_id = i;
-            ctx->ir_emitter.use_database(db_name);
+            ctx->ir_emitter.use_database(stmt->token, db_name);
             return true;
         }
     }
@@ -32,9 +32,9 @@ static inline Optional<U32> compile_binop(BinaryOpExpr* binop, IrContext* ctx) {
     IREmitter* e = &ctx->ir_emitter;
 
     switch (binop->kind) {
-    case BinaryOpExpr::Kind::EQ: return e->eq(lhs.value, rhs.value);
-    case BinaryOpExpr::Kind::GT: return e->gt(lhs.value, rhs.value);
-    case BinaryOpExpr::Kind::LT: return e->lt(lhs.value, rhs.value);
+    case BinaryOpExpr::Kind::EQ: return e->eq(binop->token, lhs.value, rhs.value);
+    case BinaryOpExpr::Kind::GT: return e->gt(binop->token, lhs.value, rhs.value);
+    case BinaryOpExpr::Kind::LT: return e->lt(binop->token, lhs.value, rhs.value);
     default: OK_UNREACHABLE();
     }
 }
@@ -54,18 +54,19 @@ static Optional<U32> compile_ident(IdentifierExpr* ident, IrContext* ctx) {
             return {};
         }
 
-        return ctx->ir_emitter.fetch_column(table_location, column_name);
+        return ctx->ir_emitter.fetch_column(ident->token, table_location, column_name);
     }
     case IrContext::NS_GLOBAL: {
         StringView table_name = ident->value.view();
+        Optional<TableSchema*> table_schema = ctx->get_table_schema(ctx->active_db_id, table_name, nullptr);
 
-        if (!ctx->get_table_schema(ctx->active_db_id, table_name, nullptr)) {
+        if (!table_schema) {
             String error_message = String::format(ctx->allocator, "cannot find table '%s'", ident->value.cstr());
             ctx->error_on(ident->token, error_message);
             return {};
         }
 
-        return ctx->ir_emitter.fetch_table(table_name);
+        return ctx->ir_emitter.fetch_table(ident->token, table_name, table_schema.value);
     }
     default: OK_UNREACHABLE();
     }
@@ -77,15 +78,15 @@ static Optional<U32> compile_expr(Expr* expr, IrContext* ctx) {
     switch (expr->type) {
     case Expr::INTEGER_LIT: {
         auto* integer_expr = static_cast<IntegerExpr*>(expr);
-        return e->constant(integer_expr->value);
+        return e->constant(expr->token, integer_expr->value);
     }
     case Expr::STRING_LIT: {
         auto* string_expr = static_cast<StringExpr*>(expr);
-        return e->constant(string_expr->value);
+        return e->constant(expr->token, string_expr->value);
     }
-    case Expr::TRUE_LIT: return e->constant_true();
-    case Expr::FALSE_LIT: return e->constant_false();
-    case Expr::NULL_LIT: return e->constant_null();
+    case Expr::TRUE_LIT: return e->constant_true(expr->token);
+    case Expr::FALSE_LIT: return e->constant_false(expr->token);
+    case Expr::NULL_LIT: return e->constant_null(expr->token);
     case Expr::IDENT: {
         auto* ident = static_cast<IdentifierExpr*>(expr);
         return compile_ident(ident, ctx);
@@ -122,7 +123,7 @@ static inline bool compile_create_stmt(CreateStmt* stmt, IrContext* ctx) {
             }
         }
 
-        ctx->ir_emitter.create_database(stmt->name.view());
+        ctx->ir_emitter.create_database(stmt->token, stmt->name.view());
         return true;
     }
 
@@ -149,7 +150,7 @@ static inline bool compile_create_stmt(CreateStmt* stmt, IrContext* ctx) {
         table_schema->column_types.value.push(column_type);
     }
 
-    ctx->ir_emitter.create_table(create_table_stmt->name.view(), table_schema);
+    ctx->ir_emitter.create_table(stmt->token, create_table_stmt->name.view(), table_schema);
 
     return true;
 }
@@ -161,7 +162,7 @@ static inline bool compile_drop_stmt(DropStmt* stmt, IrContext* ctx) {
     case DropStmt::Target::DATABASE: {
         for (UZ i = 0; i < ctx->database_schemas.count; ++i) {
             if (ctx->database_schemas[i].name == name) {
-                ctx->ir_emitter.drop_database(name);
+                ctx->ir_emitter.drop_database(stmt->token, name);
                 return true;
             }
         }
@@ -177,7 +178,7 @@ static inline bool compile_drop_stmt(DropStmt* stmt, IrContext* ctx) {
             return false;
         }
 
-        ctx->ir_emitter.drop_table(name);
+        ctx->ir_emitter.drop_table(stmt->token, name);
         return true;
     }
     default: OK_UNREACHABLE();
@@ -451,7 +452,7 @@ Optional<U32> compile_graph_node(StmtGraph* g, U32 node_id, IrContext* ctx) {
         auto rhs = compile_graph_node(g, rhs_node, ctx);
         TRY(rhs);
 
-        node->ir_id = e->eq(lhs.value, rhs.value);
+        node->ir_id = e->eq(node->value->token, lhs.value, rhs.value);
         return node->ir_id;
     }
     case StmtGraphNode::LT: {
@@ -463,7 +464,7 @@ Optional<U32> compile_graph_node(StmtGraph* g, U32 node_id, IrContext* ctx) {
         auto rhs = compile_graph_node(g, rhs_node, ctx);
         TRY(rhs);
 
-        node->ir_id = e->lt(lhs.value, rhs.value);
+        node->ir_id = e->lt(node->value->token, lhs.value, rhs.value);
         return node->ir_id;
     }
     case StmtGraphNode::GT: {
@@ -475,7 +476,7 @@ Optional<U32> compile_graph_node(StmtGraph* g, U32 node_id, IrContext* ctx) {
         auto rhs = compile_graph_node(g, rhs_node, ctx);
         TRY(rhs);
 
-        node->ir_id = e->gt(lhs.value, rhs.value);
+        node->ir_id = e->gt(node->value->token, lhs.value, rhs.value);
         return node->ir_id;
     }
     case StmtGraphNode::SELECT: {
@@ -501,9 +502,13 @@ Optional<U32> compile_graph_node(StmtGraph* g, U32 node_id, IrContext* ctx) {
         ctx->push_table(table_node_id.value);
         {
             for (UZ i = 0; i < node->edges.count - 1; ++i) {
-                auto expr_node = compile_graph_node(g, node->edges[i], ctx);
-                TRY(expr_node);
-                ctx->ir_emitter.emit_column(expr_node.value, "dummy"_sv); // FIXME
+                U32 edge_id = node->edges[i];
+
+                StmtGraphNode *expr_node = &g->nodes[edge_id];
+                auto expr_node_id = compile_graph_node(g, edge_id, ctx);
+                TRY(expr_node_id);
+
+                ctx->ir_emitter.emit_column(expr_node->value->token, expr_node_id.value, "dummy"_sv); // FIXME
 
                 String column_name = String::alloc(ctx->allocator, "dummy");
 
@@ -512,7 +517,7 @@ Optional<U32> compile_graph_node(StmtGraph* g, U32 node_id, IrContext* ctx) {
         }
         ctx->pop_namespace();
 
-        node->ir_id = ctx->ir_emitter.emit_query(columns_count, query_schema);
+        node->ir_id = ctx->ir_emitter.emit_query(node->value->token, columns_count, query_schema);
         return node->ir_id;
     }
     default: OK_TODO();
