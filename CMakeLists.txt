@@ -15,8 +15,8 @@ add_subdirectory(src/Server)
 
 include(FetchContent)
 FetchContent_Declare(
-        googletest
-        URL https://github.com/google/googletest/releases/download/v1.16.0/googletest-1.16.0.tar.gz
+  googletest
+  URL https://github.com/google/googletest/releases/download/v1.16.0/googletest-1.16.0.tar.gz
 )
 
 FetchContent_MakeAvailable(googletest)

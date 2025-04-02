@@ -18,13 +18,15 @@ namespace xmdb::SQL {
 
 using U24 = U32;
 
-enum class ColumnType {
-    INTEGER,
-    FLOAT,
-    DOUBLE,
-    TEXT,
-    IMAGE,
-    BOOLEAN,
+enum ColumnType {
+    COLUMN_INTEGER,
+    COLUMN_FLOAT,
+    COLUMN_DOUBLE,
+    COLUMN_TEXT,
+    COLUMN_IMAGE,
+    COLUMN_BOOLEAN,
+
+    COLUMN_MAX,
 };
 
 struct TableSchema {
@@ -262,6 +264,9 @@ struct IREmitter {
         instructions.push(instr);
     }
 
+    // FIXME(oleh): we don't need the table schema here, since we can derive the column names and
+    // types during the type checking stage purely from `EmitColumn` instructions, having provided
+    // the column count of the emitted query
     U32 emit_query(U32 columns_count, TableSchema* schema) {
         auto temp_name = gen_temp();
         auto query_schema = add_schema(schema);

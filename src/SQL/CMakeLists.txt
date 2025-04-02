@@ -1,10 +1,12 @@
 add_library(LibSQL
-        OBJECT
-        ast.cpp
-        Lexer.cpp
-        Parser.cpp
-        constructor_linux.cpp
-        ir.cpp)
+  OBJECT
+  ast.cpp
+  Lexer.cpp
+  Parser.cpp
+  constructor_linux.cpp
+  ir.cpp
+  type_check.cpp
+)
 
 set_property(TARGET LibSQL PROPERTY POSITION_INDEPENDENT_CODE 1)
 

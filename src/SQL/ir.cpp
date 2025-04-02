@@ -98,12 +98,12 @@ static Optional<U32> compile_expr(Expr* expr, IrContext* ctx) {
 
 static inline bool parse_type(StringView input, Token where, IrContext* ctx, ColumnType* out) {
     if (input == "int"_sv) {
-        *out = ColumnType::INTEGER;
+        *out = COLUMN_INTEGER;
         return true;
     }
 
     if (input == "text"_sv) {
-        *out = ColumnType::TEXT;
+        *out = COLUMN_TEXT;
         return true;
     }
 
