@@ -138,8 +138,12 @@ static inline bool type_check_ir_instruction(U32 ip, IREmitter *ir_emitter, Typi
             U32 ir_ip = ctx->emitted_columns[i];
             IRInstruction emit_column_instr = ir_emitter->instructions[ir_ip];
 
-            String column_name = ir_emitter->strings[emit_column_instr.operand2];
+            bool has_column_name = emit_column_instr.operand2;
+            Optional<String> column_name{};
+            if (has_column_name) column_name = ir_emitter->strings[emit_column_instr.operand3];
+
             Type column_type = ctx->ir_instruction_types.get(emit_column_instr.operand1).get();
+
             column_names.push(column_name);
             column_types.push(column_type);
         }
