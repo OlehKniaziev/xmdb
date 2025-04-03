@@ -290,20 +290,15 @@ struct IREmitter {
         instructions.push(instr);
     }
 
-    // FIXME(oleh): we don't need the table schema here, since we can derive the column names and
-    // types during the type checking stage purely from `EmitColumn` instructions, having provided
-    // the column count of the emitted query
-    U32 emit_query(Token token, U32 columns_count, TableSchema* schema) {
+    U32 emit_query(Token token, U32 columns_count) {
         tokens.push(token);
 
         auto temp_name = gen_temp();
-        auto query_schema = add_schema(schema);
 
         IRInstruction instr;
         instr.op = IRInstruction::EMIT_QUERY;
         instr.operand1 = temp_name;
         instr.operand2 = columns_count;
-        instr.operand3 = query_schema;
         return add_instruction(instr);
     }
 

@@ -497,8 +497,6 @@ Optional<U32> compile_graph_node(StmtGraph* g, U32 node_id, IrContext* ctx) {
 
         UZ columns_count = node->edges.count - 1;
 
-        TableSchema *query_schema = ctx->alloc_table_schema(ctx->active_db_id, {}, false);
-
         ctx->push_table(table_node_id.value);
         {
             for (UZ i = 0; i < node->edges.count - 1; ++i) {
@@ -509,15 +507,11 @@ Optional<U32> compile_graph_node(StmtGraph* g, U32 node_id, IrContext* ctx) {
                 TRY(expr_node_id);
 
                 ctx->ir_emitter.emit_column(expr_node->value->token, expr_node_id.value, "dummy"_sv); // FIXME
-
-                String column_name = String::alloc(ctx->allocator, "dummy");
-
-                query_schema->column_names.push(column_name);
             }
         }
         ctx->pop_namespace();
 
-        node->ir_id = ctx->ir_emitter.emit_query(node->value->token, columns_count, query_schema);
+        node->ir_id = ctx->ir_emitter.emit_query(node->value->token, columns_count);
         return node->ir_id;
     }
     default: OK_TODO();
