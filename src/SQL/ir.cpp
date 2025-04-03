@@ -506,7 +506,13 @@ Optional<U32> compile_graph_node(StmtGraph* g, U32 node_id, IrContext* ctx) {
                 auto expr_node_id = compile_graph_node(g, edge_id, ctx);
                 TRY(expr_node_id);
 
-                ctx->ir_emitter.emit_column(expr_node->value->token, expr_node_id.value, "dummy"_sv); // FIXME
+                Optional<StringView> column_name{};
+                if (expr_node->value->type == Expr::IDENT) {
+                    IdentifierExpr *ident = static_cast<IdentifierExpr*>(expr_node->value);
+                    column_name = ident->value.view();
+                }
+
+                ctx->ir_emitter.emit_column(expr_node->value->token, expr_node_id.value, column_name); // FIXME
             }
         }
         ctx->pop_namespace();
@@ -619,17 +625,22 @@ String stringify_ir(Allocator* allocator, IREmitter* emitter) {
             auto column_instr = emitter->instructions[instr.operand1];
 
             String column_name = emitter->strings[column_instr.operand1];
-            String out_name = emitter->strings[instr.operand2];
+            bool has_out_name = instr.operand2;
 
-            buffer.format_append("%s %s \"%s\"", operator_name, column_name.cstr(), out_name.cstr());
+            if (has_out_name) {
+                String out_name = emitter->strings[instr.operand3];
+                buffer.format_append("%s %s \"%s\"", operator_name, column_name.cstr(), out_name.cstr());
+            } else {
+                buffer.format_append("%s %s <anonymous>", operator_name, column_name.cstr());
+            }
+
             break;
         }
         case IRInstruction::EMIT_QUERY: {
             String var_name = emitter->strings[instr.operand1];
             U32 column_count = instr.operand2;
-            TableSchema *query_schema = emitter->schemas[instr.operand3];
 
-            buffer.format_append("%s := %s %u <schema at %p>", var_name.cstr(), operator_name, column_count, (void*)query_schema);
+            buffer.format_append("%s := %s %u", var_name.cstr(), operator_name, column_count);
             break;
         }
         case IRInstruction::LT:
@@ -689,6 +700,8 @@ bool ir_compile_query(Query* q, IrContext* ctx) {
             TRY(compile_unoptimizable_stmt(stmt, ctx));
         }
     }
+
+    ok::println(stringify_ir(ctx->allocator, &ctx->ir_emitter));
 
     return true;
 }

@@ -277,15 +277,20 @@ struct IREmitter {
         return add_instruction(instr);
     }
 
-    void emit_column(Token token, U32 column_location, StringView column_name) {
+    void emit_column(Token token, U32 column_location, Optional<StringView> column_name) {
         tokens.push(token);
-
-        auto column_name_id = add_string(column_name);
 
         IRInstruction instr;
         instr.op = IRInstruction::EMIT_COLUMN;
         instr.operand1 = column_location;
-        instr.operand2 = column_name_id;
+
+        if (column_name.has_value()) {
+            auto column_name_id = add_string(column_name.value);
+            instr.operand2 = 1;
+            instr.operand3 = column_name_id;
+        } else {
+            instr.operand2 = 0;
+        }
 
         instructions.push(instr);
     }
