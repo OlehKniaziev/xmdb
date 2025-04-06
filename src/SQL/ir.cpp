@@ -5,13 +5,105 @@
 using namespace ok::literals;
 
 namespace xmdb::SQL {
+template<typename T>
+struct IRContractAdder {};
+
+template<>
+struct IRContractAdder<StringView> {
+    static U32 add(IREmitter* emitter, StringView sv) {
+        return emitter->add_string(sv);
+    }
+};
+
+template<>
+struct IRContractAdder<S64> {
+    static U32 add(IREmitter* emitter, S64 x) {
+        return emitter->add_int(x);
+    }
+};
+
+template<>
+struct IRContractAdder<TableSchema*> {
+    static U32 add(IREmitter* emitter, TableSchema* schema) {
+        return emitter->add_schema(schema);
+    }
+};
+
+template<>
+struct IRContractAdder<U32> {
+    static U32 add(IREmitter* emitter, U32 ip) {
+        OK_UNUSED(emitter);
+        return ip;
+    }
+};
+
+#define INSTR_VAR_2(name, t1, t2)                                                                                      \
+    static U32 emit_##name(IREmitter* emitter, Token token, t1 o1, t2 o2) {                                                   \
+        emitter->tokens.push(token);                                                                                   \
+        U32 var_name = emitter->gen_temp();                                                                            \
+        IRInstruction instr;                                                                                           \
+        instr.op = IRInstructionOperator_##name;                                                                       \
+        instr.operand1 = var_name;                                                                                     \
+        instr.operand2 = IRContractAdder<t1>::add(emitter, o1);                                                         \
+        instr.operand3 = IRContractAdder<t2>::add(emitter, o2);                                                         \
+        return emitter->add_instruction(instr);                                                                        \
+    }
+
+#define INSTR_VAR_1(name, t1)                                                                                          \
+    static U32 emit_##name(IREmitter* emitter, Token token, t1 o1) {                                                          \
+        emitter->tokens.push(token);                                                                                   \
+        U32 var_name = emitter->gen_temp();                                                                            \
+        IRInstruction instr;                                                                                           \
+        instr.op = IRInstructionOperator_##name;                                                                       \
+        instr.operand1 = var_name;                                                                                     \
+        instr.operand2 = IRContractAdder<t1>::add(emitter, o1);                                                         \
+        return emitter->add_instruction(instr);                                                                        \
+    }
+
+#define INSTR_VAR_0(name)                                                                                              \
+    static U32 emit_##name(IREmitter* emitter, Token token) {                                                                 \
+        emitter->tokens.push(token);                                                                                   \
+        U32 var_name = emitter->gen_temp();                                                                            \
+        IRInstruction instr;                                                                                           \
+        instr.op = IRInstructionOperator_##name;                                                                       \
+        instr.operand1 = var_name;                                                                                     \
+        return emitter->add_instruction(instr);                                                                        \
+    }
+
+#define INSTR_1(name, t1)                                                                                              \
+    static U32 emit_##name(IREmitter* emitter, Token token, t1 o1) {                                                          \
+        emitter->tokens.push(token);                                                                                   \
+        IRInstruction instr;                                                                                           \
+        instr.op = IRInstructionOperator_##name;                                                                       \
+        instr.operand1 = IRContractAdder<t1>::add(emitter, o1);                                                         \
+        return emitter->add_instruction(instr);                                                                        \
+    }
+
+#define INSTR_2(name, t1, t2)                                                                                          \
+    static U32 emit_##name(IREmitter* emitter, Token token, t1 o1, t2 o2) {                                                   \
+        emitter->tokens.push(token);                                                                                   \
+        IRInstruction instr;                                                                                           \
+        instr.op = IRInstructionOperator_##name;                                                                       \
+        instr.operand1 = IRContractAdder<t1>::add(emitter, o1);                                                         \
+        instr.operand2 = IRContractAdder<t2>::add(emitter, o2);                                                         \
+        return emitter->add_instruction(instr);                                                                        \
+    }
+
+ENUM_IR_CONTRACTS
+
+#undef INSTR_VAR_2
+#undef INSTR_VAR_1
+#undef INSTR_VAR_0
+#undef INSTR_1
+#undef INSTR_2
+
 static inline bool compile_use_stmt(UseStmt* stmt, IrContext* ctx) {
     auto db_name = stmt->database.view();
 
     for (UZ i = 0; i < ctx->database_schemas.count; ++i) {
         if (ctx->database_schemas[i].name == db_name) {
             ctx->active_db_id = i;
-            ctx->ir_emitter.use_database(stmt->token, db_name);
+            emit_UseDatabase(&ctx->ir_emitter, stmt->token, db_name);
             return true;
         }
     }
@@ -32,10 +124,10 @@ static inline Optional<U32> compile_binop(BinaryOpExpr* binop, IrContext* ctx) {
     IREmitter* e = &ctx->ir_emitter;
 
     switch (binop->kind) {
-    case BinaryOpExpr::Kind::EQ: return e->eq(binop->token, lhs.value, rhs.value);
-    case BinaryOpExpr::Kind::GT: return e->gt(binop->token, lhs.value, rhs.value);
-    case BinaryOpExpr::Kind::LT: return e->lt(binop->token, lhs.value, rhs.value);
-    default: OK_UNREACHABLE();
+    case BinaryOpExpr::Kind::EQ: return emit_Eq(e, binop->token, lhs.value, rhs.value);
+    case BinaryOpExpr::Kind::GT: return emit_Gt(e, binop->token, lhs.value, rhs.value);
+    case BinaryOpExpr::Kind::LT: return emit_Lt(e, binop->token, lhs.value, rhs.value);
+    default:                     OK_UNREACHABLE();
     }
 }
 
@@ -54,11 +146,11 @@ static Optional<U32> compile_ident(IdentifierExpr* ident, IrContext* ctx) {
             return {};
         }
 
-        return ctx->ir_emitter.fetch_column(ident->token, table_location, column_name);
+            return emit_FetchColumn(&ctx->ir_emitter, ident->token, table_location, column_name);
     }
     case IrContext::NS_GLOBAL: {
         StringView table_name = ident->value.view();
-        Optional<TableSchema*> table_schema = ctx->get_table_schema(ctx->active_db_id, table_name, nullptr);
+        Optional<TableSchema*> table_schema = ctx->get_table_schema(ctx->active_db_id, table_name);
 
         if (!table_schema) {
             String error_message = String::format(ctx->allocator, "cannot find table '%s'", ident->value.cstr());
@@ -66,7 +158,7 @@ static Optional<U32> compile_ident(IdentifierExpr* ident, IrContext* ctx) {
             return {};
         }
 
-        return ctx->ir_emitter.fetch_table(ident->token, table_name, table_schema.value);
+        return emit_FetchTable(&ctx->ir_emitter, ident->token, table_name, table_schema.value);
     }
     default: OK_UNREACHABLE();
     }
@@ -78,22 +170,22 @@ static Optional<U32> compile_expr(Expr* expr, IrContext* ctx) {
     switch (expr->type) {
     case Expr::INTEGER_LIT: {
         auto* integer_expr = static_cast<IntegerExpr*>(expr);
-        return e->constant(expr->token, integer_expr->value);
+        return emit_ConstInt(e, expr->token, integer_expr->value);
     }
     case Expr::STRING_LIT: {
         auto* string_expr = static_cast<StringExpr*>(expr);
-        return e->constant(expr->token, string_expr->value);
+        return emit_ConstString(e, expr->token, string_expr->value.view());
     }
-    case Expr::TRUE_LIT: return e->constant_true(expr->token);
-    case Expr::FALSE_LIT: return e->constant_false(expr->token);
-    case Expr::NULL_LIT: return e->constant_null(expr->token);
-    case Expr::IDENT: {
+    case Expr::TRUE_LIT:  return emit_ConstTrue(e, expr->token);
+    case Expr::FALSE_LIT: return emit_ConstFalse(e, expr->token);
+    case Expr::NULL_LIT:  return emit_ConstNull(e, expr->token);
+    case Expr::IDENT:     {
         auto* ident = static_cast<IdentifierExpr*>(expr);
         return compile_ident(ident, ctx);
     }
     case Expr::BINARY_OP:
-    case Expr::SELECT: OK_UNREACHABLE();
-    default: OK_UNREACHABLE();
+    case Expr::SELECT:    OK_UNREACHABLE();
+    default:              OK_UNREACHABLE();
     }
 }
 
@@ -108,7 +200,8 @@ static inline bool parse_type(StringView input, Token where, IrContext* ctx, Col
         return true;
     }
 
-    String error_message = String::format(ctx->allocator, "'" OK_SV_FMT "' is not a valid column type", OK_SV_ARG(input));
+    String error_message =
+            String::format(ctx->allocator, "'" OK_SV_FMT "' is not a valid column type", OK_SV_ARG(input));
     ctx->error_on(where, error_message);
     return false;
 }
@@ -117,19 +210,20 @@ static inline bool compile_create_stmt(CreateStmt* stmt, IrContext* ctx) {
     if (stmt->target == CreateStmt::Target::DATABASE) {
         for (UZ i = 0; i < ctx->database_schemas.count; ++i) {
             if (ctx->database_schemas[i].name == stmt->name) {
-                String error_message = String::format(ctx->allocator, "database '%s' already exists", stmt->name.cstr());
+                String error_message =
+                        String::format(ctx->allocator, "database '%s' already exists", stmt->name.cstr());
                 ctx->error_on(stmt->token, error_message);
                 return false;
             }
         }
 
-        ctx->ir_emitter.create_database(stmt->token, stmt->name.view());
+        emit_CreateDatabase(&ctx->ir_emitter, stmt->token, stmt->name.view());
         return true;
     }
 
     OK_ASSERT(stmt->target == CreateStmt::Target::TABLE);
 
-    if (ctx->get_table_schema(ctx->active_db_id, stmt->name.view(), nullptr)) {
+    if (ctx->get_table_schema(ctx->active_db_id, stmt->name.view())) {
         String error_message = String::format(ctx->allocator, "table '%s' already exists", stmt->name.cstr());
         ctx->error_on(stmt->token, error_message);
         return false;
@@ -150,7 +244,7 @@ static inline bool compile_create_stmt(CreateStmt* stmt, IrContext* ctx) {
         table_schema->column_types.value.push(column_type);
     }
 
-    ctx->ir_emitter.create_table(stmt->token, create_table_stmt->name.view(), table_schema);
+    emit_CreateTable(&ctx->ir_emitter, stmt->token, create_table_stmt->name.view(), table_schema);
 
     return true;
 }
@@ -162,7 +256,7 @@ static inline bool compile_drop_stmt(DropStmt* stmt, IrContext* ctx) {
     case DropStmt::Target::DATABASE: {
         for (UZ i = 0; i < ctx->database_schemas.count; ++i) {
             if (ctx->database_schemas[i].name == name) {
-                ctx->ir_emitter.drop_database(stmt->token, name);
+                emit_DropDatabase(&ctx->ir_emitter, stmt->token, name);
                 return true;
             }
         }
@@ -172,13 +266,13 @@ static inline bool compile_drop_stmt(DropStmt* stmt, IrContext* ctx) {
         return false;
     }
     case DropStmt::Target::TABLE: {
-        if (!ctx->get_table_schema(ctx->active_db_id, name, nullptr)) {
+        if (!ctx->get_table_schema(ctx->active_db_id, name)) {
             String error_message = String::format(ctx->allocator, "table '%s' does not exist", stmt->name.cstr());
             ctx->error_on(stmt->token, error_message);
             return false;
         }
 
-        ctx->ir_emitter.drop_table(stmt->token, name);
+        emit_DropTable(&ctx->ir_emitter, stmt->token, name);
         return true;
     }
     default: OK_UNREACHABLE();
@@ -223,7 +317,7 @@ struct StmtGraphNode {
     }
 
     inline Type type() const {
-        return (Type)(flags & 0xFF);
+        return (Type) (flags & 0xFF);
     }
 
     inline bool is_visited() const {
@@ -241,14 +335,9 @@ struct StmtGraphNode {
 };
 
 static const char* stmt_graph_node_types_pretty[StmtGraphNode::Type::MAX] = {
-    [StmtGraphNode::EQ] = "=",
-    [StmtGraphNode::LT] = "<",
-    [StmtGraphNode::GT] = ">",
-    [StmtGraphNode::SELECT] = "SELECT",
-    [StmtGraphNode::UPDATE] = "UPDATE",
-    [StmtGraphNode::INSERT] = "INSERT",
-    [StmtGraphNode::DELETE] = "DELETE",
-    [StmtGraphNode::LEAF] = "<leaf>",
+        [StmtGraphNode::EQ] = "=",          [StmtGraphNode::LT] = "<",          [StmtGraphNode::GT] = ">",
+        [StmtGraphNode::SELECT] = "SELECT", [StmtGraphNode::UPDATE] = "UPDATE", [StmtGraphNode::INSERT] = "INSERT",
+        [StmtGraphNode::DELETE] = "DELETE", [StmtGraphNode::LEAF] = "<leaf>",
 };
 
 struct StmtGraph {
@@ -291,7 +380,7 @@ static U32 expr_to_node(StmtGraph* g, Expr* expr, bool set_root = false) {
     case Expr::TRUE_LIT:
     case Expr::FALSE_LIT:
     case Expr::NULL_LIT:
-    case Expr::IDENT: {
+    case Expr::IDENT:       {
         node_type = StmtGraphNode::LEAF;
         break;
     }
@@ -350,9 +439,9 @@ static U32 expr_to_node(StmtGraph* g, Expr* expr, bool set_root = false) {
     }
 
     StmtGraphNode graph_node{
-        node_type,
-        expr,
-        edges,
+            node_type,
+            expr,
+            edges,
     };
 
     U32 node_id = g->add_node(expr, graph_node);
@@ -390,14 +479,12 @@ static inline bool is_stmt_graph_optimizable(Stmt* stmt) {
     switch (stmt->type) {
     case Stmt::USE:
     case Stmt::DROP:
-    case Stmt::CREATE:
-        return false;
+    case Stmt::CREATE: return false;
     case Stmt::EXPR:
     case Stmt::UPDATE:
     case Stmt::DELETE:
-    case Stmt::INSERT:
-        return true;
-    default: OK_UNREACHABLE();
+    case Stmt::INSERT: return true;
+    default:           OK_UNREACHABLE();
     }
 }
 
@@ -452,7 +539,7 @@ Optional<U32> compile_graph_node(StmtGraph* g, U32 node_id, IrContext* ctx) {
         auto rhs = compile_graph_node(g, rhs_node, ctx);
         TRY(rhs);
 
-        node->ir_id = e->eq(node->value->token, lhs.value, rhs.value);
+        node->ir_id = emit_Eq(e, node->value->token, lhs.value, rhs.value);
         return node->ir_id;
     }
     case StmtGraphNode::LT: {
@@ -464,7 +551,7 @@ Optional<U32> compile_graph_node(StmtGraph* g, U32 node_id, IrContext* ctx) {
         auto rhs = compile_graph_node(g, rhs_node, ctx);
         TRY(rhs);
 
-        node->ir_id = e->lt(node->value->token, lhs.value, rhs.value);
+        node->ir_id = emit_Lt(e, node->value->token, lhs.value, rhs.value);
         return node->ir_id;
     }
     case StmtGraphNode::GT: {
@@ -476,7 +563,7 @@ Optional<U32> compile_graph_node(StmtGraph* g, U32 node_id, IrContext* ctx) {
         auto rhs = compile_graph_node(g, rhs_node, ctx);
         TRY(rhs);
 
-        node->ir_id = e->gt(node->value->token, lhs.value, rhs.value);
+        node->ir_id = emit_Gt(e, node->value->token, lhs.value, rhs.value);
         return node->ir_id;
     }
     case StmtGraphNode::SELECT: {
@@ -502,22 +589,22 @@ Optional<U32> compile_graph_node(StmtGraph* g, U32 node_id, IrContext* ctx) {
             for (UZ i = 0; i < node->edges.count - 1; ++i) {
                 U32 edge_id = node->edges[i];
 
-                StmtGraphNode *expr_node = &g->nodes[edge_id];
+                StmtGraphNode* expr_node = &g->nodes[edge_id];
                 auto expr_node_id = compile_graph_node(g, edge_id, ctx);
                 TRY(expr_node_id);
 
-                Optional<StringView> column_name{};
+                StringView column_name = ""_sv;
                 if (expr_node->value->type == Expr::IDENT) {
-                    IdentifierExpr *ident = static_cast<IdentifierExpr*>(expr_node->value);
+                    IdentifierExpr* ident = static_cast<IdentifierExpr*>(expr_node->value);
                     column_name = ident->value.view();
                 }
 
-                ctx->ir_emitter.emit_column(expr_node->value->token, expr_node_id.value, column_name); // FIXME
+                emit_EmitColumn(&ctx->ir_emitter, expr_node->value->token, expr_node_id.value, column_name);
             }
         }
         ctx->pop_namespace();
 
-        node->ir_id = ctx->ir_emitter.emit_query(node->value->token, columns_count);
+        node->ir_id = emit_EmitQuery(&ctx->ir_emitter, node->value->token, columns_count);
         return node->ir_id;
     }
     default: OK_TODO();
@@ -541,27 +628,25 @@ static inline bool compile_graph(StmtGraph* graph, IrContext* ctx) {
 
     OK_ASSERT(!err.has_value());
 #endif
-    return (bool)compile_graph_node(graph, graph->root_node_index, ctx);
+    return (bool) compile_graph_node(graph, graph->root_node_index, ctx);
 }
 
-static const char* ir_operator_names[IRInstruction::OP_MAX] = {
-    [IRInstruction::EQ] = "Equals",
-    [IRInstruction::GT] = "Greater",
-    [IRInstruction::LT] = "Less",
-    [IRInstruction::FETCH_COLUMN] = "FetchColumn",
-    [IRInstruction::FETCH_TABLE] = "FetchTable",
-    [IRInstruction::EMIT_COLUMN] = "EmitColumn",
-    [IRInstruction::EMIT_QUERY] = "EmitQuery",
-    [IRInstruction::USE_DATABASE] = "UseDatabase",
-    [IRInstruction::CREATE] = "Create",
-    [IRInstruction::DROP] = "Drop",
-    [IRInstruction::CONST] = "Const",
-};
+const char *stringify_op(StringView op) {
+    char *data = ok::temp_allocator->alloc<char>(op.count + 1);
+    memcpy(data, op.data, op.count);
+    data[op.count] = '\0';
+    return data;
+}
 
-static const char* ir_target_names[IRInstruction::TARGET_MAX] = {
-    [IRInstruction::TARGET_TABLE] = "Table",
-    [IRInstruction::TARGET_DATABASE] = "Database",
-};
+const char *stringify_op(S64 op) {
+    String s = ok::to_string(ok::temp_allocator, op);
+    return s.cstr();
+}
+
+const char *stringify_op(TableSchema *op) {
+    String s = String::format(ok::temp_allocator, "<table schema with %zu columns>", op->column_names.count);
+    return s.cstr();
+}
 
 String stringify_ir(Allocator* allocator, IREmitter* emitter) {
     String buffer = String::alloc(allocator);
@@ -575,112 +660,57 @@ String stringify_ir(Allocator* allocator, IREmitter* emitter) {
     for (UZ i = 0; i < instructions.count; ++i) {
         IRInstruction instr = instructions[i];
 
-        const char* operator_name = ir_operator_names[instr.op];
-
         buffer.format_append("[%-*zu] ", ip_padding, i);
 
-        switch (instr.op) {
-        case IRInstruction::CONST: {
-            String var_name = emitter->strings[instr.operand1];
-            String constant;
-
-            switch (instr.operand2) {
-            case IRInstruction::CONST_INT: {
-                S64 integer = emitter->integers[instr.operand3];
-                constant = ok::to_string(ok::temp_allocator, integer);
-                break;
-            }
-            case IRInstruction::CONST_STRING: {
-                String string = emitter->strings[instr.operand3];
-                constant = String::format(ok::temp_allocator, "\"%s\"", string.cstr());
-                break;
-            }
-            case IRInstruction::CONST_TRUE: constant = String::alloc(ok::temp_allocator, "TRUE"); break;
-            case IRInstruction::CONST_FALSE: constant = String::alloc(ok::temp_allocator, "FALSE"); break;
-            case IRInstruction::CONST_NULL: constant = String::alloc(ok::temp_allocator, "NULL"); break;
-            default: OK_UNREACHABLE();
-            }
-
-            buffer.format_append("%s := %s", var_name.cstr(), constant.cstr());
-            break;
+#define INSTR_VAR_2(name, t1, t2) \
+        case IRInstructionOperator_##name: { \
+        Triple<String, t1, t2> operands = operands_of_##name(emitter, i); \
+        const char *op1 = stringify_op(operands.op2); \
+        const char *op2 = stringify_op(operands.op3); \
+        buffer.format_append("%s := %s %s %s", operands.op1.cstr(), #name,  op1, op2); \
+        break;\
         }
-        case IRInstruction::FETCH_TABLE: {
-            String var_name = emitter->strings[instr.operand1];
-            String table_name = emitter->strings[instr.operand2];
 
-            buffer.format_append("%s := %s \"%s\"", var_name.cstr(), operator_name, table_name.cstr());
-            break;
+#define INSTR_VAR_1(name, t1) \
+        case IRInstructionOperator_##name: { \
+        Tuple<String, t1> operands = operands_of_##name(emitter, i); \
+        const char *op1 = stringify_op(operands.op2); \
+        buffer.format_append("%s := %s %s", operands.op1.cstr(), #name, op1); \
+        break;\
         }
-        case IRInstruction::FETCH_COLUMN: {
-            String var_name = emitter->strings[instr.operand1];
-            String column_name = emitter->strings[instr.operand3];
 
-            auto table_instr = emitter->instructions[instr.operand2];
-            String table_name = emitter->strings[table_instr.operand1];
-
-            buffer.format_append("%s := %s %s \"%s\"", var_name.cstr(), operator_name, table_name.cstr(), column_name.cstr());
-            break;
+#define INSTR_VAR_0(name) \
+        case IRInstructionOperator_##name: { \
+        String var_name = operands_of_##name(emitter, i); \
+        buffer.format_append("%s := %s", var_name.cstr(), #name); \
+        break;\
         }
-        case IRInstruction::EMIT_COLUMN: {
-            auto column_instr = emitter->instructions[instr.operand1];
 
-            String column_name = emitter->strings[column_instr.operand1];
-            bool has_out_name = instr.operand2;
-
-            if (has_out_name) {
-                String out_name = emitter->strings[instr.operand3];
-                buffer.format_append("%s %s \"%s\"", operator_name, column_name.cstr(), out_name.cstr());
-            } else {
-                buffer.format_append("%s %s <anonymous>", operator_name, column_name.cstr());
-            }
-
-            break;
+#define INSTR_1(name, t1) \
+        case IRInstructionOperator_##name: { \
+        t1 op = operands_of_##name(emitter, i); \
+        const char *op_str = stringify_op(op); \
+        buffer.format_append("%s %s", #name, op_str); \
+        break;\
         }
-        case IRInstruction::EMIT_QUERY: {
-            String var_name = emitter->strings[instr.operand1];
-            U32 column_count = instr.operand2;
 
-            buffer.format_append("%s := %s %u", var_name.cstr(), operator_name, column_count);
-            break;
+#define INSTR_2(name, t1, t2) \
+        case IRInstructionOperator_##name: { \
+        Tuple<t1, t2> operands = operands_of_##name(emitter, i); \
+        const char *op1 = stringify_op(operands.op1); \
+        const char *op2 = stringify_op(operands.op2); \
+        buffer.format_append("%s %s %s", #name, op1, op2); \
+        break;\
         }
-        case IRInstruction::LT:
-        case IRInstruction::GT:
-        case IRInstruction::EQ: {
-            String var_name = emitter->strings[instr.operand1];
 
-            auto lhs_instr = emitter->instructions[instr.operand2];
-            auto lhs_name = emitter->strings[lhs_instr.operand1];
-
-            auto rhs_instr = emitter->instructions[instr.operand3];
-            auto rhs_name = emitter->strings[rhs_instr.operand1];
-
-            buffer.format_append("%s := %s %s %s", var_name.cstr(), operator_name, lhs_name.cstr(), rhs_name.cstr());
-            break;
-        }
-        case IRInstruction::CREATE: {
-            U32 target = instr.operand1;
-            const char* target_name = ir_target_names[target];
-            String name = emitter->strings[instr.operand2];
-
-            if (target == IRInstruction::TARGET_TABLE) {
-                auto table_schema = emitter->schemas[instr.operand3];
-                buffer.format_append("%s%s %s <schema at %p>", operator_name, target_name, name.cstr(), (void*)table_schema);
-            } else if (target == IRInstruction::TARGET_DATABASE) {
-                buffer.format_append("%s%s %s", operator_name, target_name, name.cstr());
-            } else {
-                OK_PANIC_FMT("invalid target '%s' for 'CREATE' statement", target_name);
-            }
-
-            break;
-        }
-        case IRInstruction::DROP: {
-            const char* target_name = ir_target_names[instr.operand1];
-            String name = emitter->strings[instr.operand2];
-
-            buffer.format_append("%s%s %s", operator_name, target_name, name.cstr());
-            break;
-        }
-        default: OK_PANIC_FMT("don't know how to print the '%s' operator", operator_name);
+switch (instr.op) {
+    ENUM_IR_CONTRACTS
+#undef INSTR_1
+#undef INSTR_2
+#undef INSTR_VAR_0
+#undef INSTR_VAR_1
+#undef INSTR_VAR_2
+        default: OK_UNREACHABLE();
         }
 
         buffer.push('\n');
@@ -705,4 +735,4 @@ bool ir_compile_query(Query* q, IrContext* ctx) {
 
     return true;
 }
-};
+}; // namespace xmdb::SQL
