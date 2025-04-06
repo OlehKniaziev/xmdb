@@ -33,14 +33,6 @@ static void error_on(TypingContext *ctx, Token token, String message) {
     ctx->error = TypingContextError { .location = source_location, .message = message };
 }
 
-static Type const_to_type_table[IRInstruction::CONST_MAX] = {
-    [IRInstruction::CONST_INT] = TYPE_INT,
-    [IRInstruction::CONST_STRING] = TYPE_STRING,
-    [IRInstruction::CONST_TRUE] = TYPE_BOOL,
-    [IRInstruction::CONST_FALSE] = TYPE_BOOL,
-    [IRInstruction::CONST_NULL] = TYPE_NULL,
-};
-
 static Type column_type_to_type_table[COLUMN_MAX] = {
     [COLUMN_INTEGER] = TYPE_INT,
     [COLUMN_FLOAT] = TYPE_FLOAT,
@@ -63,17 +55,19 @@ static inline bool type_check_ir_instruction(U32 ip, IREmitter *ir_emitter, Typi
     IRInstruction instr = ir_emitter->instructions[ip];
 
     switch (instr.op) {
-    case IRInstruction::LT:
-    case IRInstruction::GT:
-    case IRInstruction::EQ: {
-        Type lhs_type = ctx->ir_instruction_types.get(instr.operand2).get();
+    case IRInstructionOperator_Lt:
+    case IRInstructionOperator_Gt:
+    case IRInstructionOperator_Eq: {
+        Triple<String, U32, U32> operands = operands_of_Eq(ir_emitter, ip);
+
+        Type lhs_type = ctx->ir_instruction_types.get(operands.op2).get();
         if (!type_is_comparable(lhs_type)) {
             Token token = ir_emitter->tokens[ip];
             String message = String::format(ctx->allocator, "type '%s' is not comparable", type_to_string_table[lhs_type]);
             error_on(ctx, token, message);
             return false;
         }
-        Type rhs_type = ctx->ir_instruction_types.get(instr.operand3).get();
+        Type rhs_type = ctx->ir_instruction_types.get(operands.op3).get();
 
         if (!types_are_equal(lhs_type, rhs_type)) {
             Token token = ir_emitter->tokens[ip];
@@ -85,13 +79,29 @@ static inline bool type_check_ir_instruction(U32 ip, IREmitter *ir_emitter, Typi
         ctx->ir_instruction_types.put(ip, {TYPE_BOOL});
         return true;
     }
-    case IRInstruction::CONST: {
-        Type type = const_to_type_table[instr.operand1];
-        ctx->ir_instruction_types.put(ip, type);
+    case IRInstructionOperator_ConstInt: {
+        ctx->ir_instruction_types.put(ip, TYPE_INT);
         return true;
     }
-    case IRInstruction::FETCH_TABLE: {
-        TableSchema *table_schema = ir_emitter->schemas[instr.operand3];
+    case IRInstructionOperator_ConstString: {
+        ctx->ir_instruction_types.put(ip, TYPE_STRING);
+        return true;
+    }
+    case IRInstructionOperator_ConstTrue: {
+        ctx->ir_instruction_types.put(ip, TYPE_BOOL);
+        return true;
+    }
+    case IRInstructionOperator_ConstFalse: {
+        ctx->ir_instruction_types.put(ip, TYPE_BOOL);
+        return true;
+    }
+    case IRInstructionOperator_ConstNull: {
+        ctx->ir_instruction_types.put(ip, TYPE_NULL);
+        return true;
+    }
+    case IRInstructionOperator_FetchTable: {
+        Triple<String, StringView, TableSchema*> operands = operands_of_FetchTable(ir_emitter, ip);
+        TableSchema *table_schema = operands.op3;
 
         OK_ASSERT(table_schema->column_types.has_value());
 
@@ -111,24 +121,27 @@ static inline bool type_check_ir_instruction(U32 ip, IREmitter *ir_emitter, Typi
         ctx->table_types.put(ip, typed_table_schema);
         return true;
     }
-    case IRInstruction::FETCH_COLUMN: {
-        U32 table_type_ip = instr.operand2;
-        String column_name = ir_emitter->strings[instr.operand3];
+    case IRInstructionOperator_FetchColumn: {
+        Triple<String, U32, StringView> operands = operands_of_FetchColumn(ir_emitter, ip);
+
+        U32 table_type_ip = operands.op2;
+        StringView column_name = operands.op3;
 
         TypedTableSchema table_schema = ctx->table_types.get(table_type_ip).get();
 
         Type column_type;
-        OK_ASSERT(find_column(&table_schema, column_name.view(), &column_type));
+        OK_ASSERT(find_column(&table_schema, column_name, &column_type));
 
         ctx->ir_instruction_types.put(ip, column_type);
         return true;
     }
-    case IRInstruction::EMIT_COLUMN: {
+    case IRInstructionOperator_EmitColumn: {
         ctx->emitted_columns.push(ip);
         return true;
     }
-    case IRInstruction::EMIT_QUERY: {
-        U32 columns_to_emit_count = instr.operand2;
+    case IRInstructionOperator_EmitQuery: {
+        Tuple<String, U32> operands = operands_of_EmitQuery(ir_emitter, ip);
+        U32 columns_to_emit_count = operands.op2;
         OK_ASSERT(ctx->emitted_columns.count >= columns_to_emit_count);
 
         List<Optional<String>> column_names = List<Optional<String>>::alloc(ctx->allocator);
@@ -158,9 +171,10 @@ static inline bool type_check_ir_instruction(U32 ip, IREmitter *ir_emitter, Typi
         ctx->table_types.put(ip, typed_schema);
         return true;
     }
-    case IRInstruction::CREATE:
-    case IRInstruction::DROP:
-    case IRInstruction::USE_DATABASE:
+    case IRInstructionOperator_CreateTable:
+    case IRInstructionOperator_CreateDatabase:
+    case IRInstructionOperator_DropTable:
+    case IRInstructionOperator_DropDatabase:
         return true;
     default: OK_UNREACHABLE();
     }
