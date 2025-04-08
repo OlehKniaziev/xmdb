@@ -55,14 +55,16 @@ endforeach()
 file(GLOB snap_files "tests/snaps/*.cpp")
 
 set(snap "./tests/snap.py")
+set(snapdir "./tests/snaps")
 
 cmake_path(ABSOLUTE_PATH snap)
+cmake_path(ABSOLUTE_PATH snapdir)
 
 foreach(snap_file ${snap_files})
   string(REGEX REPLACE "^.*/snaps/(.*)\\.cpp$" "\\1-snap" snap_exe_name ${snap_file})
 
   add_executable(${snap_exe_name} ${snap_file})
-  add_test(NAME ${snap_exe_name} COMMAND ${snap} "-f" "-d" "tests/snaps" ${snap_exe_name})
+  add_test(NAME ${snap_exe_name} COMMAND ${snap} "-f" "-d" ${snapdir} ${snap_exe_name})
 
   target_link_libraries(
     ${snap_exe_name}

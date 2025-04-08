@@ -25,9 +25,6 @@ def main() -> None:
 
 def test_snapshot(executable: str, snapshot_dir: str) -> None:
     append_dot = True
-    executable_dir = os.path.dirname(executable)
-    if executable_dir == "":
-        executable_dir = "."
 
     if executable.startswith("./") or os.path.isabs(executable):
         append_dot = False
@@ -45,7 +42,7 @@ def test_snapshot(executable: str, snapshot_dir: str) -> None:
     if append_dot:
         executable = f"./{executable}"
 
-    recorded_snapshot = record_snapshot(executable, executable_dir)
+    recorded_snapshot = record_snapshot(executable)
     (failed, save_recorded_snapshot) = report_snapshot_diff(expected_snapshot, recorded_snapshot)
 
     if save_recorded_snapshot:
@@ -62,8 +59,8 @@ def save_snapshot(path: str, snapshot: dict) -> None:
     with open(path, "w") as f:
         json.dump(snapshot, f)
 
-def record_snapshot(executable: str, dirname: str) -> None:
-    proc = subprocess.run([executable], capture_output=True, cwd=dirname)
+def record_snapshot(executable: str) -> None:
+    proc = subprocess.run([executable], capture_output=True)
     snapshot = {
         "code": proc.returncode,
         "stdout": proc.stdout.decode("utf-8"),
