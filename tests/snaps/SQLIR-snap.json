@@ -1,0 +1,1 @@
+{"code": 0, "stdout": "[0] CreateTable MyTable <table schema with 2 columns>\n[1] temp_0 := FetchTable MyTable <table schema with 2 columns>\n[2] temp_1 := FetchColumn 1 column1\n[3] EmitColumn 2 column1\n[4] temp_2 := FetchColumn 1 column2\n[5] EmitColumn 4 column2\n[6] temp_3 := EmitQuery 2\n\n", "stderr": ""}

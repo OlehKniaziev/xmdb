@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.10)
+cmake_minimum_required(VERSION 3.20)
 
 project(xmdb VERSION 0.0.1 LANGUAGES CXX)
 
@@ -38,12 +38,6 @@ foreach(test_file ${test_files})
     ${test_file}
   )
 
-  target_include_directories(
-    ${test_exe_name}
-    PUBLIC
-    ${XMDB_SRC_DIR}
-  )
-
   target_link_libraries(
     ${test_exe_name}
     GTest::gtest_main
@@ -56,4 +50,25 @@ foreach(test_file ${test_files})
   )
 
   gtest_discover_tests(${test_exe_name})
+endforeach()
+
+file(GLOB snap_files "tests/snaps/*.cpp")
+
+set(snap "./tests/snap.py")
+set(snapdir "./tests/snaps")
+
+cmake_path(ABSOLUTE_PATH snap)
+cmake_path(ABSOLUTE_PATH snapdir)
+
+foreach(snap_file ${snap_files})
+  string(REGEX REPLACE "^.*/snaps/(.*)\\.cpp$" "\\1-snap" snap_exe_name ${snap_file})
+
+  add_executable(${snap_exe_name} ${snap_file})
+  add_test(NAME ${snap_exe_name} COMMAND ${snap} "-f" "-d" ${snapdir} ${snap_exe_name})
+
+  target_link_libraries(
+    ${snap_exe_name}
+    LibCore
+    LibSQL::shared
+  )
 endforeach()
