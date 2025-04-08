@@ -731,8 +731,6 @@ bool ir_compile_query(Query* q, IrContext* ctx) {
         }
     }
 
-    ok::println(stringify_ir(ctx->allocator, &ctx->ir_emitter));
-
     return true;
 }
 }; // namespace xmdb::SQL

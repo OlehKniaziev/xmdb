@@ -27,10 +27,11 @@ def test_snapshot(executable: str, snapshot_dir: str) -> None:
     append_dot = True
     executable_dir = os.path.dirname(executable)
     if executable_dir == "":
-        append_dot = False
         executable_dir = "."
 
-    executable_name = os.path.basename(executable)
+    if executable.startswith("./") or os.path.isabs(executable):
+        append_dot = False
+
     snapshot_name = f"{executable}.json"
     full_snapshot_path = os.path.join(snapshot_dir, snapshot_name)
     snapshot_dirname = os.path.dirname(full_snapshot_path)
@@ -42,9 +43,9 @@ def test_snapshot(executable: str, snapshot_dir: str) -> None:
 
     expected_snapshot = load_snapshot(full_snapshot_path)
     if append_dot:
-        executable_name = f"./{executable_name}"
+        executable = f"./{executable}"
 
-    recorded_snapshot = record_snapshot(executable_name, executable_dir)
+    recorded_snapshot = record_snapshot(executable, executable_dir)
     (failed, save_recorded_snapshot) = report_snapshot_diff(expected_snapshot, recorded_snapshot)
 
     if save_recorded_snapshot:
