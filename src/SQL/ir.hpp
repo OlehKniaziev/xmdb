@@ -263,6 +263,18 @@ ENUM_IR_CONTRACTS
 #undef INSTR_2
 
 struct DBSchema {
+    static DBSchema alloc(Allocator *allocator, StringView name) {
+        DBSchema schema;
+        schema.allocator = allocator;
+        schema.name = name.to_string(allocator);
+        schema.table_schemas_index = Table<String, U32>::alloc(allocator);
+        schema.table_schema_count = 0;
+        // This memory will not be commited until we touch it, so allocate *enough*
+        // of it upfront, for our convenience.
+        schema.table_schemas = (TableSchema*) allocator->raw_alloc(~(U32) 0);
+        return schema;
+    }
+
     static DBSchema alloc_default(Allocator* allocator) {
         DBSchema schema;
         schema.allocator = allocator;
@@ -291,6 +303,7 @@ struct DBSchema {
 
     U32 table_schema_count;
     Allocator* allocator;
+    // FIXME: don't allocate it as a bigass block of memory, find out a better way
     TableSchema* table_schemas;
     String name;
     Table<String, U32> table_schemas_index;

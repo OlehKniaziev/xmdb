@@ -563,7 +563,12 @@ struct String {
     }
 
     inline StringView view(UZ start, UZ end) const {
-        OK_ASSERT(start < count());
+        UZ c = count();
+        if (c == 0) {
+            return StringView{"", 0};
+        }
+
+        OK_ASSERT(start < c);
         OK_ASSERT(end >= start);
 
         return StringView{data.items + start, end - start};
@@ -941,131 +946,12 @@ struct Command {
         return *this;
     }
 
-
     Command& set_stdin(Slice<U8> data) {
         stdin_data = data.copy(allocator);
         return *this;
     }
 
-    Optional<ExecError> exec() {
-#if OK_UNIX
-        Optional<ExecError> exec_err{};
-        pid_t child_pid;
-
-        posix_spawn_file_actions_t actions{};
-        posix_spawnattr_t attributes{};
-
-        int stdin_fds[2];
-        UZ stdin_write_count;
-
-        int spawn_ret;
-        int child_status;
-        pid_t wait_ret;
-
-        arg(nullptr);
-        env(nullptr);
-
-        if (pipe(stdin_fds) < -1) {
-            switch (errno) {
-            case EMFILE: exec_err = ExecError::PROCESS_OPEN_FILE_LIMIT_REACHED; goto cleanup;
-            case ENFILE: exec_err = ExecError::SYSTEM_OPEN_FILE_LIMIT_REACHED; goto cleanup;
-            case EFAULT: OK_UNREACHABLE();
-            default: OK_PANIC_FMT("unhandled error %d", errno);
-            }
-        }
-
-        OK_ASSERT(posix_spawn_file_actions_init(&actions) == 0);
-
-        // Close the write end
-        OK_ASSERT(posix_spawn_file_actions_addclose(&actions, stdin_fds[1]) == 0);
-        // Map the read end to stdin
-        OK_ASSERT(posix_spawn_file_actions_adddup2(&actions, stdin_fds[0], STDIN_FILENO) == 0);
-
-        spawn_ret = posix_spawnp(&child_pid, name, &actions, &attributes, args.items, envs.items);
-
-        if (spawn_ret != 0) {
-            switch (spawn_ret) {
-            case E2BIG:    exec_err = ExecError::TOO_BIG; goto cleanup;
-
-            case EPERM:
-            case EACCES:   exec_err = ExecError::ACCESS_DENIED; goto cleanup;
-
-            case EAGAIN:   exec_err = ExecError::PROCESS_LIMIT_EXCEEDED; goto cleanup;
-
-            case ENOEXEC:
-            case ELIBBAD:
-            case EISDIR:
-            case EINVAL:   exec_err = ExecError::INVALID_EXECUTABLE; goto cleanup;
-
-            case EIO:      exec_err = ExecError::IO; goto cleanup;
-            case ELOOP:    exec_err = ExecError::LOOP; goto cleanup;
-            case ENFILE:   exec_err = ExecError::TOO_MANY_FILES; goto cleanup;
-            case ENOENT:   exec_err = ExecError::EXECUTABLE_NOT_FOUND; goto cleanup;
-            case ENOMEM:   exec_err = ExecError::KERNEL_OUT_OF_MEMORY; goto cleanup;
-            case ENOTDIR:  exec_err = ExecError::INVALID_PATH; goto cleanup;
-            case ETXTBSY:  exec_err = ExecError::BUSY; goto cleanup;
-            case EFAULT:   OK_UNREACHABLE();
-            default:       OK_PANIC_FMT("unhandled error %d", spawn_ret);
-            }
-        }
-
-        stdin_write_count = 0;
-        while (stdin_write_count < stdin_data.count) {
-            U8* data = stdin_data.items + stdin_write_count;
-            UZ data_count = stdin_data.count - stdin_write_count;
-
-            SZ write_count = write(stdin_fds[1], data, data_count);
-            if (write_count < 0) {
-                switch (errno) {
-                case EFBIG:  exec_err = ExecError::TOO_BIG; goto cleanup;
-                case EIO:    exec_err = ExecError::IO; goto cleanup;
-                case ENOSPC: exec_err = ExecError::OUT_OF_SPACE; goto cleanup;
-                case EPERM:  exec_err = ExecError::ACCESS_DENIED; goto cleanup;
-                case EPIPE:
-                case EBADFD:
-                case EDESTADDRREQ:
-                case EAGAIN:
-                case EDQUOT:
-                case EINVAL:
-                case EINTR:
-                    OK_UNREACHABLE();
-                default: OK_PANIC_FMT("unhandled error %d", errno);
-                }
-            }
-
-            stdin_write_count += write_count;
-        }
-
-        OK_ASSERT(close(stdin_fds[1]) == 0);
-
-        wait_ret = waitpid(child_pid, &child_status, 0);
-        if (wait_ret == (pid_t)-1) OK_UNREACHABLE();
-
-        if (WIFEXITED(child_status)) {
-            exit_code = WEXITSTATUS(child_status);
-            goto cleanup;
-        }
-
-        if (WIFSIGNALED(child_status)) {
-            term_signal_num = WTERMSIG(child_status);
-            exec_err = ExecError::TERMINATED_BY_SIGNAL;
-            goto cleanup;
-        }
-
-        if (WIFSTOPPED(child_status)) {
-            stop_signal_num = WSTOPSIG(child_status);
-            exec_err = ExecError::STOPPED;
-            goto cleanup;
-        }
-
-cleanup:
-        posix_spawn_file_actions_destroy(&actions);
-
-        return exec_err;
-#else
-        OK_TODO();
-#endif // OS guard
-    }
+    Optional<ExecError> exec();
 
     Allocator* allocator;
     const char* name;
@@ -1763,6 +1649,127 @@ Optional<File::ReadError> File::read_full(Allocator* a, List<U8>* out) {
     out->count = n_read;
 
     return {};
+}
+
+// SUBPROCESS API IMPLEMENTATION
+Optional<Command::ExecError> Command::exec() {
+#if OK_UNIX
+        Optional<ExecError> exec_err{};
+        pid_t child_pid;
+
+        posix_spawn_file_actions_t actions{};
+        posix_spawnattr_t attributes{};
+
+        int stdin_fds[2];
+        UZ stdin_write_count;
+
+        int spawn_ret;
+        int child_status;
+        pid_t wait_ret;
+
+        arg(nullptr);
+        env(nullptr);
+
+        if (pipe(stdin_fds) < -1) {
+            switch (errno) {
+            case EMFILE: exec_err = ExecError::PROCESS_OPEN_FILE_LIMIT_REACHED; goto cleanup;
+            case ENFILE: exec_err = ExecError::SYSTEM_OPEN_FILE_LIMIT_REACHED; goto cleanup;
+            case EFAULT: OK_UNREACHABLE();
+            default: OK_PANIC_FMT("unhandled error %d", errno);
+            }
+        }
+
+        OK_ASSERT(posix_spawn_file_actions_init(&actions) == 0);
+
+        // Close the write end
+        OK_ASSERT(posix_spawn_file_actions_addclose(&actions, stdin_fds[1]) == 0);
+        // Map the read end to stdin
+        OK_ASSERT(posix_spawn_file_actions_adddup2(&actions, stdin_fds[0], STDIN_FILENO) == 0);
+
+        spawn_ret = posix_spawnp(&child_pid, name, &actions, &attributes, args.items, envs.items);
+
+        if (spawn_ret != 0) {
+            switch (spawn_ret) {
+            case E2BIG:    exec_err = ExecError::TOO_BIG; goto cleanup;
+
+            case EPERM:
+            case EACCES:   exec_err = ExecError::ACCESS_DENIED; goto cleanup;
+
+            case EAGAIN:   exec_err = ExecError::PROCESS_LIMIT_EXCEEDED; goto cleanup;
+
+            case ENOEXEC:
+            case ELIBBAD:
+            case EISDIR:
+            case EINVAL:   exec_err = ExecError::INVALID_EXECUTABLE; goto cleanup;
+
+            case EIO:      exec_err = ExecError::IO; goto cleanup;
+            case ELOOP:    exec_err = ExecError::LOOP; goto cleanup;
+            case ENFILE:   exec_err = ExecError::TOO_MANY_FILES; goto cleanup;
+            case ENOENT:   exec_err = ExecError::EXECUTABLE_NOT_FOUND; goto cleanup;
+            case ENOMEM:   exec_err = ExecError::KERNEL_OUT_OF_MEMORY; goto cleanup;
+            case ENOTDIR:  exec_err = ExecError::INVALID_PATH; goto cleanup;
+            case ETXTBSY:  exec_err = ExecError::BUSY; goto cleanup;
+            case EFAULT:   OK_UNREACHABLE();
+            default:       OK_PANIC_FMT("unhandled error %d", spawn_ret);
+            }
+        }
+
+        stdin_write_count = 0;
+        while (stdin_write_count < stdin_data.count) {
+            U8* data = stdin_data.items + stdin_write_count;
+            UZ data_count = stdin_data.count - stdin_write_count;
+
+            SZ write_count = write(stdin_fds[1], data, data_count);
+            if (write_count < 0) {
+                switch (errno) {
+                case EFBIG:  exec_err = ExecError::TOO_BIG; goto cleanup;
+                case EIO:    exec_err = ExecError::IO; goto cleanup;
+                case ENOSPC: exec_err = ExecError::OUT_OF_SPACE; goto cleanup;
+                case EPERM:  exec_err = ExecError::ACCESS_DENIED; goto cleanup;
+                case EPIPE:
+                case EBADFD:
+                case EDESTADDRREQ:
+                case EAGAIN:
+                case EDQUOT:
+                case EINVAL:
+                case EINTR:
+                    OK_UNREACHABLE();
+                default: OK_PANIC_FMT("unhandled error %d", errno);
+                }
+            }
+
+            stdin_write_count += write_count;
+        }
+
+        OK_ASSERT(close(stdin_fds[1]) == 0);
+
+        wait_ret = waitpid(child_pid, &child_status, 0);
+        if (wait_ret == (pid_t)-1) OK_UNREACHABLE();
+
+        if (WIFEXITED(child_status)) {
+            exit_code = WEXITSTATUS(child_status);
+            goto cleanup;
+        }
+
+        if (WIFSIGNALED(child_status)) {
+            term_signal_num = WTERMSIG(child_status);
+            exec_err = ExecError::TERMINATED_BY_SIGNAL;
+            goto cleanup;
+        }
+
+        if (WIFSTOPPED(child_status)) {
+            stop_signal_num = WSTOPSIG(child_status);
+            exec_err = ExecError::STOPPED;
+            goto cleanup;
+        }
+
+cleanup:
+    posix_spawn_file_actions_destroy(&actions);
+
+    return exec_err;
+#else
+        OK_TODO();
+#endif // OS guard
 }
 
 // PROCEDURES IMPLEMENTATION

@@ -113,6 +113,8 @@ Optional<UseStmt*> Parser::use_stmt() {
     auto database = expect(Token::IDENT);
     TRY(database);
 
+    TRY(expect(Token::SEMICOLON));
+
     return UseStmt::alloc(arena, use_token.value, database.value.data);
 }
 

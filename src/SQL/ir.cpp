@@ -217,6 +217,9 @@ static inline bool compile_create_stmt(CreateStmt* stmt, IrContext* ctx) {
             }
         }
 
+        DBSchema new_db_schema = DBSchema::alloc(ctx->allocator, stmt->name.view());
+        ctx->database_schemas.push(new_db_schema);
+
         emit_CreateDatabase(&ctx->ir_emitter, stmt->token, stmt->name.view());
         return true;
     }
