@@ -37,15 +37,13 @@ struct IRContractAdder<U32> {
     }
 };
 
-#define INSTR_VAR_2(name, t1, t2)                                                                                      \
-    static U32 emit_##name(IREmitter* emitter, Token token, t1 o1, t2 o2) {                                                   \
+#define INSTR_VAR_0(name)                                                                                              \
+    static U32 emit_##name(IREmitter* emitter, Token token) {                                                                 \
         emitter->tokens.push(token);                                                                                   \
         U32 var_name = emitter->gen_temp();                                                                            \
         IRInstruction instr;                                                                                           \
         instr.op = IRInstructionOperator_##name;                                                                       \
         instr.operand1 = var_name;                                                                                     \
-        instr.operand2 = IRContractAdder<t1>::add(emitter, o1);                                                         \
-        instr.operand3 = IRContractAdder<t2>::add(emitter, o2);                                                         \
         return emitter->add_instruction(instr);                                                                        \
     }
 
@@ -60,13 +58,23 @@ struct IRContractAdder<U32> {
         return emitter->add_instruction(instr);                                                                        \
     }
 
-#define INSTR_VAR_0(name)                                                                                              \
-    static U32 emit_##name(IREmitter* emitter, Token token) {                                                                 \
+#define INSTR_VAR_2(name, t1, t2)                                                                                      \
+    static U32 emit_##name(IREmitter* emitter, Token token, t1 o1, t2 o2) {                                                   \
         emitter->tokens.push(token);                                                                                   \
         U32 var_name = emitter->gen_temp();                                                                            \
         IRInstruction instr;                                                                                           \
         instr.op = IRInstructionOperator_##name;                                                                       \
         instr.operand1 = var_name;                                                                                     \
+        instr.operand2 = IRContractAdder<t1>::add(emitter, o1);                                                         \
+        instr.operand3 = IRContractAdder<t2>::add(emitter, o2);                                                         \
+        return emitter->add_instruction(instr);                                                                        \
+    }
+
+#define INSTR_0(name) \
+    static U32 emit_##name(IREmitter* emitter, Token token) {                                                          \
+        emitter->tokens.push(token);                                                                                   \
+        IRInstruction instr;                                                                                           \
+        instr.op = IRInstructionOperator_##name;                                                                       \
         return emitter->add_instruction(instr);                                                                        \
     }
 
@@ -89,13 +97,26 @@ struct IRContractAdder<U32> {
         return emitter->add_instruction(instr);                                                                        \
     }
 
+#define INSTR_3(name, t1, t2, t3)                                                                                          \
+    static U32 emit_##name(IREmitter* emitter, Token token, t1 o1, t2 o2, t3 o3) {                                                   \
+        emitter->tokens.push(token);                                                                                   \
+        IRInstruction instr;                                                                                           \
+        instr.op = IRInstructionOperator_##name;                                                                       \
+        instr.operand1 = IRContractAdder<t1>::add(emitter, o1);                                                         \
+        instr.operand2 = IRContractAdder<t2>::add(emitter, o2);                                                         \
+        instr.operand3 = IRContractAdder<t3>::add(emitter, o3);                                                         \
+        return emitter->add_instruction(instr);                                                                        \
+    }
+
 ENUM_IR_CONTRACTS
 
-#undef INSTR_VAR_2
-#undef INSTR_VAR_1
-#undef INSTR_VAR_0
+#undef INSTR_0
 #undef INSTR_1
 #undef INSTR_2
+#undef INSTR_3
+#undef INSTR_VAR_0
+#undef INSTR_VAR_1
+#undef INSTR_VAR_2
 
 static inline bool compile_use_stmt(UseStmt* stmt, IrContext* ctx) {
     auto db_name = stmt->database.view();
@@ -316,8 +337,22 @@ struct StmtGraphNode {
         MAX,
     };
 
-    StmtGraphNode(Type type, Expr* value, Slice<U32> edges) : flags{type}, value{value}, edges{edges} {
+    static StmtGraphNode expr(Type type, Expr *value, Slice<U32> edges) {
+        StmtGraphNode node;
+        node.flags = type;
+        node.up.expr = value;
+        node.edges = edges;
+        return node;
     }
+
+    static StmtGraphNode stmt(Type type, Stmt *stmt, Slice<U32> edges) {
+        StmtGraphNode node;
+        node.flags = type;
+        node.up.stmt = stmt;
+        node.edges = edges;
+        return node;
+    }
+
 
     inline Type type() const {
         return (Type) (flags & 0xFF);
@@ -333,7 +368,11 @@ struct StmtGraphNode {
 
     U32 ir_id = 0;
     U32 flags;
-    Expr* value;
+    // Check the node type to find out which one is active.
+    union {
+        Expr *expr;
+        Stmt *stmt;
+    } up;
     Slice<U32> edges;
 };
 
@@ -349,19 +388,17 @@ struct StmtGraph {
         nodes = List<StmtGraphNode>::alloc(allocator);
     }
 
-    inline U32 add_or_get_node(Expr* expr, StmtGraphNode node) {
-        auto node_index = node_indices.get(ok::HashPtr{expr});
-        if (node_index.has_value()) return node_index.value;
-
-        return add_node(expr, node);
-    }
-
-    inline U32 add_node(Expr* expr, StmtGraphNode node) {
+    inline U32 add_expr_node(Expr* expr, StmtGraphNode node) {
         nodes.push(node);
 
         U32 id = nodes.count - 1;
         node_indices.put(expr, id);
         return id;
+    }
+
+    inline U32 add_stmt_node(StmtGraphNode node) {
+        nodes.push(node);
+        return nodes.count - 1;
     }
 
     Allocator* allocator;
@@ -370,7 +407,7 @@ struct StmtGraph {
     U32 root_node_index{};
 };
 
-static U32 expr_to_node(StmtGraph* g, Expr* expr, bool set_root = false) {
+static U32 expr_to_node(StmtGraph* g, Expr* expr) {
     auto existing_node = g->node_indices.get(ok::HashPtr{expr});
     if (existing_node.has_value()) return existing_node.value;
 
@@ -441,27 +478,45 @@ static U32 expr_to_node(StmtGraph* g, Expr* expr, bool set_root = false) {
     default: OK_UNREACHABLE();
     }
 
-    StmtGraphNode graph_node{
-            node_type,
-            expr,
-            edges,
-    };
+    StmtGraphNode graph_node = StmtGraphNode::expr(node_type, expr, edges);
 
-    U32 node_id = g->add_node(expr, graph_node);
-    if (set_root) g->root_node_index = node_id;
-    return node_id;
+    return g->add_expr_node(expr, graph_node);
 }
 
 static StmtGraph build_expr_stmt_graph(Allocator* allocator, ExprStmt* stmt) {
     StmtGraph graph{allocator};
-    expr_to_node(&graph, stmt->expr, true);
+    graph.root_node_index = expr_to_node(&graph, stmt->expr);
+    return graph;
+}
+
+static StmtGraph build_insert_stmt_graph(Allocator *allocator, InsertStmt *stmt) {
+    StmtGraph graph{allocator};
+
+    UZ edges_count = stmt->values.count + 1;
+    U32 *edges_ptr = allocator->alloc<U32>(edges_count);
+
+    Slice<U32> edges{};
+    edges.items = edges_ptr;
+    edges.count = edges_count;
+
+    edges[0] = expr_to_node(&graph, stmt->table);
+
+    for (UZ i = 0; i < stmt->values.count; ++i) {
+        Expr *value = stmt->values[i];
+        U32 value_id = expr_to_node(&graph, value);
+        edges[i + 1] = value_id;
+    }
+
+    StmtGraphNode root_node = StmtGraphNode::stmt(StmtGraphNode::INSERT, stmt, edges);
+    graph.root_node_index = graph.add_stmt_node(root_node);
     return graph;
 }
 
 static StmtGraph build_statement_graph(Allocator* allocator, Stmt* stmt) {
     switch (stmt->type) {
     case Stmt::INSERT: {
-        OK_TODO();
+        auto *insert = static_cast<InsertStmt*>(stmt);
+        return build_insert_stmt_graph(allocator, insert);
     }
     case Stmt::UPDATE: {
         OK_TODO();
@@ -495,7 +550,7 @@ static void to_string(ok::String* string, StmtGraph* g, U32 node_idx, bool type_
     auto* node = &g->nodes[node_idx];
 
     if (node->type() == StmtGraphNode::LEAF) {
-        auto expr_string = node->value->to_string(ok::temp_allocator);
+        auto expr_string = node->up.expr->to_string(ok::temp_allocator);
         string->format_append("\"%s\";", expr_string.cstr());
         return;
     }
@@ -528,7 +583,7 @@ Optional<U32> compile_graph_node(StmtGraph* g, U32 node_id, IrContext* ctx) {
 
     switch (node->type()) {
     case StmtGraphNode::LEAF: {
-        auto expr_id = compile_expr(node->value, ctx);
+        auto expr_id = compile_expr(node->up.expr, ctx);
         TRY(expr_id);
         node->ir_id = expr_id.value;
         return node->ir_id;
@@ -542,7 +597,7 @@ Optional<U32> compile_graph_node(StmtGraph* g, U32 node_id, IrContext* ctx) {
         auto rhs = compile_graph_node(g, rhs_node, ctx);
         TRY(rhs);
 
-        node->ir_id = emit_Eq(e, node->value->token, lhs.value, rhs.value);
+        node->ir_id = emit_Eq(e, node->up.expr->token, lhs.value, rhs.value);
         return node->ir_id;
     }
     case StmtGraphNode::LT: {
@@ -554,7 +609,7 @@ Optional<U32> compile_graph_node(StmtGraph* g, U32 node_id, IrContext* ctx) {
         auto rhs = compile_graph_node(g, rhs_node, ctx);
         TRY(rhs);
 
-        node->ir_id = emit_Lt(e, node->value->token, lhs.value, rhs.value);
+        node->ir_id = emit_Lt(e, node->up.expr->token, lhs.value, rhs.value);
         return node->ir_id;
     }
     case StmtGraphNode::GT: {
@@ -566,22 +621,22 @@ Optional<U32> compile_graph_node(StmtGraph* g, U32 node_id, IrContext* ctx) {
         auto rhs = compile_graph_node(g, rhs_node, ctx);
         TRY(rhs);
 
-        node->ir_id = emit_Gt(e, node->value->token, lhs.value, rhs.value);
+        node->ir_id = emit_Gt(e, node->up.expr->token, lhs.value, rhs.value);
         return node->ir_id;
     }
     case StmtGraphNode::SELECT: {
         OK_ASSERT(node->edges.count != 0);
-        auto table_node_edge = node->edges[node->edges.count - 1];
+        U32 table_node_edge = node->edges[node->edges.count - 1];
         StmtGraphNode table_node = g->nodes[table_node_edge];
 
-        auto table_node_id = compile_graph_node(g, table_node_edge, ctx);
+        Optional<U32> table_node_id = compile_graph_node(g, table_node_edge, ctx);
         TRY(table_node_id);
 
         Optional<TableSchema*> table_schema = ctx->get_table_schema_by_id(table_node_id.value);
 
         if (!table_schema) {
             String error_message = String::alloc(ctx->allocator, "expression is not a table");
-            ctx->error_on(table_node.value->token, error_message);
+            ctx->error_on(table_node.up.expr->token, error_message);
             return {};
         }
 
@@ -593,21 +648,87 @@ Optional<U32> compile_graph_node(StmtGraph* g, U32 node_id, IrContext* ctx) {
                 U32 edge_id = node->edges[i];
 
                 StmtGraphNode* expr_node = &g->nodes[edge_id];
-                auto expr_node_id = compile_graph_node(g, edge_id, ctx);
+                Optional<U32> expr_node_id = compile_graph_node(g, edge_id, ctx);
                 TRY(expr_node_id);
 
                 StringView column_name = ""_sv;
-                if (expr_node->value->type == Expr::IDENT) {
-                    IdentifierExpr* ident = static_cast<IdentifierExpr*>(expr_node->value);
+                if (expr_node->up.expr->type == Expr::IDENT) {
+                    IdentifierExpr* ident = static_cast<IdentifierExpr*>(expr_node->up.expr);
                     column_name = ident->value.view();
                 }
 
-                emit_EmitColumn(&ctx->ir_emitter, expr_node->value->token, expr_node_id.value, column_name);
+                emit_EmitColumn(&ctx->ir_emitter, expr_node->up.expr->token, expr_node_id.value, column_name);
             }
         }
         ctx->pop_namespace();
 
-        node->ir_id = emit_EmitQuery(&ctx->ir_emitter, node->value->token, columns_count);
+        node->ir_id = emit_EmitQuery(&ctx->ir_emitter, node->up.expr->token, columns_count);
+        return node->ir_id;
+    }
+    case StmtGraphNode::INSERT: {
+        OK_ASSERT(node->edges.count != 0);
+
+        U32 table_node_edge = node->edges[0];
+        StmtGraphNode table_node = g->nodes[table_node_edge];
+
+        Optional<U32> table_node_id = compile_graph_node(g, table_node_edge, ctx);
+        TRY(table_node_id);
+
+        Optional<TableSchema*> table_schema = ctx->get_table_schema_by_id(table_node_id.value);
+
+        if (!table_schema) {
+            String error_message = String::alloc(ctx->allocator, "expression is not a table");
+            ctx->error_on(table_node.up.expr->token, error_message);
+            return {};
+        }
+
+        OK_ASSERT(node->up.stmt->type == Stmt::INSERT);
+
+        auto *insert_stmt = static_cast<InsertStmt*>(node->up.stmt);
+
+        ctx->push_table(table_node_id.value);
+        {
+            UZ values_start = 1;
+
+            for (UZ i = 0; i < insert_stmt->values_counts.count; ++i) {
+                U32 values_count = insert_stmt->values_counts[i];
+
+                U32 first_expr_node_id = node->edges[values_start];
+                StmtGraphNode *first_expr_node = &g->nodes[first_expr_node_id];
+
+                if (values_count != insert_stmt->columns.count) {
+                    String error_message = String::format(ctx->allocator,
+                                                         "expected %zu values, but got %u instead",
+                                                         insert_stmt->columns.count,
+                                                         values_count);
+                    ctx->error_on(first_expr_node->up.expr->token, error_message);
+                    return {};
+                }
+
+                for (UZ j = 0; j < values_count; ++j) {
+                    U32 value_edge = node->edges[values_start + j];
+                    StmtGraphNode *value_edge_node = &g->nodes[value_edge];
+
+                    Optional<U32> value_id = compile_graph_node(g, value_edge, ctx);
+                    TRY(value_id);
+
+                    StringView column_name = insert_stmt->columns[j].view();
+
+                    emit_InsertColumn(&ctx->ir_emitter,
+                                      value_edge_node->up.expr->token,
+                                      table_node_id.value,
+                                      value_id.value,
+                                      column_name);
+                }
+
+                emit_InsertRow(&ctx->ir_emitter, first_expr_node->up.expr->token, table_node_id.value);
+
+                values_start += values_count;
+            }
+        }
+        ctx->pop_namespace();
+
+        node->ir_id = emit_CommitInsert(&ctx->ir_emitter, insert_stmt->token);
         return node->ir_id;
     }
     default: OK_TODO();
@@ -689,6 +810,12 @@ String stringify_ir(Allocator* allocator, IREmitter* emitter) {
         break;\
         }
 
+#define INSTR_0(name) \
+        case IRInstructionOperator_##name: { \
+        buffer.format_append("%s", #name); \
+        break;\
+        }
+
 #define INSTR_1(name, t1) \
         case IRInstructionOperator_##name: { \
         t1 op = operands_of_##name(emitter, i); \
@@ -706,10 +833,22 @@ String stringify_ir(Allocator* allocator, IREmitter* emitter) {
         break;\
         }
 
+#define INSTR_3(name, t1, t2, t3) \
+        case IRInstructionOperator_##name: { \
+        Triple<t1, t2, t3> operands = operands_of_##name(emitter, i); \
+        const char *op1 = stringify_op(operands.op1); \
+        const char *op2 = stringify_op(operands.op2); \
+        const char *op3 = stringify_op(operands.op3); \
+        buffer.format_append("%s %s %s %s", #name, op1, op2, op3); \
+        break;\
+        }
+
 switch (instr.op) {
     ENUM_IR_CONTRACTS
+#undef INSTR_0
 #undef INSTR_1
 #undef INSTR_2
+#undef INSTR_3
 #undef INSTR_VAR_0
 #undef INSTR_VAR_1
 #undef INSTR_VAR_2
@@ -733,6 +872,8 @@ bool ir_compile_query(Query* q, IrContext* ctx) {
             TRY(compile_unoptimizable_stmt(stmt, ctx));
         }
     }
+
+    ok::println(stringify_ir(ctx->allocator, &ctx->ir_emitter));
 
     return true;
 }

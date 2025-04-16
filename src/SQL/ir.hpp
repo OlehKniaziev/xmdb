@@ -72,6 +72,10 @@ enum IRInstructionOperator : U32 {
     IRInstructionOperator_DropDatabase,
     IRInstructionOperator_DropTable,
 
+    IRInstructionOperator_InsertColumn,
+    IRInstructionOperator_InsertRow,
+    IRInstructionOperator_CommitInsert,
+
     IRInstructionOperator_ConstInt,
     IRInstructionOperator_ConstString,
     IRInstructionOperator_ConstTrue,
@@ -94,6 +98,9 @@ enum IRInstructionOperator : U32 {
     INSTR_1(CreateDatabase, StringView)                                                                                \
     INSTR_1(DropTable, StringView)                                                                                     \
     INSTR_1(DropDatabase, StringView)                                                                                  \
+    INSTR_3(InsertColumn, U32, U32, StringView) \
+    INSTR_1(InsertRow, U32) \
+    INSTR_0(CommitInsert) \
     INSTR_VAR_1(ConstInt, S64)                                                                                             \
     INSTR_VAR_1(ConstString, StringView)                                                                                   \
     INSTR_VAR_0(ConstTrue)                                                                                             \
@@ -210,14 +217,12 @@ struct IRContractGetter<U32> {
     }
 };
 
-#define INSTR_VAR_2(name, t1, t2) \
-    static inline Triple<String, t1, t2> operands_of_##name(IREmitter *emitter, U32 ip) { \
+#define INSTR_VAR_0(name) \
+        static inline String operands_of_##name(IREmitter *emitter, U32 ip) { \
     IRInstruction instr = emitter->instructions[ip]; \
     OK_ASSERT(instr.op == IRInstructionOperator_##name); \
     String var_name = emitter->strings[instr.operand1]; \
-    t1 op1 = IRContractGetter<t1>::get(emitter, instr.operand2); \
-    t2 op2 = IRContractGetter<t2>::get(emitter, instr.operand3); \
-    return {var_name, op1, op2}; \
+    return var_name; \
     }
 
 #define INSTR_VAR_1(name, t1) \
@@ -229,12 +234,20 @@ struct IRContractGetter<U32> {
     return {var_name, op1}; \
     }
 
-#define INSTR_VAR_0(name) \
-        static inline String operands_of_##name(IREmitter *emitter, U32 ip) { \
+#define INSTR_VAR_2(name, t1, t2) \
+    static inline Triple<String, t1, t2> operands_of_##name(IREmitter *emitter, U32 ip) { \
     IRInstruction instr = emitter->instructions[ip]; \
     OK_ASSERT(instr.op == IRInstructionOperator_##name); \
     String var_name = emitter->strings[instr.operand1]; \
-    return var_name; \
+    t1 op1 = IRContractGetter<t1>::get(emitter, instr.operand2); \
+    t2 op2 = IRContractGetter<t2>::get(emitter, instr.operand3); \
+    return {var_name, op1, op2}; \
+    }
+
+#define INSTR_0(name)  \
+        static inline void operands_of_##name(IREmitter *emitter, U32 ip) { \
+    IRInstruction instr = emitter->instructions[ip]; \
+    OK_ASSERT(instr.op == IRInstructionOperator_##name); \
     }
 
 #define INSTR_1(name, t1) \
@@ -254,13 +267,26 @@ struct IRContractGetter<U32> {
     return {op1, op2}; \
     }
 
+#define INSTR_3(name, t1, t2, t3) \
+        static inline Triple<t1, t2, t3> operands_of_##name(IREmitter *emitter, U32 ip) { \
+    IRInstruction instr = emitter->instructions[ip]; \
+    OK_ASSERT(instr.op == IRInstructionOperator_##name); \
+    t1 op1 = IRContractGetter<t1>::get(emitter, instr.operand1); \
+    t2 op2 = IRContractGetter<t2>::get(emitter, instr.operand2); \
+    t3 op3 = IRContractGetter<t3>::get(emitter, instr.operand3); \
+    return {op1, op2, op3}; \
+    }
+
+
 ENUM_IR_CONTRACTS
 
 #undef INSTR_VAR_0
 #undef INSTR_VAR_1
 #undef INSTR_VAR_2
+#undef INSTR_0
 #undef INSTR_1
 #undef INSTR_2
+#undef INSTR_3
 
 struct DBSchema {
     static DBSchema alloc(Allocator *allocator, StringView name) {

@@ -113,3 +113,20 @@ TEST(ir, drop_table) {
     TypingContext t_ctx = new_typing_context(&arena, source);
     ASSERT_TRUE(type_check_ir(&ir_ctx.ir_emitter, &t_ctx));
 }
+
+TEST(ir, insert) {
+    ok::ArenaAllocator arena{};
+    auto source = R"sql(CREATE TABLE MyTable (
+        column1 int,
+        column2 text
+    );
+    INSERT INTO MyTable (column1) VALUES (1), (2), (3);)sql"_sv;
+    Parser parser{&arena, source};
+
+    auto query = parser.query();
+    ASSERT_TRUE(query.has_value());
+
+    IrContext ir_ctx{&arena, source};
+
+    ASSERT_TRUE(ir_compile_query(&query.value, &ir_ctx));
+}
