@@ -130,3 +130,20 @@ TEST(ir, insert) {
 
     ASSERT_TRUE(ir_compile_query(&query.value, &ir_ctx));
 }
+
+TEST(ir, update) {
+    ok::ArenaAllocator arena{};
+    auto source = R"sql(CREATE TABLE MyTable (
+        column1 int,
+        column2 text
+    );
+    UPDATE MyTable SET column1 = 1, column2 = "hello";)sql"_sv;
+    Parser parser{&arena, source};
+
+    auto query = parser.query();
+    ASSERT_TRUE(query.has_value());
+
+    IrContext ir_ctx{&arena, source};
+
+    ASSERT_TRUE(ir_compile_query(&query.value, &ir_ctx));
+}

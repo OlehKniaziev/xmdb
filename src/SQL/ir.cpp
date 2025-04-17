@@ -512,6 +512,28 @@ static StmtGraph build_insert_stmt_graph(Allocator *allocator, InsertStmt *stmt)
     return graph;
 }
 
+StmtGraph build_update_stmt_graph(Allocator *allocator, UpdateStmt *stmt) {
+    StmtGraph graph{allocator};
+
+    if (stmt->filter.has_value()) OK_TODO();
+
+    UZ edges_count = stmt->values.count + 1;
+
+    Slice<U32> edges;
+    edges.items = allocator->alloc<U32>(edges_count);
+    edges.count = edges_count;
+
+    edges[0] = expr_to_node(&graph, stmt->table);
+
+    for (UZ i = 0; i < stmt->values.count; ++i) {
+        edges[i + 1] = expr_to_node(&graph, stmt->values[i]);
+    }
+
+    StmtGraphNode root_node = StmtGraphNode::stmt(StmtGraphNode::UPDATE, stmt, edges);
+    graph.root_node_index = graph.add_stmt_node(root_node);
+    return graph;
+}
+
 static StmtGraph build_statement_graph(Allocator* allocator, Stmt* stmt) {
     switch (stmt->type) {
     case Stmt::INSERT: {
@@ -519,7 +541,8 @@ static StmtGraph build_statement_graph(Allocator* allocator, Stmt* stmt) {
         return build_insert_stmt_graph(allocator, insert);
     }
     case Stmt::UPDATE: {
-        OK_TODO();
+        auto *update = static_cast<UpdateStmt*>(stmt);
+        return build_update_stmt_graph(allocator, update);
     }
     case Stmt::DELETE: {
         OK_TODO();
@@ -729,6 +752,58 @@ Optional<U32> compile_graph_node(StmtGraph* g, U32 node_id, IrContext* ctx) {
         ctx->pop_namespace();
 
         node->ir_id = emit_CommitInsert(&ctx->ir_emitter, insert_stmt->token);
+        return node->ir_id;
+    }
+    case StmtGraphNode::UPDATE: {
+        OK_ASSERT(node->edges.count != 0);
+
+        U32 table_node_edge = node->edges[0];
+        StmtGraphNode table_node = g->nodes[table_node_edge];
+
+        Optional<U32> table_node_id = compile_graph_node(g, table_node_edge, ctx);
+        TRY(table_node_id);
+
+        Optional<TableSchema*> table_schema = ctx->get_table_schema_by_id(table_node_id.value);
+
+        if (!table_schema) {
+            String error_message = String::alloc(ctx->allocator, "expression is not a table");
+            ctx->error_on(table_node.up.expr->token, error_message);
+            return {};
+        }
+
+        OK_ASSERT(node->up.stmt->type == Stmt::UPDATE);
+
+        auto *update_stmt = static_cast<UpdateStmt*>(node->up.stmt);
+
+        ctx->push_table(table_node_id.value);
+        {
+            for (UZ i = 1; i < node->edges.count; ++i) {
+                StringView column_name = update_stmt->columns[i - 1].view();
+
+                if (!table_schema.value->find_column(column_name)) {
+                    String error_message = String::format(ctx->allocator,
+                                                          "column '" OK_SV_FMT "' not found",
+                                                          OK_SV_ARG(column_name));
+                    ctx->error_on(update_stmt->token, error_message);
+                    return {};
+                }
+
+                U32 value_edge = node->edges[i];
+                StmtGraphNode *value_edge_node = &g->nodes[value_edge];
+
+                Optional<U32> value_edge_id = compile_graph_node(g, value_edge, ctx);
+                TRY(value_edge_id);
+
+                emit_UpdateColumn(&ctx->ir_emitter,
+                                  value_edge_node->up.expr->token,
+                                  table_node_id.value,
+                                  value_edge_id.value,
+                                  column_name);
+            }
+        }
+        ctx->pop_namespace();
+
+        node->ir_id = emit_CommitUpdate(&ctx->ir_emitter, update_stmt->token);
         return node->ir_id;
     }
     default: OK_TODO();
