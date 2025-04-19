@@ -129,6 +129,9 @@ TEST(ir, insert) {
     IrContext ir_ctx{&arena, source};
 
     ASSERT_TRUE(ir_compile_query(&query.value, &ir_ctx));
+
+    TypingContext t_ctx = new_typing_context(&arena, source);
+    ASSERT_TRUE(type_check_ir(&ir_ctx.ir_emitter, &t_ctx));
 }
 
 TEST(ir, update) {
@@ -146,4 +149,7 @@ TEST(ir, update) {
     IrContext ir_ctx{&arena, source};
 
     ASSERT_TRUE(ir_compile_query(&query.value, &ir_ctx));
+
+    TypingContext t_ctx = new_typing_context(&arena, source);
+    ASSERT_TRUE(type_check_ir(&ir_ctx.ir_emitter, &t_ctx));
 }
