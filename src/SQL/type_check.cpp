@@ -223,6 +223,7 @@ static inline bool type_check_ir_instruction(U32 ip, IREmitter *ir_emitter, Typi
     case IRInstructionOperator_InsertRow:
     case IRInstructionOperator_CommitInsert:
     case IRInstructionOperator_CommitUpdate:
+    case IRInstructionOperator_DeleteTable:
         return true;
     default: OK_UNREACHABLE();
     }

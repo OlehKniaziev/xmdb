@@ -79,6 +79,8 @@ enum IRInstructionOperator : U32 {
     IRInstructionOperator_UpdateColumn,
     IRInstructionOperator_CommitUpdate,
 
+    IRInstructionOperator_DeleteTable,
+
     IRInstructionOperator_ConstInt,
     IRInstructionOperator_ConstString,
     IRInstructionOperator_ConstTrue,
@@ -106,6 +108,7 @@ enum IRInstructionOperator : U32 {
     INSTR_0(CommitInsert) \
     INSTR_3(UpdateColumn, U32, U32, StringView) \
     INSTR_0(CommitUpdate) \
+    INSTR_1(DeleteTable, U32) \
     INSTR_VAR_1(ConstInt, S64)                                                                                             \
     INSTR_VAR_1(ConstString, StringView)                                                                                   \
     INSTR_VAR_0(ConstTrue)                                                                                             \

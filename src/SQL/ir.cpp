@@ -534,6 +534,22 @@ StmtGraph build_update_stmt_graph(Allocator *allocator, UpdateStmt *stmt) {
     return graph;
 }
 
+static StmtGraph build_delete_stmt_graph(Allocator *allocator, DeleteStmt *stmt) {
+    StmtGraph graph{allocator};
+
+    if (stmt->filter.has_value()) OK_TODO();
+
+    Slice<U32> edges;
+    edges.items = allocator->alloc<U32>(1);
+    edges.count = 1;
+
+    edges[0] = expr_to_node(&graph, stmt->table);
+
+    StmtGraphNode root_node = StmtGraphNode::stmt(StmtGraphNode::DELETE, stmt, edges);
+    graph.root_node_index = graph.add_stmt_node(root_node);
+    return graph;
+}
+
 static StmtGraph build_statement_graph(Allocator* allocator, Stmt* stmt) {
     switch (stmt->type) {
     case Stmt::INSERT: {
@@ -545,7 +561,8 @@ static StmtGraph build_statement_graph(Allocator* allocator, Stmt* stmt) {
         return build_update_stmt_graph(allocator, update);
     }
     case Stmt::DELETE: {
-        OK_TODO();
+        auto *del = static_cast<DeleteStmt*>(stmt);
+        return build_delete_stmt_graph(allocator, del);
     }
     case Stmt::EXPR: {
         auto* expr = static_cast<ExprStmt*>(stmt);
@@ -806,6 +823,34 @@ Optional<U32> compile_graph_node(StmtGraph* g, U32 node_id, IrContext* ctx) {
         node->ir_id = emit_CommitUpdate(&ctx->ir_emitter, update_stmt->token);
         return node->ir_id;
     }
+    case StmtGraphNode::DELETE: {
+        OK_ASSERT(node->edges.count == 1);
+
+        U32 table_node_edge = node->edges[0];
+        StmtGraphNode table_node = g->nodes[table_node_edge];
+
+        Optional<U32> table_node_id = compile_graph_node(g, table_node_edge, ctx);
+        TRY(table_node_id);
+
+        Optional<TableSchema*> table_schema = ctx->get_table_schema_by_id(table_node_id.value);
+
+        if (!table_schema) {
+            String error_message = String::alloc(ctx->allocator, "expression is not a table");
+            ctx->error_on(table_node.up.expr->token, error_message);
+            return {};
+        }
+
+        OK_ASSERT(node->up.stmt->type == Stmt::DELETE);
+
+        ctx->push_table(table_node_id.value);
+        {
+            // TODO: apply filter
+        }
+        ctx->pop_namespace();
+
+        node->ir_id = emit_DeleteTable(&ctx->ir_emitter, node->up.stmt->token, table_node_id.value);
+        return node->ir_id;
+    }
     default: OK_TODO();
     }
 }
@@ -947,8 +992,6 @@ bool ir_compile_query(Query* q, IrContext* ctx) {
             TRY(compile_unoptimizable_stmt(stmt, ctx));
         }
     }
-
-    ok::println(stringify_ir(ctx->allocator, &ctx->ir_emitter));
 
     return true;
 }
