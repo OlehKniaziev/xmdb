@@ -10,7 +10,11 @@ int main() {
         column1 int,
         column2 text
     );
-    SELECT column1, column2 FROM MyTable;)sql"_sv;
+    SELECT column1, column2 FROM MyTable;
+    INSERT INTO MyTable(column1, column2) VALUES (1, "1"), (2, "2"), (3, "3");
+    UPDATE MyTable SET column1 = 1337;
+    DELETE FROM MyTable;
+    DROP TABLE MyTable;)sql"_sv;
     Parser parser{&arena, source};
 
     auto query = parser.query();
