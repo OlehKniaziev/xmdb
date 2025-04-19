@@ -5,10 +5,10 @@ static inline bool type_is_comparable(Type type) {
     return type == TYPE_NULL || type == TYPE_INT || type == TYPE_STRING || type == TYPE_BOOL;
 }
 
-static inline bool find_column(TypedTableSchema *schema, StringView name, Type *type) {
-    for (UZ i = 0; i < schema->column_names.count; ++i) {
-        if (schema->column_names[i].has_value() && schema->column_names[i].value == name) {
-            *type = schema->column_types[i];
+static inline bool find_column(TypedTableSchema schema, StringView name, Type *type) {
+    for (UZ i = 0; i < schema.column_names.count; ++i) {
+        if (schema.column_names[i].has_value() && schema.column_names[i].value == name) {
+            *type = schema.column_types[i];
             return true;
         }
     }
@@ -130,7 +130,7 @@ static inline bool type_check_ir_instruction(U32 ip, IREmitter *ir_emitter, Typi
         TypedTableSchema table_schema = ctx->table_types.get(table_type_ip).get();
 
         Type column_type;
-        OK_ASSERT(find_column(&table_schema, column_name, &column_type));
+        OK_ASSERT(find_column(table_schema, column_name, &column_type));
 
         ctx->ir_instruction_types.put(ip, column_type);
         return true;
@@ -171,11 +171,59 @@ static inline bool type_check_ir_instruction(U32 ip, IREmitter *ir_emitter, Typi
         ctx->table_types.put(ip, typed_schema);
         return true;
     }
+    case IRInstructionOperator_InsertColumn: {
+        Triple<U32, U32, StringView> operands = operands_of_InsertColumn(ir_emitter, ip);
+
+        TypedTableSchema table_schema = ctx->table_types.get(operands.op1).get();
+
+        Type column_type = ctx->ir_instruction_types.get(operands.op2).get();
+
+        Type expected_column_type;
+        OK_ASSERT(find_column(table_schema, operands.op3, &expected_column_type));
+
+        if (!types_are_equal(column_type, expected_column_type)) {
+            Token token = ir_emitter->tokens[ip];
+            String message = String::format(ctx->allocator,
+                                            "expected a value of type '%s', but got '%s' instead",
+                                            type_to_string_table[expected_column_type],
+                                            type_to_string_table[column_type]);
+            error_on(ctx, token, message);
+            return false;
+        }
+
+        return true;
+    }
+    case IRInstructionOperator_UpdateColumn: {
+        Triple<U32, U32, StringView> operands = operands_of_UpdateColumn(ir_emitter, ip);
+
+        TypedTableSchema table_schema = ctx->table_types.get(operands.op1).get();
+
+        Type column_type = ctx->ir_instruction_types.get(operands.op2).get();
+
+        Type expected_column_type;
+        OK_ASSERT(find_column(table_schema, operands.op3, &expected_column_type));
+
+        if (!types_are_equal(column_type, expected_column_type)) {
+            Token token = ir_emitter->tokens[ip];
+            String message = String::format(ctx->allocator,
+                                            "expected a value of type '%s', but got '%s' instead",
+                                            type_to_string_table[expected_column_type],
+                                            type_to_string_table[column_type]);
+            error_on(ctx, token, message);
+            return false;
+        }
+
+        return true;
+    }
     case IRInstructionOperator_CreateTable:
     case IRInstructionOperator_CreateDatabase:
     case IRInstructionOperator_DropTable:
     case IRInstructionOperator_DropDatabase:
     case IRInstructionOperator_UseDatabase:
+    case IRInstructionOperator_InsertRow:
+    case IRInstructionOperator_CommitInsert:
+    case IRInstructionOperator_CommitUpdate:
+    case IRInstructionOperator_DeleteTable:
         return true;
     default: OK_UNREACHABLE();
     }

@@ -165,6 +165,8 @@ Optional<InsertStmt*> Parser::insert_stmt() {
         if (!try_expect(Token::COMMA)) break;
     }
 
+    TRY(expect(Token::SEMICOLON));
+
     return InsertStmt::alloc(arena, insert_token.value, table_expr.value, columns.slice(), values.slice(), values_counts.slice());
 }
 

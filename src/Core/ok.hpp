@@ -50,7 +50,7 @@
 
 #define OK_TODO() do { \
     fprintf(stderr, "%s:%d: TODO: Not implemented\n", __FILE__, __LINE__); \
-    exit(1); \
+    abort(); \
 } while (0)
 
 #define OK_UNUSED(arg) (void)(arg);
