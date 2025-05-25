@@ -7,100 +7,78 @@ using ok::Allocator;
 using ok::List;
 
 namespace xmdb {
-template<typename K, typename V>
-struct BTree {
-    struct Node {
-        static Node alloc(Allocator *alloc, size_t max_keys, bool is_leaf) {
-            Node node;
-            node.keys = List<K>::alloc(alloc, max_keys);
-            node.values = List<V>::alloc(alloc);
-            node.children = List<Node>::alloc(alloc);
-            node.is_leaf = is_leaf;
+static constexpr U16 BTREE_PAGE_SIZE = 4096;
+static constexpr U16 BTREE_ORDER = BTREE_PAGE_SIZE / 32;
+static constexpr U16 BTREE_MAX_KEYS = BTREE_ORDER * 2 - 1;
+static constexpr U16 BTREE_MAX_CHILDREN = BTREE_ORDER * 2;
 
-            return node;
-        }
+static_assert((BTREE_MAX_KEYS + BTREE_MAX_CHILDREN + 1) * 8 == BTREE_PAGE_SIZE);
 
-        bool is_leaf;
-        List<K> keys;
-        List<V> values;
-        List<Node> children;
-    };
+/*
+ * Disk layout of the B-Tree node is as following:
+ *   64-bit meta field
+ *   BTREE_MAX_KEYS 64-bit keys
+ *   BTREE_MAX_CHILDREN 64-bit children indices
+ */
 
-    static BTree alloc(Allocator *alloc, size_t max_keys_per_node) {
-        BTree tree;
-        tree.allocator = alloc;
-        tree.max_keys_per_node = max_keys_per_node;
-        tree.root = Node::alloc(alloc, max_keys_per_node, false /* should this be `true`? */);
-
-        return tree;
-    }
-
-    bool search_node(const K &key, Node **out, size_t *idx) {
-        Node *node = &root;
-
-        while (true) {
-            size_t low = 0;
-            size_t high = node->keys.count - 1;
-
-            size_t median;
-
-            while (low <= high) {
-                median = (low + high) / 2;
-
-                const K &median_key = node->keys[median];
-
-                if (median_key == key) {
-                    *out = node;
-                    *idx = median;
-                    return true;
-                }
-
-                if (median_key < key)
-                    low = median + 1;
-                else
-                    high = median - 1;
-            }
-
-            if (node->is_leaf) {
-                *out = node;
-                *idx = low;
-                return false;
-            }
-
-            node = &node->children[median];
-        }
-    }
-
-    void insert(const K &key, const V &value) {
-        Node *node;
-        size_t idx;
-
-        if (search_node(key, &node, &idx)) {
-            node->values[idx] = value;
-            return;
-        }
-
-        // TODO: check if the tree needs to be re-balanced
-        if (node->keys.count < max_keys_per_node) {
-            node->keys.insert(idx, value);
-            return;
-        }
-
-        size_t median = node->keys.count / 2;
-
-        Node left = Node::alloc(allocator);
-        Node right = Node::alloc(allocator);
-
-        for (size_t i = 0; i < median; i++)
-            left.keys.push(node->keys[i]);
-        for (size_t i = median; i < node->keys.count; i++)
-            right.keys.push(node->keys[i]);
-    }
-
-    Allocator *allocator;
-    size_t max_keys_per_node;
-    Node root;
+struct BTreeNodePayload {
+    /*
+      0th bit   - 1 if leaf, 0 if internal / root
+      1-63 bits - the count of keys
+     */
+    U64 meta;
+    U64 keys[BTREE_MAX_KEYS];
+    U64 children[BTREE_MAX_CHILDREN];
 };
+
+static_assert(sizeof(BTreeNodePayload) == BTREE_PAGE_SIZE);
+
+struct BTreeNode {
+    BTreeNode *next;
+    BTreeNodePayload payload;
+    U64 index;
+
+    inline U64 count() const {
+        return payload.meta & ~((U64)1 << 63);
+    }
+
+    inline U64 set_count(UZ count) {
+        if (payload.meta >= UINT64_MAX - count) OK_PANIC("node reached max count");
+        payload.meta += count;
+    }
+
+    inline bool is_leaf() const {
+        return (payload.meta & ((U64)1 << 63)) >> 63;
+    }
+};
+
+struct BTreeNodePool {
+    ok::ArenaAllocator arena;
+    BTreeNode *head;
+};
+
+/*
+ * Disk layout of the B-Tree is as following:
+ *   0-4   - version of the tree structure
+ *   4-8   - node count
+ *   8-end - nodes
+ */
+
+struct BTreeHeader {
+    U32 version;
+    U32 node_count;
+};
+
+struct BTree {
+    ok::File file;
+    BTreeNodePool node_pool;
+    BTreeHeader header;
+    BTreeNode *root_node;
+};
+
+// FIXME: Remove the `out_node` parameter, the found node can be stored as the
+// `current_node` field of the b-tree.
+bool btree_search(BTree *tree, U64 key, BTreeNode **out_node, U64 *out_index);
 }; // namespace xmdb
 
 #endif // XMDB_BTREE_H_

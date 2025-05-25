@@ -53,7 +53,7 @@
     abort(); \
 } while (0)
 
-#define OK_UNUSED(arg) (void)(arg);
+#define OK_UNUSED(arg) (void)(arg)
 
 #define OK_UNREACHABLE() do { \
     fprintf(stderr, "%s:%d: Encountered unreachable code\n", __FILE__, __LINE__); \
@@ -284,6 +284,7 @@ struct ArenaAllocator : public Allocator {
 
     Region* head;
     Region* region_pool;
+    void* last_alloc_ptr;
 };
 
 // templates
@@ -390,10 +391,6 @@ struct List : public ArrayBase<List<T>, T> {
 
     void reserve(UZ new_cap);
 
-    UZ find_index(const T& elem);
-    template <typename F>
-    UZ find_index(F pred);
-
     UZ get_count() const {
         return count;
     }
@@ -470,6 +467,57 @@ struct Slice : public ArrayBase<Slice<T>, T> {
     UZ count;
 };
 
+template <typename T>
+struct LinkedList {
+    struct Node {
+        Node *prev;
+        Node *next;
+        T value;
+    };
+
+    static LinkedList alloc(Allocator *allocator) {
+        LinkedList<T> list{};
+        list.allocator = allocator;
+        return list;
+    }
+
+    void prepend(const T& value) {
+        Node *node = allocator->alloc<Node>();
+        node->value = value;
+
+        if (head == nullptr) {
+            OK_ASSERT(tail == nullptr);
+            head = node;
+            tail = node;
+            return;
+        }
+
+        node->next = head;
+        head->prev = node;
+        head = node;
+    }
+
+    void append(const T& value) {
+        Node *node = allocator->alloc<Node>();
+        node->value = value;
+
+        if (tail == nullptr) {
+            OK_ASSERT(head == nullptr);
+            head = node;
+            tail = node;
+            return;
+        }
+
+        node->prev = tail;
+        tail->next = node;
+        tail = node;
+    }
+
+    Allocator *allocator;
+    Node *head;
+    Node *tail;
+};
+
 // char predicates
 bool is_whitespace(char);
 bool is_digit(char);
@@ -480,7 +528,71 @@ struct String;
 #define OK_SV_FMT "%.*s"
 #define OK_SV_ARG(sv) (int)(sv).count, reinterpret_cast<const char*>((sv).data)
 
-struct StringView {
+template <typename Self, typename Char>
+struct StringBase : public ArrayBase<Self, Char> {
+    inline bool starts_with(const char* prefix) const {
+        const Self *self = this->self_cast();
+        UZ prefix_count = strlen(prefix);
+        UZ count = self->get_count();
+        if (prefix_count > count) return false;
+
+        for (UZ i = 0; i < prefix_count; ++i) {
+            if ((*self)[i] != prefix[i]) return false;
+        }
+
+        return true;
+    }
+
+    inline bool ends_with(const char* suffix) const {
+        const Self *self = this->self_cast();
+        UZ suffix_count = strlen(suffix);
+        UZ count = self->get_count();
+        if (suffix_count > count) return false;
+
+        UZ suffix_diff = count - suffix_count;
+
+        for (UZ i = suffix_diff; i < count; ++i) {
+            UZ suffix_idx = i - suffix_diff;
+            if ((*self)[i] != suffix[suffix_idx]) return false;
+        }
+
+        return true;
+    }
+
+    template <typename Other, typename OtherChar>
+    inline constexpr auto operator <=>(const StringBase<Other, OtherChar>& other) const {
+        const Self *self = this->self_cast();
+        UZ self_count = self->get_count();
+        UZ other_count = other.self_cast()->get_count();
+
+        if (self_count < other_count)      return -1;
+        else if (other_count > self_count) return 1;
+
+        for (UZ i = 0; i < self_count; ++i) {
+            if ((*self)[i] < other[i]) return -1;
+            if ((*self)[i] > other[i]) return 1;
+        }
+
+        return 0;
+    }
+
+    template <typename Other, typename OtherChar>
+    inline constexpr bool operator ==(const StringBase<Other, OtherChar>& other) const {
+        const Self *self = this->self_cast();
+        UZ self_count = self->get_count();
+        UZ other_count = other.self_cast()->get_count();
+
+        if (self_count != other_count) return false;
+
+        for (UZ i = 0; i < self_count; ++i) {
+            if ((*self)[i] != other[i]) return false;
+        }
+
+        return true;
+    }
+};
+
+struct StringView : public StringBase<StringView, const char> {
     StringView() = default;
 
     constexpr StringView(const char* data, UZ count) : data{data}, count{count} {}
@@ -497,34 +609,12 @@ struct StringView {
         return view(start, count);
     }
 
-    inline constexpr auto operator <=>(const StringView& other) const {
-        UZ min_length = min(count, other.count);
-        for (UZ i = 0; i < min_length; ++i) {
-            if (data[i] < other[i]) return -1;
-            if (data[i] > other[i]) return 1;
-        }
-        return 0;
+    inline UZ get_count() const {
+        return count;
     }
 
-    inline bool operator ==(const StringView rhs) const {
-        if (count != rhs.count) return false;
-
-        for (UZ i = 0; i < count; i++) {
-            if (data[i] != rhs.data[i]) return false;
-        }
-
-        return true;
-    }
-
-    bool operator ==(const String& string) const;
-
-    inline bool operator!=(const String& string) const {
-        return !(*this == string);
-    }
-
-    inline const char& operator [](UZ idx) const {
-        OK_ASSERT(idx < count);
-        return data[idx];
+    inline const char* get_items() const {
+        return data;
     }
 
     const char* data;
@@ -537,7 +627,7 @@ constexpr StringView operator ""_sv(const char* cstr, UZ len) {
 }
 };
 
-struct String {
+struct String : public StringBase<String, char> {
     static constexpr char NULL_CHAR = '\0';
     static constexpr UZ DEFAULT_CAPACITY = 7;
 
@@ -555,8 +645,6 @@ struct String {
     void append(String);
 
     void format_append(const char*, ...) OK_ATTRIBUTE_PRINTF(2, 3);
-
-    bool starts_with(StringView);
 
     inline const char* cstr() const {
         return reinterpret_cast<const char*>(data.items);
@@ -606,32 +694,13 @@ struct String {
         return data.count - 1;
     }
 
-    inline bool operator ==(const String& other) const {
-        return view() == other.view();
+    inline UZ get_count() const {
+        OK_ASSERT(data.count != 0);
+        return data.count - 1;
     }
 
-    inline bool operator ==(const StringView& other) const {
-        return view() == other;
-    }
-
-    inline bool operator !=(const String& other) const {
-        return !(*this == other);
-    }
-
-    inline bool operator !=(const StringView& other) const {
-        return !(*this == other);
-    }
-
-    inline char& operator [](UZ idx) {
-        OK_ASSERT(idx < count());
-
-        return data.items[idx];
-    }
-
-    inline const char& operator [](UZ idx) const {
-        OK_ASSERT(idx < count());
-
-        return data.items[idx];
+    inline char* get_items() const {
+        return data.items;
     }
 
     List<char> data;
@@ -845,8 +914,12 @@ struct Table {
     template <typename K>
     bool has(const K& key) const;
 
-
     static constexpr UZ DEFAULT_CAPACITY = 47;
+
+    inline void clear() {
+        count = 0;
+        memset(meta, 0, sizeof(meta[0]) * capacity);
+    }
 
     inline U8 load_percentage() const {
         return (U8)((double)(count * 100) / (double)capacity);
@@ -1269,7 +1342,7 @@ bool Set<T>::has(const T& elem) const {
     return false;
 }
 
-// filesystem API
+// Filesystem API
 struct File {
     enum class OpenError {
         ACCESS_DENIED,
@@ -1290,18 +1363,40 @@ struct File {
         IO_ERROR,
     };
 
-    static Optional<OpenError> open(File* out, const char* path);
+    enum class WriteError {
+        NOT_ALLOWED,
+        OUT_OF_SPACE,
+        BAD_DATA,
+    };
 
-    void seek_start() const;
-    off_t seek_end() const;
+    static Optional<OpenError> open(File* out, const char* path);
+    static Optional<OpenError> open(File* out, StringView path);
+
+    static const char* error_string(OpenError);
+    static const char* error_string(ReadError);
+    static const char* error_string(WriteError);
+
+    void seek_to(UZ offset);
+
+    inline void seek_start() {
+        return seek_to(0);
+    }
+
+    off_t seek_end();
 
     Optional<ReadError> read(U8* buf, UZ count, UZ* n_read);
-
     Optional<ReadError> read_full(Allocator* a, List<U8>* out);
 
-    UZ size() const;
+    Optional<WriteError> write(U8 *data, UZ count);
+
+    inline Optional<WriteError> write(Slice<U8> data) {
+        return write(data.items, data.count);
+    }
+
+    UZ size();
 
     int fd;
+    UZ offset;
     const char* path;
 };
 
@@ -1400,37 +1495,46 @@ ArenaAllocator::Region* ArenaAllocator::alloc_region(UZ region_size) {
 }
 
 void* ArenaAllocator::raw_alloc(UZ size) {
+    void* ptr;
+    UZ region_size;
+
     ArenaAllocator::Region* region_head = this->head;
 
     size = align_up(size, sizeof(void*));
 
-    while (region_head) {
+    while (region_head != nullptr) {
         if (region_head->size - region_head->off >= size) {
-            void* ptr = (void*)((U8*)region_head->data + region_head->off);
+            ptr = (void*)((U8*)region_head->data + region_head->off);
             region_head->off += size;
-            return ptr;
+            goto end;
         }
 
         region_head = region_head->next;
     }
 
-    UZ region_size = align_up(size, OK_PAGE_ALIGN);
+    region_size = align_up(size, OK_PAGE_ALIGN);
     region_head = alloc_region(region_size);
     region_head->next = this->head;
     this->head = region_head;
 
-    void* ptr = (void*)((U8*)region_head->data + region_head->off);
+    ptr = (void*)((U8*)region_head->data + region_head->off);
     region_head->off += size;
+
+end:
+    last_alloc_ptr = ptr;
     return ptr;
 }
 
 void ArenaAllocator::raw_dealloc(void* ptr, UZ size) {
-    OK_UNUSED(ptr);
-    OK_UNUSED(size);
+    if (last_alloc_ptr == ptr) {
+        size = align_up(size, sizeof(void*));
+        head->off -= size;
+    }
 }
 
 void* ArenaAllocator::raw_resize(void* old_ptr, UZ old_size, UZ new_size) {
-    auto* new_ptr = raw_alloc(new_size);
+    raw_dealloc(old_ptr, old_size);
+    void* new_ptr = raw_alloc(new_size);
     memcpy(new_ptr, old_ptr, old_size);
     return new_ptr;
 }
@@ -1533,21 +1637,7 @@ void String::format_append(const char* fmt, ...) {
     data.count += required_buf_size;
 }
 
-bool String::starts_with(StringView prefix) {
-    if (count() < prefix.count) return false;
-
-    for (UZ i = 0; i < prefix.count; i++) {
-        if (data.items[i] != prefix.data[i]) return false;
-    }
-
-    return true;
-}
-
 // STRING VIEW IMPLEMENTATION
-bool StringView::operator ==(const String& string) const {
-    return *this == string.view();
-}
-
 String StringView::to_string(Allocator* a) const {
     return String::alloc(a, data, count);
 }
@@ -1581,10 +1671,50 @@ Optional<File::OpenError> File::open(File* out, const char* path) {
         }
     }
 
+    out->offset = 0;
     out->fd = fd;
     out->path = path;
 
     return {};
+}
+
+Optional<File::OpenError> File::open(File* out, StringView path) {
+    // FIXME: Temporary allocation in potentially multi-threaded context.
+    char* path_cstr = temp_allocator->alloc<char>(path.count + 1);
+    memcpy(path_cstr, path.data, path.count);
+    path_cstr[path.count] = '\0';
+    return File::open(out, path_cstr);
+}
+
+const char* File::error_string(File::OpenError error) {
+    switch (error) {
+    case File::OpenError::ACCESS_DENIED:                    return "access denied";
+    case File::OpenError::INVALID_PATH:                     return "invalid file path";
+    case File::OpenError::IS_DIRECTORY:                     return "file is a directory";
+    case File::OpenError::TOO_MANY_SYMLINKS:                return "too many symlinks";
+    case File::OpenError::PROCESS_OPEN_FILES_LIMIT_REACHED: return "process open files limit has been reached";
+    case File::OpenError::SYSTEM_OPEN_FILES_LIMIT_REACHED:  return "system open files limit has been reached";
+    case File::OpenError::PATH_TOO_LONG:                    return "file path is too long";
+    case File::OpenError::KERNEL_OUT_OF_MEMORY:             return "kernel out of memory";
+    case File::OpenError::OUT_OF_SPACE:                     return "disk out of space";
+    case File::OpenError::IS_SOCKET:                        return "file is a socket";
+    case File::OpenError::FILE_TOO_BIG:                     return "file is too big";
+    case File::OpenError::READONLY_FILE:                    return "file is readonly";
+    }
+}
+
+const char* File::error_string(File::ReadError error) {
+    switch (error) {
+    case File::ReadError::IO_ERROR: return "I/O error";
+    }
+}
+
+const char* File::error_string(File::WriteError error) {
+    switch (error) {
+    case WriteError::NOT_ALLOWED:  return "operation not allowed";
+    case WriteError::OUT_OF_SPACE: return "out of space";
+    case WriteError::BAD_DATA:     return "bad data";
+    }
 }
 
 static inline off_t _lseek(int fd, off_t offset, int whence) {
@@ -1595,21 +1725,22 @@ static inline off_t _lseek(int fd, off_t offset, int whence) {
 #endif // OK_UNIX
 }
 
-void File::seek_start() const {
-    off_t seek_res = _lseek(fd, 0, SEEK_SET);
-    OK_ASSERT(seek_res != (off_t)-1);
+void File::seek_to(UZ offset) {
+    this->offset = offset;
+    ok::_lseek(fd, offset, SEEK_SET);
 }
 
-off_t File::seek_end() const {
+off_t File::seek_end() {
     off_t seek_res = _lseek(fd, 0, SEEK_END);
     OK_ASSERT(seek_res != (off_t)-1);
-
+    offset = seek_res;
     return seek_res;
 }
 
-UZ File::size() const {
+UZ File::size() {
+    UZ offset = this->offset;
     off_t res = seek_end();
-    seek_start();
+    seek_to(offset);
     return res;
 }
 
@@ -1638,17 +1769,45 @@ Optional<File::ReadError> File::read(U8* buf, UZ count, UZ* n_read) {
 }
 
 Optional<File::ReadError> File::read_full(Allocator* a, List<U8>* out) {
-    UZ sz = size();
-    *out = List<U8>::alloc(a, sz);
+    UZ file_offset = offset;
 
+    UZ file_size = size();
+    *out = List<U8>::alloc(a, file_size);
+
+    Optional<ReadError> err{};
+
+    seek_start();
     UZ n_read;
-    auto err = read(out->items, sz, &n_read);
+    err = read(out->items, file_size, &n_read);
 
-    if (err.has_value()) return err;
+    if (err.has_value()) goto end;
 
     out->count = n_read;
 
-    return {};
+end:
+    seek_to(file_offset);
+
+    return err;
+}
+
+static inline S64 _write(int fd, const void* buffer, UZ count) {
+#if OK_UNIX
+    return ::write(fd, buffer, count);
+#elif OK_WINDOWS
+    return ::_write(fd, buffer, (unsigned int)count);
+#endif // OK_UNIX
+}
+
+Optional<File::WriteError> File::write(U8 *data, UZ count) {
+    S64 ret = ok::_write(fd, (const void*)data, count);
+    if (ret != -1) return {};
+
+    switch (errno) {
+    case EBADF:  return WriteError::NOT_ALLOWED;
+    case ENOSPC: return WriteError::OUT_OF_SPACE;
+    case EINVAL: return WriteError::BAD_DATA;
+    default:     OK_UNREACHABLE();
+    }
 }
 
 // SUBPROCESS API IMPLEMENTATION
