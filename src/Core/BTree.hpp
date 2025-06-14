@@ -14,6 +14,10 @@ static constexpr U16 BTREE_MAX_CHILDREN = BTREE_ORDER * 2;
 
 static_assert((BTREE_MAX_KEYS + BTREE_MAX_CHILDREN + 1) * 8 == BTREE_PAGE_SIZE);
 
+using BTreeMetaType = U64;
+using BTreeKeyType = U64;
+using BTreeChildType = U64;
+
 /*
  * Disk layout of the B-Tree node is as following:
  *   64-bit meta field
@@ -26,9 +30,9 @@ struct BTreeNodePayload {
       0th bit   - 1 if leaf, 0 if internal / root
       1-63 bits - the count of keys
      */
-    U64 meta;
-    U64 keys[BTREE_MAX_KEYS];
-    U64 children[BTREE_MAX_CHILDREN];
+    BTreeMetaType meta;
+    BTreeKeyType keys[BTREE_MAX_KEYS];
+    BTreeChildType children[BTREE_MAX_CHILDREN];
 };
 
 static_assert(sizeof(BTreeNodePayload) == BTREE_PAGE_SIZE);
@@ -42,7 +46,7 @@ struct BTreeNode {
         return payload.meta & ~((U64)1 << 63);
     }
 
-    inline U64 set_count(UZ count) {
+    inline void set_count(U64 count) {
         if (payload.meta >= UINT64_MAX - count) OK_PANIC("node reached max count");
         payload.meta += count;
     }
@@ -50,10 +54,17 @@ struct BTreeNode {
     inline bool is_leaf() const {
         return (payload.meta & ((U64)1 << 63)) >> 63;
     }
+
+    inline void set_is_leaf(bool bool_value) {
+        U64 value = (U64)bool_value;
+        payload.meta |= value << 63;
+    }
 };
 
 struct BTreeNodePool {
-    ok::ArenaAllocator arena;
+    explicit BTreeNodePool(ok::ArenaAllocator *arena) : arena{arena}, head{nullptr} {}
+
+    ok::ArenaAllocator *arena;
     BTreeNode *head;
 };
 
@@ -74,11 +85,12 @@ struct BTree {
     BTreeNodePool node_pool;
     BTreeHeader header;
     BTreeNode *root_node;
-};
 
-// FIXME: Remove the `out_node` parameter, the found node can be stored as the
-// `current_node` field of the b-tree.
-bool btree_search(BTree *tree, U64 key, BTreeNode **out_node, U64 *out_index);
+    explicit BTree(ok::File file, ok::ArenaAllocator *arena);
+
+    bool search(BTreeKeyType key, BTreeNode **out_node, U16 *out_index);
+    bool insert(BTreeKeyType key);
+};
 }; // namespace xmdb
 
 #endif // XMDB_BTREE_H_

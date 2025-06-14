@@ -35,6 +35,7 @@
 #include <cstdlib>
 #include <cstring>
 #include <climits>
+#include <ctime>
 
 #include <fcntl.h>
 #include <sys/types.h>
@@ -638,6 +639,7 @@ struct String : public StringBase<String, char> {
 
     static String from(List<U8>);
     static String from(List<char>);
+    static String from_cstr_set_allocator(Allocator*, char*, UZ);
 
     static String format(Allocator* a, const char* fmt, ...) OK_ATTRIBUTE_PRINTF(2, 3);
 
@@ -677,8 +679,8 @@ struct String : public StringBase<String, char> {
     }
 
     inline void push(char character) {
+        data[data.count - 1] = character;
         data.push(NULL_CHAR);
-        data[data.count - 2] = character;
     }
 
     inline void reserve(UZ chars) {
@@ -918,7 +920,20 @@ struct Table {
 
     inline void clear() {
         count = 0;
-        memset(meta, 0, sizeof(meta[0]) * capacity);
+        memset(meta, 0, sizeof(Meta) * capacity);
+    }
+
+    inline Table<TKey, TValue> copy(Allocator* copy_allocator) {
+        UZ new_table_capacity = OK_TABLE_GROWTH_FACTOR(capacity);
+        Table<TKey, TValue> new_table = Table<TKey, TValue>::alloc(copy_allocator, new_table_capacity);
+
+        for (UZ i = 0; i < capacity; i++) {
+            if (OK_TAB_IS_OCCUPIED(meta[i])) {
+                new_table.put(keys[i], values[i]);
+            }
+        }
+
+        return new_table;
     }
 
     inline U8 load_percentage() const {
@@ -1180,15 +1195,7 @@ Table<K, V> Table<K, V>::alloc(Allocator* a, UZ capacity) {
 template <typename K, typename V>
 void Table<K, V>::put(const K& key, const V& value) {
     if (load_percentage() >= 70) {
-        auto new_table = Table<K, V>::alloc(allocator, OK_TABLE_GROWTH_FACTOR(capacity));
-
-        for (UZ i = 0; i < capacity; i++) {
-            if (OK_TAB_IS_OCCUPIED(meta[i])) {
-                new_table.put(keys[i], values[i]);
-            }
-        }
-
-        *this = new_table;
+        *this = copy(allocator);
     }
 
     U64 idx = Hash<K>::hash(key) % capacity;
@@ -1344,6 +1351,7 @@ bool Set<T>::has(const T& elem) const {
 
 // Filesystem API
 struct File {
+#if OK_UNIX
     enum class OpenError {
         ACCESS_DENIED,
         INVALID_PATH,
@@ -1360,7 +1368,7 @@ struct File {
     };
 
     enum class ReadError {
-        IO_ERROR,
+        IO,
     };
 
     enum class WriteError {
@@ -1369,20 +1377,47 @@ struct File {
         BAD_DATA,
     };
 
+    enum class CloseError {
+        BAD_FILE_DESCRIPTOR,
+        INTERRUPTED_BY_SIGNAL,
+        IO,
+        NOT_ENOUGH_SPACE,
+    };
+
+    enum class RemoveError {
+        ACCESS_DENIED,
+        CURRENTLY_IN_USE,
+        IO,
+        PATH_TOO_LONG,
+        DOES_NOT_EXIST,
+        KERNEL_OUT_OF_MEMORY,
+        READ_ONLY_FS,
+    };
+#else
+    using OpenError = DWORD;
+    using ReadError = DWORD;
+    using WriteError = DWORD;
+    using CloseError = DWORD;
+#endif // Platform check.
+
     static Optional<OpenError> open(File* out, const char* path);
     static Optional<OpenError> open(File* out, StringView path);
 
-    static const char* error_string(OpenError);
-    static const char* error_string(ReadError);
-    static const char* error_string(WriteError);
+#if OK_UNIX
+    static String error_string(Allocator*, OpenError);
+    static String error_string(Allocator*, ReadError);
+    static String error_string(Allocator*, WriteError);
+#else
+    static String error_string(Allocator*, DWORD);
+#endif // Platform check.
 
-    void seek_to(UZ offset);
+    void seek_to(U64 offset);
 
     inline void seek_start() {
         return seek_to(0);
     }
 
-    off_t seek_end();
+    U64 seek_end();
 
     Optional<ReadError> read(U8* buf, UZ count, UZ* n_read);
     Optional<ReadError> read_full(Allocator* a, List<U8>* out);
@@ -1395,12 +1430,26 @@ struct File {
 
     UZ size();
 
+    inline Optional<WriteError> write(StringView data) {
+        Slice<const char> chars = data.slice();
+        return write(chars.cast<U8>());
+    }
+
+    Optional<CloseError> close() const;
+
+    Optional<RemoveError> remove();
+
+#if OK_UNIX
     int fd;
+#else
+    HANDLE handle;
+#endif // Platform check.
     UZ offset;
+
     const char* path;
 };
 
-// procedures
+// Procedures.
 void println(const char*);
 void println(StringView);
 void println(String);
@@ -1415,6 +1464,34 @@ String to_string(Allocator*, S64);
 String to_string(Allocator*, U64);
 
 bool parse_int64(StringView, S64*);
+
+Optional<File::OpenError> create_temp_file(File* file);
+
+static inline U32 get_rand() {
+#if OK_UNIX
+    return (U32)rand();
+#else
+    U32 r = 0;
+    errno_t err = rand_s(&r);
+    OK_ASSERT(err == 0);
+    return r;
+#endif // Platform check.
+}
+
+static inline F64 millis_timestamp() {
+#if OK_UNIX
+    struct timespec ts;
+    clock_gettime(CLOCK_REALTIME, &ts);
+    return (F64)ts.tv_sec * 1000.0 + (F64)ts.tv_nsec / 1e6;
+#else
+    LARGE_INTEGER frequency_int = {};
+    QueryPerformanceFrequency(&frequency_int);
+    F64 frequency = (F64)frequency_int.QuadPart / 1000.0;
+    LARGE_INTEGER counter;
+    QueryPerformanceCounter(&counter);
+    return (F64)counter.QuadPart / frequency;
+#endif // Platform check.
+}
 
 #ifdef OK_IMPLEMENTATION
 
@@ -1574,6 +1651,20 @@ String String::from(List<U8> bytes) {
     return String::from(chars);
 }
 
+String String::from_cstr_set_allocator(Allocator* allocator, char* cstr, UZ count) {
+    OK_ASSERT(cstr[count] == '\0');
+
+    List<char> data{};
+    data.allocator = allocator;
+    data.items = cstr;
+    data.count = count;
+    data.capacity = count;
+
+    String string{};
+    string.data = data;
+    return string;
+}
+
 String String::format(Allocator* a, const char* fmt, ...) {
     va_list sprintf_args;
 
@@ -1645,12 +1736,8 @@ String StringView::to_string(Allocator* a) const {
 // FILESYSTEM API IMPLEMENTATION
 Optional<File::OpenError> File::open(File* out, const char* path) {
 #if OK_UNIX
-    int fd = ::open(path, O_RDWR);
+    int fd = ::open(path, O_RDWR | O_CREAT);
     int error = errno;
-#elif OK_WINDOWS
-    int fd;
-    errno_t error = ::_sopen_s(&fd, path, _O_RDWR, _SH_DENYNO, 0);
-#endif // OK_UNIX
 
     if (fd < 0) {
         switch (error) {
@@ -1667,7 +1754,7 @@ Optional<File::OpenError> File::open(File* out, const char* path) {
         case EOVERFLOW:    return OpenError::FILE_TOO_BIG;
         case EROFS:        return OpenError::READONLY_FILE;
         case EFAULT:       OK_PANIC_FMT("Parameter 'path' (%p) is not mapped to the current process", (void*)path);
-        default:           OK_UNREACHABLE();
+        default:           OK_PANIC_FMT("Unexpected error: %s", strerror(error));
         }
     }
 
@@ -1676,6 +1763,31 @@ Optional<File::OpenError> File::open(File* out, const char* path) {
     out->path = path;
 
     return {};
+#elif OK_WINDOWS
+    // NOTE: Possible CreateFileA errors
+    //   ERROR_SHARING_VIOLATION
+
+    constexpr DWORD FILE_SHARE_MODE = 0;
+    constexpr LPSECURITY_ATTRIBUTES SECURITY_ATTRIBUTES = nullptr;
+    constexpr HANDLE TEMPLATE_FILE = nullptr;
+
+    HANDLE file_handle = CreateFileA(path,
+                                     GENERIC_READ | GENERIC_WRITE,
+                                     FILE_SHARE_MODE,
+                                     SECURITY_ATTRIBUTES,
+                                     OPEN_ALWAYS,
+                                     FILE_ATTRIBUTE_NORMAL,
+                                     TEMPLATE_FILE);
+
+    if (file_handle == INVALID_HANDLE_VALUE) {
+        DWORD file_open_error = GetLastError();
+        return file_open_error;
+    }
+
+    out->handle = file_handle;
+    out->path = path;
+    return {};
+#endif // OK_UNIX
 }
 
 Optional<File::OpenError> File::open(File* out, StringView path) {
@@ -1686,78 +1798,108 @@ Optional<File::OpenError> File::open(File* out, StringView path) {
     return File::open(out, path_cstr);
 }
 
-const char* File::error_string(File::OpenError error) {
-    switch (error) {
-    case File::OpenError::ACCESS_DENIED:                    return "access denied";
-    case File::OpenError::INVALID_PATH:                     return "invalid file path";
-    case File::OpenError::IS_DIRECTORY:                     return "file is a directory";
-    case File::OpenError::TOO_MANY_SYMLINKS:                return "too many symlinks";
-    case File::OpenError::PROCESS_OPEN_FILES_LIMIT_REACHED: return "process open files limit has been reached";
-    case File::OpenError::SYSTEM_OPEN_FILES_LIMIT_REACHED:  return "system open files limit has been reached";
-    case File::OpenError::PATH_TOO_LONG:                    return "file path is too long";
-    case File::OpenError::KERNEL_OUT_OF_MEMORY:             return "kernel out of memory";
-    case File::OpenError::OUT_OF_SPACE:                     return "disk out of space";
-    case File::OpenError::IS_SOCKET:                        return "file is a socket";
-    case File::OpenError::FILE_TOO_BIG:                     return "file is too big";
-    case File::OpenError::READONLY_FILE:                    return "file is readonly";
-    }
-}
-
-const char* File::error_string(File::ReadError error) {
-    switch (error) {
-    case File::ReadError::IO_ERROR: return "I/O error";
-    }
-}
-
-const char* File::error_string(File::WriteError error) {
-    switch (error) {
-    case WriteError::NOT_ALLOWED:  return "operation not allowed";
-    case WriteError::OUT_OF_SPACE: return "out of space";
-    case WriteError::BAD_DATA:     return "bad data";
-    }
-}
-
-static inline off_t _lseek(int fd, off_t offset, int whence) {
 #if OK_UNIX
-    return ::lseek(fd, offset, whence);
-#elif OK_WINDOWS
-    return ::_lseek(fd, offset, whence);
-#endif // OK_UNIX
+String File::error_string(Allocator* allocator, File::OpenError error) {
+    switch (error) {
+    case File::OpenError::ACCESS_DENIED:                    return String::alloc(allocator, "access denied");
+    case File::OpenError::INVALID_PATH:                     return String::alloc(allocator, "invalid file path");
+    case File::OpenError::IS_DIRECTORY:                     return String::alloc(allocator, "file is a directory");
+    case File::OpenError::TOO_MANY_SYMLINKS:                return String::alloc(allocator, "too many symlinks");
+    case File::OpenError::PROCESS_OPEN_FILES_LIMIT_REACHED: return String::alloc(allocator, "process open files limit has been reached");
+    case File::OpenError::SYSTEM_OPEN_FILES_LIMIT_REACHED:  return String::alloc(allocator, "system open files limit has been reached");
+    case File::OpenError::PATH_TOO_LONG:                    return String::alloc(allocator, "file path is too long");
+    case File::OpenError::KERNEL_OUT_OF_MEMORY:             return String::alloc(allocator, "kernel out of memory");
+    case File::OpenError::OUT_OF_SPACE:                     return String::alloc(allocator, "disk out of space");
+    case File::OpenError::IS_SOCKET:                        return String::alloc(allocator, "file is a socket");
+    case File::OpenError::FILE_TOO_BIG:                     return String::alloc(allocator, "file is too big");
+    case File::OpenError::READONLY_FILE:                    return String::alloc(allocator, "file is readonly");
+    }
+
+    OK_UNREACHABLE();
 }
 
-void File::seek_to(UZ offset) {
-    this->offset = offset;
-    ok::_lseek(fd, offset, SEEK_SET);
+String File::error_string(Allocator* allocator, File::ReadError error) {
+    switch (error) {
+    case File::ReadError::IO: return String::alloc(allocator, "I/O error");
+    }
+
+    OK_UNREACHABLE();
 }
 
-off_t File::seek_end() {
-    off_t seek_res = _lseek(fd, 0, SEEK_END);
+String File::error_string(Allocator* allocator, File::WriteError error) {
+    switch (error) {
+    case WriteError::NOT_ALLOWED:  return String::alloc(allocator, "operation not allowed");
+    case WriteError::OUT_OF_SPACE: return String::alloc(allocator, "out of space");
+    case WriteError::BAD_DATA:     return String::alloc(allocator, "bad data");
+    }
+
+    OK_UNREACHABLE();
+}
+
+#else
+
+String File::error_string(Allocator* allocator, DWORD error) {
+    constexpr DWORD LANGUAGE_ID = 0;
+    constexpr DWORD ERROR_BUFFER_SIZE = 1024;
+
+    char* error_buffer = allocator->alloc<char>(ERROR_BUFFER_SIZE);
+
+    DWORD result = FormatMessage(FORMAT_MESSAGE_FROM_SYSTEM,
+                                 nullptr,
+                                 error,
+                                 LANGUAGE_ID,
+                                 error_buffer,
+                                 ERROR_BUFFER_SIZE,
+                                 nullptr);
+
+    OK_ASSERT(result != 0);
+
+    return String::from_cstr_set_allocator(allocator, error_buffer, ERROR_BUFFER_SIZE);
+}
+
+#endif // Platform check.
+
+void File::seek_to(U64 seek_offset) {
+    this->offset = seek_offset;
+#if OK_UNIX
+    OK_ASSERT(lseek(fd, seek_offset, SEEK_SET) != (off_t)-1);
+#else
+    LONG higher_order_bits = 0;
+    DWORD lower_order_bits = SetFilePointer(handle, (LONG)seek_offset, &higher_order_bits, FILE_BEGIN);
+    OK_ASSERT(lower_order_bits != INVALID_SET_FILE_POINTER);
+#endif // Platform check.
+}
+
+U64 File::seek_end() {
+#if OK_UNIX
+    off_t seek_res = lseek(fd, 0, SEEK_END);
     OK_ASSERT(seek_res != (off_t)-1);
     offset = seek_res;
     return seek_res;
+#else
+    long higher_order_bits = 0;
+    DWORD lower_order_bits = SetFilePointer(handle, 0, &higher_order_bits, FILE_END);
+    OK_ASSERT(lower_order_bits != INVALID_SET_FILE_POINTER);
+
+    offset = (U64)higher_order_bits << 32 | (U64)lower_order_bits;
+    return offset;
+#endif // Platform check.
 }
 
 UZ File::size() {
-    UZ offset = this->offset;
-    off_t res = seek_end();
-    seek_to(offset);
+    UZ prev_offset = this->offset;
+    U64 res = seek_end();
+    seek_to(prev_offset);
     return res;
 }
 
-static inline S64 _read(int fd, void* buffer, UZ count) {
-#if OK_UNIX
-    return ::read(fd, buffer, count);
-#elif OK_WINDOWS
-    return ::_read(fd, buffer, (unsigned int)count);
-#endif // OK_UNIX
-}
-
 Optional<File::ReadError> File::read(U8* buf, UZ count, UZ* n_read) {
-    S64 r = ok::_read(fd, buf, count);
+#if OK_UNIX
+    S64 r = ::read(fd, buf, count);
 
     if (r < 0) {
         switch (errno) {
-        case EIO: return ReadError::IO_ERROR;
+        case EIO: return ReadError::IO;
         case EFAULT: OK_PANIC_FMT("The buffer (%p) is mapped outside the current process", (void*)buf);
         default: OK_UNREACHABLE();
         }
@@ -1766,6 +1908,11 @@ Optional<File::ReadError> File::read(U8* buf, UZ count, UZ* n_read) {
     *n_read = r;
 
     return {};
+#elif OK_WINDOWS
+    bool ok = ReadFile(handle, (void*)buf, (DWORD)count, (LPDWORD)n_read, nullptr);
+    if (!ok) return GetLastError();
+    return {};
+#endif // Platform check
 }
 
 Optional<File::ReadError> File::read_full(Allocator* a, List<U8>* out) {
@@ -1777,7 +1924,7 @@ Optional<File::ReadError> File::read_full(Allocator* a, List<U8>* out) {
     Optional<ReadError> err{};
 
     seek_start();
-    UZ n_read;
+    UZ n_read = 0;
     err = read(out->items, file_size, &n_read);
 
     if (err.has_value()) goto end;
@@ -1790,16 +1937,48 @@ end:
     return err;
 }
 
-static inline S64 _write(int fd, const void* buffer, UZ count) {
-#if OK_UNIX
-    return ::write(fd, buffer, count);
-#elif OK_WINDOWS
-    return ::_write(fd, buffer, (unsigned int)count);
-#endif // OK_UNIX
+Optional<File::RemoveError> File::remove() {
+    int res = ::remove(this->path);
+    if (res != -1)     return {};
+
+    switch (errno) {
+    case EPERM:
+    case EACCES:       return RemoveError::ACCESS_DENIED;
+    case EBUSY:        return RemoveError::CURRENTLY_IN_USE;
+    case EIO:          return RemoveError::IO;
+    case ENAMETOOLONG: return RemoveError::PATH_TOO_LONG;
+    case ENOTDIR:
+    case ENOENT:       return RemoveError::DOES_NOT_EXIST;
+    case ENOMEM:       return RemoveError::KERNEL_OUT_OF_MEMORY;
+    case EROFS:        return RemoveError::READ_ONLY_FS;
+    default: OK_UNREACHABLE();
+    }
 }
 
-Optional<File::WriteError> File::write(U8 *data, UZ count) {
-    S64 ret = ok::_write(fd, (const void*)data, count);
+Optional<File::CloseError> File::close() const {
+#if OK_UNIX
+    int ret = ::close(fd);
+    if (ret == 0) return {};
+
+    switch (ret) {
+    case EBADF:  return CloseError::BAD_FILE_DESCRIPTOR;
+    case EINTR:  return CloseError::INTERRUPTED_BY_SIGNAL;
+    case EIO:    return CloseError::IO;
+    case ENOSPC:
+    case EDQUOT: return CloseError::NOT_ENOUGH_SPACE;
+    default: OK_UNREACHABLE();
+    }
+#else
+    bool ok = CloseHandle(handle);
+    if (ok) return {};
+    return GetLastError();
+#endif // Platform check.
+}
+
+Optional<File::WriteError> File::write(U8* data, UZ count) {
+#if OK_UNIX
+    S64 ret = ::write(fd, (const void*)data, count);
+
     if (ret != -1) return {};
 
     switch (errno) {
@@ -1808,6 +1987,24 @@ Optional<File::WriteError> File::write(U8 *data, UZ count) {
     case EINVAL: return WriteError::BAD_DATA;
     default:     OK_UNREACHABLE();
     }
+#else
+    // We first seek to the start of the file, and then set that as the end of file,
+    // so when the write proceeds, it will flush the buffer to disk and set a the new
+    // end of file to the length of the supplied buffer, overriding the file contents
+    // fully.
+    seek_start();
+    SetEndOfFile(handle);
+
+    DWORD n_written = 0;
+    bool ok = WriteFile(handle,
+                        data,
+                        (DWORD)count,
+                        &n_written,
+                        nullptr);
+
+    if (!ok) return GetLastError();
+    return {};
+#endif // Platform check.
 }
 
 // SUBPROCESS API IMPLEMENTATION
@@ -2098,6 +2295,26 @@ bool is_digit(char c) {
 
 bool is_alpha(char c) {
     return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z');
+}
+
+Optional<File::OpenError> create_temp_file(File* file) {
+#if OK_UNIX
+    U64 timestamp = millis_timestamp();
+
+    String file_path = String::alloc(temp_allocator, "/tmp/");
+    file_path.reserve(13);
+
+    for (U8 i = 0; i < 8; ++i) {
+        U8 c0 = (timestamp >> (i * 4)) & 15;
+        U8 c1 = (timestamp >> (64 - ((i + 1) * 4))) & 15;
+        U8 c = 'a' + (c0 ^ c1);
+        file_path.push(c);
+    }
+
+    return File::open(file, file_path.cstr());
+#else
+    OK_TODO();
+#endif // Platform check.
 }
 
 // HASHES IMPLEMENTATION
