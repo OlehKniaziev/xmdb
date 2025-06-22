@@ -198,93 +198,103 @@ struct IRContractGetter {};
 
 template <>
 struct IRContractGetter<StringView> {
-    static StringView get(IREmitter *emitter, U32 op) {
+    template <typename Store>
+    static StringView get(Store *emitter, U32 op) {
         return emitter->strings[op].view();
     }
 };
 
 template <>
 struct IRContractGetter<S64> {
-    static S64 get(IREmitter *emitter, U32 op) {
+    template <typename Store>
+    static S64 get(Store *emitter, U32 op) {
         return emitter->integers[op];
     }
 };
 
 template <>
 struct IRContractGetter<TableSchema*> {
-    static TableSchema *get(IREmitter *emitter, U32 op) {
+    template <typename Store>
+    static TableSchema *get(Store *emitter, U32 op) {
         return emitter->schemas[op];
     }
 };
 
 template <>
 struct IRContractGetter<U32> {
-    static U32 get(IREmitter *emitter, U32 op) {
+    template <typename Store>
+    static U32 get(Store *emitter, U32 op) {
         OK_UNUSED(emitter);
         return op;
     }
 };
 
-#define INSTR_VAR_0(name) \
-        static inline String operands_of_##name(IREmitter *emitter, U32 ip) { \
-    IRInstruction instr = emitter->instructions[ip]; \
-    OK_ASSERT(instr.op == IRInstructionOperator_##name); \
-    String var_name = emitter->strings[instr.operand1]; \
-    return var_name; \
+#define INSTR_VAR_0(name)                                               \
+    template <typename Store>                                           \
+    static inline String operands_of_##name(Store *emitter, U32 ip) {   \
+        IRInstruction instr = emitter->instructions[ip];                \
+        OK_ASSERT(instr.op == IRInstructionOperator_##name);            \
+        String var_name = emitter->strings[instr.operand1];             \
+        return var_name;                                                \
     }
 
-#define INSTR_VAR_1(name, t1) \
-    static inline Tuple<String, t1> operands_of_##name(IREmitter *emitter, U32 ip) { \
-    IRInstruction instr = emitter->instructions[ip]; \
-    OK_ASSERT(instr.op == IRInstructionOperator_##name); \
-    String var_name = emitter->strings[instr.operand1]; \
-    t1 op1 = IRContractGetter<t1>::get(emitter, instr.operand2); \
-    return {var_name, op1}; \
+#define INSTR_VAR_1(name, t1)                                           \
+    template <typename Store>                                           \
+    static inline Tuple<String, t1> operands_of_##name(Store *emitter, U32 ip) { \
+        IRInstruction instr = emitter->instructions[ip];                \
+        OK_ASSERT(instr.op == IRInstructionOperator_##name);            \
+        String var_name = emitter->strings[instr.operand1];             \
+        t1 op1 = IRContractGetter<t1>::get(emitter, instr.operand2);    \
+        return {var_name, op1};                                         \
     }
 
-#define INSTR_VAR_2(name, t1, t2) \
-    static inline Triple<String, t1, t2> operands_of_##name(IREmitter *emitter, U32 ip) { \
-    IRInstruction instr = emitter->instructions[ip]; \
-    OK_ASSERT(instr.op == IRInstructionOperator_##name); \
-    String var_name = emitter->strings[instr.operand1]; \
-    t1 op1 = IRContractGetter<t1>::get(emitter, instr.operand2); \
-    t2 op2 = IRContractGetter<t2>::get(emitter, instr.operand3); \
-    return {var_name, op1, op2}; \
+#define INSTR_VAR_2(name, t1, t2)                                       \
+    template <typename Store>                                           \
+    static inline Triple<String, t1, t2> operands_of_##name(Store *emitter, U32 ip) { \
+        IRInstruction instr = emitter->instructions[ip];                \
+        OK_ASSERT(instr.op == IRInstructionOperator_##name);            \
+        String var_name = emitter->strings[instr.operand1];             \
+        t1 op1 = IRContractGetter<t1>::get(emitter, instr.operand2);    \
+        t2 op2 = IRContractGetter<t2>::get(emitter, instr.operand3);    \
+        return {var_name, op1, op2};                                    \
     }
 
-#define INSTR_0(name)  \
-        static inline void operands_of_##name(IREmitter *emitter, U32 ip) { \
-    IRInstruction instr = emitter->instructions[ip]; \
-    OK_ASSERT(instr.op == IRInstructionOperator_##name); \
+#define INSTR_0(name)                                                   \
+    template <typename Store>                                           \
+    static inline void operands_of_##name(Store *emitter, U32 ip) { \
+        IRInstruction instr = emitter->instructions[ip];                \
+        OK_ASSERT(instr.op == IRInstructionOperator_##name);            \
     }
 
-#define INSTR_1(name, t1) \
-        static inline t1 operands_of_##name(IREmitter *emitter, U32 ip) { \
-    IRInstruction instr = emitter->instructions[ip]; \
-    OK_ASSERT(instr.op == IRInstructionOperator_##name); \
-    t1 op1 = IRContractGetter<t1>::get(emitter, instr.operand1); \
-    return op1; \
+#define INSTR_1(name, t1)                                               \
+    template <typename Store>                                           \
+    static inline t1 operands_of_##name(Store *emitter, U32 ip) {   \
+        IRInstruction instr = emitter->instructions[ip];                \
+        OK_ASSERT(instr.op == IRInstructionOperator_##name);            \
+        t1 op1 = IRContractGetter<t1>::get(emitter, instr.operand1);    \
+        return op1;                                                     \
     }
 
-#define INSTR_2(name, t1, t2) \
-        static inline Tuple<t1, t2> operands_of_##name(IREmitter *emitter, U32 ip) { \
-    IRInstruction instr = emitter->instructions[ip]; \
-    OK_ASSERT(instr.op == IRInstructionOperator_##name); \
-    t1 op1 = IRContractGetter<t1>::get(emitter, instr.operand1); \
-    t2 op2 = IRContractGetter<t2>::get(emitter, instr.operand2); \
-    return {op1, op2}; \
+#define INSTR_2(name, t1, t2)                                           \
+    template <typename Store>                                           \
+    static inline Tuple<t1, t2> operands_of_##name(Store *emitter, U32 ip) { \
+        IRInstruction instr = emitter->instructions[ip];                \
+        OK_ASSERT(instr.op == IRInstructionOperator_##name);            \
+        t1 op1 = IRContractGetter<t1>::get(emitter, instr.operand1);    \
+        t2 op2 = IRContractGetter<t2>::get(emitter, instr.operand2);    \
+        return {op1, op2};                                              \
     }
 
-#define INSTR_3(name, t1, t2, t3) \
-        static inline Triple<t1, t2, t3> operands_of_##name(IREmitter *emitter, U32 ip) { \
-    IRInstruction instr = emitter->instructions[ip]; \
-    OK_ASSERT(instr.op == IRInstructionOperator_##name); \
-    t1 op1 = IRContractGetter<t1>::get(emitter, instr.operand1); \
-    t2 op2 = IRContractGetter<t2>::get(emitter, instr.operand2); \
-    t3 op3 = IRContractGetter<t3>::get(emitter, instr.operand3); \
-    return {op1, op2, op3}; \
+#define INSTR_3(name, t1, t2, t3)                                       \
+    template <typename Store>                                           \
+    static inline Triple<t1, t2, t3> operands_of_##name(Store *emitter, U32 ip) { \
+        IRInstruction instr = emitter->instructions[ip];                \
+        OK_ASSERT(instr.op == IRInstructionOperator_##name);            \
+        t1 op1 = IRContractGetter<t1>::get(emitter, instr.operand1);    \
+        t2 op2 = IRContractGetter<t2>::get(emitter, instr.operand2);    \
+        t3 op3 = IRContractGetter<t3>::get(emitter, instr.operand3);    \
+        return {op1, op2, op3};                                         \
     }
-
 
 ENUM_IR_CONTRACTS
 
@@ -440,7 +450,15 @@ struct IrContext {
     Optional<Error> error{};
 };
 
-bool ir_compile_query(Query*, IrContext*);
+struct CompiledQuery {
+    Slice<IRInstruction> instructions;
+    Slice<Token> tokens;
+    Slice<String> strings;
+    Slice<S64> integers;
+    Slice<TableSchema *> schemas;
+};
+
+bool ir_compile_query(Query *in_query, IrContext *ctx, CompiledQuery *out_query);
 String stringify_ir(Allocator*, IREmitter*);
 }; // namespace xmdb::SQL
 

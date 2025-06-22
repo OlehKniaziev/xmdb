@@ -22,6 +22,8 @@ int main() {
 
     IrContext ir_ctx{&arena, source};
 
-    OK_ASSERT(ir_compile_query(&query.value, &ir_ctx));
+    CompiledQuery compiled_query{};
+
+    OK_ASSERT(ir_compile_query(&query.value, &ir_ctx, &compiled_query));
     ok::println(stringify_ir(&arena, &ir_ctx.ir_emitter));
 }

@@ -29,6 +29,8 @@ struct TypingContextError {
 };
 
 struct TypingContext {
+    TypingContext(Allocator *allocator, StringView source);
+
     Allocator *allocator;
     Table<U32, Type> ir_instruction_types;
     Table<U32, TypedTableSchema> table_types;
@@ -37,9 +39,7 @@ struct TypingContext {
     Optional<TypingContextError> error{};
 };
 
-TypingContext new_typing_context(Allocator *allocator, StringView source);
-
-bool type_check_ir(IREmitter *, TypingContext *);
+bool type_check_query(CompiledQuery *query, TypingContext *ctx);
 };
 
 #endif // XMDB_SQL_TYPE_CHECK_HPP

@@ -51,7 +51,7 @@ static const char *type_to_string_table[TYPE_MAX] = {
     [TYPE_TABLE] = "table",
 };
 
-static inline bool type_check_ir_instruction(U32 ip, IREmitter *ir_emitter, TypingContext *ctx) {
+static inline bool type_check_ir_instruction(U32 ip, CompiledQuery *ir_emitter, TypingContext *ctx) {
     IRInstruction instr = ir_emitter->instructions[ip];
 
     switch (instr.op) {
@@ -229,21 +229,18 @@ static inline bool type_check_ir_instruction(U32 ip, IREmitter *ir_emitter, Typi
     }
 }
 
-bool type_check_ir(IREmitter *ir_emitter, TypingContext *ctx) {
-    for (UZ i = 0; i < ir_emitter->instructions.count; ++i) {
-        TRY(type_check_ir_instruction(i, ir_emitter, ctx));
+bool type_check_query(CompiledQuery *query, TypingContext *ctx) {
+    for (UZ i = 0; i < query->instructions.count; ++i) {
+        TRY(type_check_ir_instruction(i, query, ctx));
     }
 
     return true;
 }
 
-TypingContext new_typing_context(Allocator *allocator, StringView source) {
-    TypingContext ctx;
-    ctx.allocator = allocator;
-    ctx.ir_instruction_types = Table<U32, Type>::alloc(allocator);
-    ctx.table_types = Table<U32, TypedTableSchema>::alloc(allocator);
-    ctx.emitted_columns = List<U32>::alloc(allocator);
-    ctx.source = source;
-    return ctx;
+TypingContext::TypingContext(Allocator *allocator, StringView source) : allocator{allocator}, source{source} {
+    ir_instruction_types = Table<U32, Type>::alloc(allocator);
+    table_types = Table<U32, TypedTableSchema>::alloc(allocator);
+    emitted_columns = List<U32>::alloc(allocator);
 }
+
 }; // namespace xmdb::SQL

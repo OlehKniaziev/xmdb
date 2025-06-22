@@ -981,7 +981,7 @@ switch (instr.op) {
     return buffer;
 }
 
-bool ir_compile_query(Query* q, IrContext* ctx) {
+bool ir_compile_query(Query *q, IrContext *ctx, CompiledQuery *out_query) {
     for (UZ i = 0; i < q->stmts.count; ++i) {
         auto* stmt = q->stmts[i];
 
@@ -992,6 +992,12 @@ bool ir_compile_query(Query* q, IrContext* ctx) {
             TRY(compile_unoptimizable_stmt(stmt, ctx));
         }
     }
+
+    out_query->instructions = ctx->ir_emitter.instructions.slice();
+    out_query->tokens = ctx->ir_emitter.tokens.slice();
+    out_query->strings = ctx->ir_emitter.strings.slice();
+    out_query->integers = ctx->ir_emitter.integers.slice();
+    out_query->schemas = ctx->ir_emitter.schemas.slice();
 
     return true;
 }
