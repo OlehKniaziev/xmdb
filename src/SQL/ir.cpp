@@ -892,7 +892,7 @@ const char *stringify_op(TableSchema *op) {
     return s.cstr();
 }
 
-String stringify_ir(Allocator* allocator, IREmitter* emitter) {
+String stringify_ir(Allocator* allocator, CompiledQuery* emitter) {
     String buffer = String::alloc(allocator);
 
     Slice<IRInstruction> instructions = emitter->instructions.slice();

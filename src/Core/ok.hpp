@@ -35,6 +35,7 @@
 #include <cstdlib>
 #include <cstring>
 #include <climits>
+#include <ctime>
 
 #include <fcntl.h>
 #include <sys/types.h>
@@ -53,7 +54,7 @@
     abort(); \
 } while (0)
 
-#define OK_UNUSED(arg) (void)(arg);
+#define OK_UNUSED(arg) (void)(arg)
 
 #define OK_UNREACHABLE() do { \
     fprintf(stderr, "%s:%d: Encountered unreachable code\n", __FILE__, __LINE__); \
@@ -263,6 +264,12 @@ struct ArenaAllocator : public Allocator {
         return result;
     }
 
+    inline UZ capacity() const {
+        UZ result = 0;
+        for (Region* r = head; r != nullptr; r = r->next) result += r->size;
+        return result;
+    }
+
     inline void reserve(UZ bytes) {
         UZ available_bytes = avail();
 
@@ -284,6 +291,7 @@ struct ArenaAllocator : public Allocator {
 
     Region* head;
     Region* region_pool;
+    void* last_alloc_ptr;
 };
 
 // templates
@@ -390,10 +398,6 @@ struct List : public ArrayBase<List<T>, T> {
 
     void reserve(UZ new_cap);
 
-    UZ find_index(const T& elem);
-    template <typename F>
-    UZ find_index(F pred);
-
     UZ get_count() const {
         return count;
     }
@@ -470,6 +474,57 @@ struct Slice : public ArrayBase<Slice<T>, T> {
     UZ count;
 };
 
+template <typename T>
+struct LinkedList {
+    struct Node {
+        Node *prev;
+        Node *next;
+        T value;
+    };
+
+    static LinkedList alloc(Allocator *allocator) {
+        LinkedList<T> list{};
+        list.allocator = allocator;
+        return list;
+    }
+
+    void prepend(const T& value) {
+        Node *node = allocator->alloc<Node>();
+        node->value = value;
+
+        if (head == nullptr) {
+            OK_ASSERT(tail == nullptr);
+            head = node;
+            tail = node;
+            return;
+        }
+
+        node->next = head;
+        head->prev = node;
+        head = node;
+    }
+
+    void append(const T& value) {
+        Node *node = allocator->alloc<Node>();
+        node->value = value;
+
+        if (tail == nullptr) {
+            OK_ASSERT(head == nullptr);
+            head = node;
+            tail = node;
+            return;
+        }
+
+        node->prev = tail;
+        tail->next = node;
+        tail = node;
+    }
+
+    Allocator *allocator;
+    Node *head;
+    Node *tail;
+};
+
 // char predicates
 bool is_whitespace(char);
 bool is_digit(char);
@@ -480,7 +535,71 @@ struct String;
 #define OK_SV_FMT "%.*s"
 #define OK_SV_ARG(sv) (int)(sv).count, reinterpret_cast<const char*>((sv).data)
 
-struct StringView {
+template <typename Self, typename Char>
+struct StringBase : public ArrayBase<Self, Char> {
+    inline bool starts_with(const char* prefix) const {
+        const Self *self = this->self_cast();
+        UZ prefix_count = strlen(prefix);
+        UZ count = self->get_count();
+        if (prefix_count > count) return false;
+
+        for (UZ i = 0; i < prefix_count; ++i) {
+            if ((*self)[i] != prefix[i]) return false;
+        }
+
+        return true;
+    }
+
+    inline bool ends_with(const char* suffix) const {
+        const Self *self = this->self_cast();
+        UZ suffix_count = strlen(suffix);
+        UZ count = self->get_count();
+        if (suffix_count > count) return false;
+
+        UZ suffix_diff = count - suffix_count;
+
+        for (UZ i = suffix_diff; i < count; ++i) {
+            UZ suffix_idx = i - suffix_diff;
+            if ((*self)[i] != suffix[suffix_idx]) return false;
+        }
+
+        return true;
+    }
+
+    template <typename Other, typename OtherChar>
+    inline constexpr auto operator <=>(const StringBase<Other, OtherChar>& other) const {
+        const Self *self = this->self_cast();
+        UZ self_count = self->get_count();
+        UZ other_count = other.self_cast()->get_count();
+
+        if (self_count < other_count)      return -1;
+        else if (other_count > self_count) return 1;
+
+        for (UZ i = 0; i < self_count; ++i) {
+            if ((*self)[i] < other[i]) return -1;
+            if ((*self)[i] > other[i]) return 1;
+        }
+
+        return 0;
+    }
+
+    template <typename Other, typename OtherChar>
+    inline constexpr bool operator ==(const StringBase<Other, OtherChar>& other) const {
+        const Self *self = this->self_cast();
+        UZ self_count = self->get_count();
+        UZ other_count = other.self_cast()->get_count();
+
+        if (self_count != other_count) return false;
+
+        for (UZ i = 0; i < self_count; ++i) {
+            if ((*self)[i] != other[i]) return false;
+        }
+
+        return true;
+    }
+};
+
+struct StringView : public StringBase<StringView, const char> {
     StringView() = default;
 
     constexpr StringView(const char* data, UZ count) : data{data}, count{count} {}
@@ -497,34 +616,12 @@ struct StringView {
         return view(start, count);
     }
 
-    inline constexpr auto operator <=>(const StringView& other) const {
-        UZ min_length = min(count, other.count);
-        for (UZ i = 0; i < min_length; ++i) {
-            if (data[i] < other[i]) return -1;
-            if (data[i] > other[i]) return 1;
-        }
-        return 0;
+    inline UZ get_count() const {
+        return count;
     }
 
-    inline bool operator ==(const StringView rhs) const {
-        if (count != rhs.count) return false;
-
-        for (UZ i = 0; i < count; i++) {
-            if (data[i] != rhs.data[i]) return false;
-        }
-
-        return true;
-    }
-
-    bool operator ==(const String& string) const;
-
-    inline bool operator!=(const String& string) const {
-        return !(*this == string);
-    }
-
-    inline const char& operator [](UZ idx) const {
-        OK_ASSERT(idx < count);
-        return data[idx];
+    inline const char* get_items() const {
+        return data;
     }
 
     const char* data;
@@ -537,7 +634,7 @@ constexpr StringView operator ""_sv(const char* cstr, UZ len) {
 }
 };
 
-struct String {
+struct String : public StringBase<String, char> {
     static constexpr char NULL_CHAR = '\0';
     static constexpr UZ DEFAULT_CAPACITY = 7;
 
@@ -548,6 +645,7 @@ struct String {
 
     static String from(List<U8>);
     static String from(List<char>);
+    static String from_cstr_set_allocator(Allocator*, char*, UZ);
 
     static String format(Allocator* a, const char* fmt, ...) OK_ATTRIBUTE_PRINTF(2, 3);
 
@@ -555,8 +653,6 @@ struct String {
     void append(String);
 
     void format_append(const char*, ...) OK_ATTRIBUTE_PRINTF(2, 3);
-
-    bool starts_with(StringView);
 
     inline const char* cstr() const {
         return reinterpret_cast<const char*>(data.items);
@@ -589,8 +685,8 @@ struct String {
     }
 
     inline void push(char character) {
+        data[data.count - 1] = character;
         data.push(NULL_CHAR);
-        data[data.count - 2] = character;
     }
 
     inline void reserve(UZ chars) {
@@ -606,32 +702,13 @@ struct String {
         return data.count - 1;
     }
 
-    inline bool operator ==(const String& other) const {
-        return view() == other.view();
+    inline UZ get_count() const {
+        OK_ASSERT(data.count != 0);
+        return data.count - 1;
     }
 
-    inline bool operator ==(const StringView& other) const {
-        return view() == other;
-    }
-
-    inline bool operator !=(const String& other) const {
-        return !(*this == other);
-    }
-
-    inline bool operator !=(const StringView& other) const {
-        return !(*this == other);
-    }
-
-    inline char& operator [](UZ idx) {
-        OK_ASSERT(idx < count());
-
-        return data.items[idx];
-    }
-
-    inline const char& operator [](UZ idx) const {
-        OK_ASSERT(idx < count());
-
-        return data.items[idx];
+    inline char* get_items() const {
+        return data.items;
     }
 
     List<char> data;
@@ -845,8 +922,25 @@ struct Table {
     template <typename K>
     bool has(const K& key) const;
 
-
     static constexpr UZ DEFAULT_CAPACITY = 47;
+
+    inline void clear() {
+        count = 0;
+        memset(meta, 0, sizeof(Meta) * capacity);
+    }
+
+    inline Table<TKey, TValue> copy(Allocator* copy_allocator) {
+        UZ new_table_capacity = OK_TABLE_GROWTH_FACTOR(capacity);
+        Table<TKey, TValue> new_table = Table<TKey, TValue>::alloc(copy_allocator, new_table_capacity);
+
+        for (UZ i = 0; i < capacity; i++) {
+            if (OK_TAB_IS_OCCUPIED(meta[i])) {
+                new_table.put(keys[i], values[i]);
+            }
+        }
+
+        return new_table;
+    }
 
     inline U8 load_percentage() const {
         return (U8)((double)(count * 100) / (double)capacity);
@@ -1107,15 +1201,7 @@ Table<K, V> Table<K, V>::alloc(Allocator* a, UZ capacity) {
 template <typename K, typename V>
 void Table<K, V>::put(const K& key, const V& value) {
     if (load_percentage() >= 70) {
-        auto new_table = Table<K, V>::alloc(allocator, OK_TABLE_GROWTH_FACTOR(capacity));
-
-        for (UZ i = 0; i < capacity; i++) {
-            if (OK_TAB_IS_OCCUPIED(meta[i])) {
-                new_table.put(keys[i], values[i]);
-            }
-        }
-
-        *this = new_table;
+        *this = copy(allocator);
     }
 
     U64 idx = Hash<K>::hash(key) % capacity;
@@ -1269,8 +1355,9 @@ bool Set<T>::has(const T& elem) const {
     return false;
 }
 
-// filesystem API
+// Filesystem API
 struct File {
+#if OK_UNIX
     enum class OpenError {
         ACCESS_DENIED,
         INVALID_PATH,
@@ -1287,25 +1374,88 @@ struct File {
     };
 
     enum class ReadError {
-        IO_ERROR,
+        IO,
     };
 
-    static Optional<OpenError> open(File* out, const char* path);
+    enum class WriteError {
+        NOT_ALLOWED,
+        OUT_OF_SPACE,
+        BAD_DATA,
+    };
 
-    void seek_start() const;
-    off_t seek_end() const;
+    enum class CloseError {
+        BAD_FILE_DESCRIPTOR,
+        INTERRUPTED_BY_SIGNAL,
+        IO,
+        NOT_ENOUGH_SPACE,
+    };
+
+    enum class RemoveError {
+        ACCESS_DENIED,
+        CURRENTLY_IN_USE,
+        IO,
+        PATH_TOO_LONG,
+        DOES_NOT_EXIST,
+        KERNEL_OUT_OF_MEMORY,
+        READ_ONLY_FS,
+    };
+#else
+    using OpenError = DWORD;
+    using ReadError = DWORD;
+    using WriteError = DWORD;
+    using CloseError = DWORD;
+#endif // Platform check.
+
+    static Optional<OpenError> open(File* out, const char* path);
+    static Optional<OpenError> open(File* out, StringView path);
+
+#if OK_UNIX
+    static String error_string(Allocator*, OpenError);
+    static String error_string(Allocator*, ReadError);
+    static String error_string(Allocator*, WriteError);
+#else
+    static String error_string(Allocator*, DWORD);
+#endif // Platform check.
+
+    void seek_to(U64 offset);
+
+    inline void seek_start() {
+        return seek_to(0);
+    }
+
+    U64 seek_end();
 
     Optional<ReadError> read(U8* buf, UZ count, UZ* n_read);
-
     Optional<ReadError> read_full(Allocator* a, List<U8>* out);
 
-    UZ size() const;
+    Optional<WriteError> write(U8 *data, UZ count);
 
+    inline Optional<WriteError> write(Slice<U8> data) {
+        return write(data.items, data.count);
+    }
+
+    UZ size();
+
+    inline Optional<WriteError> write(StringView data) {
+        Slice<const char> chars = data.slice();
+        return write(chars.cast<U8>());
+    }
+
+    Optional<CloseError> close() const;
+
+    Optional<RemoveError> remove();
+
+#if OK_UNIX
     int fd;
+#else
+    HANDLE handle;
+#endif // Platform check.
+    UZ offset;
+
     const char* path;
 };
 
-// procedures
+// Procedures.
 void println(const char*);
 void println(StringView);
 void println(String);
@@ -1320,6 +1470,34 @@ String to_string(Allocator*, S64);
 String to_string(Allocator*, U64);
 
 bool parse_int64(StringView, S64*);
+
+Optional<File::OpenError> create_temp_file(File* file);
+
+static inline U32 get_rand() {
+#if OK_UNIX
+    return (U32)rand();
+#else
+    U32 r = 0;
+    errno_t err = rand_s(&r);
+    OK_ASSERT(err == 0);
+    return r;
+#endif // Platform check.
+}
+
+static inline F64 millis_timestamp() {
+#if OK_UNIX
+    struct timespec ts;
+    clock_gettime(CLOCK_REALTIME, &ts);
+    return (F64)ts.tv_sec * 1000.0 + (F64)ts.tv_nsec / 1e6;
+#else
+    LARGE_INTEGER frequency_int = {};
+    QueryPerformanceFrequency(&frequency_int);
+    F64 frequency = (F64)frequency_int.QuadPart / 1000.0;
+    LARGE_INTEGER counter;
+    QueryPerformanceCounter(&counter);
+    return (F64)counter.QuadPart / frequency;
+#endif // Platform check.
+}
 
 #ifdef OK_IMPLEMENTATION
 
@@ -1400,37 +1578,46 @@ ArenaAllocator::Region* ArenaAllocator::alloc_region(UZ region_size) {
 }
 
 void* ArenaAllocator::raw_alloc(UZ size) {
+    void* ptr;
+    UZ region_size;
+
     ArenaAllocator::Region* region_head = this->head;
 
     size = align_up(size, sizeof(void*));
 
-    while (region_head) {
+    while (region_head != nullptr) {
         if (region_head->size - region_head->off >= size) {
-            void* ptr = (void*)((U8*)region_head->data + region_head->off);
+            ptr = (void*)((U8*)region_head->data + region_head->off);
             region_head->off += size;
-            return ptr;
+            goto end;
         }
 
         region_head = region_head->next;
     }
 
-    UZ region_size = align_up(size, OK_PAGE_ALIGN);
+    region_size = align_up(size, OK_PAGE_ALIGN);
     region_head = alloc_region(region_size);
     region_head->next = this->head;
     this->head = region_head;
 
-    void* ptr = (void*)((U8*)region_head->data + region_head->off);
+    ptr = (void*)((U8*)region_head->data + region_head->off);
     region_head->off += size;
+
+end:
+    last_alloc_ptr = ptr;
     return ptr;
 }
 
 void ArenaAllocator::raw_dealloc(void* ptr, UZ size) {
-    OK_UNUSED(ptr);
-    OK_UNUSED(size);
+    if (last_alloc_ptr == ptr) {
+        size = align_up(size, sizeof(void*));
+        head->off -= size;
+    }
 }
 
 void* ArenaAllocator::raw_resize(void* old_ptr, UZ old_size, UZ new_size) {
-    auto* new_ptr = raw_alloc(new_size);
+    raw_dealloc(old_ptr, old_size);
+    void* new_ptr = raw_alloc(new_size);
     memcpy(new_ptr, old_ptr, old_size);
     return new_ptr;
 }
@@ -1468,6 +1655,20 @@ String String::from(List<char> chars) {
 String String::from(List<U8> bytes) {
     List<char> chars = bytes.cast<char>();
     return String::from(chars);
+}
+
+String String::from_cstr_set_allocator(Allocator* allocator, char* cstr, UZ count) {
+    OK_ASSERT(cstr[count] == '\0');
+
+    List<char> data{};
+    data.allocator = allocator;
+    data.items = cstr;
+    data.count = count;
+    data.capacity = count;
+
+    String string{};
+    string.data = data;
+    return string;
 }
 
 String String::format(Allocator* a, const char* fmt, ...) {
@@ -1533,21 +1734,7 @@ void String::format_append(const char* fmt, ...) {
     data.count += required_buf_size;
 }
 
-bool String::starts_with(StringView prefix) {
-    if (count() < prefix.count) return false;
-
-    for (UZ i = 0; i < prefix.count; i++) {
-        if (data.items[i] != prefix.data[i]) return false;
-    }
-
-    return true;
-}
-
 // STRING VIEW IMPLEMENTATION
-bool StringView::operator ==(const String& string) const {
-    return *this == string.view();
-}
-
 String StringView::to_string(Allocator* a) const {
     return String::alloc(a, data, count);
 }
@@ -1555,12 +1742,8 @@ String StringView::to_string(Allocator* a) const {
 // FILESYSTEM API IMPLEMENTATION
 Optional<File::OpenError> File::open(File* out, const char* path) {
 #if OK_UNIX
-    int fd = ::open(path, O_RDWR);
+    int fd = ::open(path, O_RDWR | O_CREAT);
     int error = errno;
-#elif OK_WINDOWS
-    int fd;
-    errno_t error = ::_sopen_s(&fd, path, _O_RDWR, _SH_DENYNO, 0);
-#endif // OK_UNIX
 
     if (fd < 0) {
         switch (error) {
@@ -1577,56 +1760,152 @@ Optional<File::OpenError> File::open(File* out, const char* path) {
         case EOVERFLOW:    return OpenError::FILE_TOO_BIG;
         case EROFS:        return OpenError::READONLY_FILE;
         case EFAULT:       OK_PANIC_FMT("Parameter 'path' (%p) is not mapped to the current process", (void*)path);
-        default:           OK_UNREACHABLE();
+        default:           OK_PANIC_FMT("Unexpected error: %s", strerror(error));
         }
     }
 
+    out->offset = 0;
     out->fd = fd;
     out->path = path;
 
     return {};
-}
-
-static inline off_t _lseek(int fd, off_t offset, int whence) {
-#if OK_UNIX
-    return ::lseek(fd, offset, whence);
 #elif OK_WINDOWS
-    return ::_lseek(fd, offset, whence);
+    // NOTE: Possible CreateFileA errors
+    //   ERROR_SHARING_VIOLATION
+
+    constexpr DWORD FILE_SHARE_MODE = 0;
+    constexpr LPSECURITY_ATTRIBUTES SECURITY_ATTRIBUTES = nullptr;
+    constexpr HANDLE TEMPLATE_FILE = nullptr;
+
+    HANDLE file_handle = CreateFileA(path,
+                                     GENERIC_READ | GENERIC_WRITE,
+                                     FILE_SHARE_MODE,
+                                     SECURITY_ATTRIBUTES,
+                                     OPEN_ALWAYS,
+                                     FILE_ATTRIBUTE_NORMAL,
+                                     TEMPLATE_FILE);
+
+    if (file_handle == INVALID_HANDLE_VALUE) {
+        DWORD file_open_error = GetLastError();
+        return file_open_error;
+    }
+
+    out->handle = file_handle;
+    out->path = path;
+    return {};
 #endif // OK_UNIX
 }
 
-void File::seek_start() const {
-    off_t seek_res = _lseek(fd, 0, SEEK_SET);
-    OK_ASSERT(seek_res != (off_t)-1);
+Optional<File::OpenError> File::open(File* out, StringView path) {
+    // FIXME: Temporary allocation in potentially multi-threaded context.
+    char* path_cstr = temp_allocator->alloc<char>(path.count + 1);
+    memcpy(path_cstr, path.data, path.count);
+    path_cstr[path.count] = '\0';
+    return File::open(out, path_cstr);
 }
 
-off_t File::seek_end() const {
-    off_t seek_res = _lseek(fd, 0, SEEK_END);
-    OK_ASSERT(seek_res != (off_t)-1);
+#if OK_UNIX
+String File::error_string(Allocator* allocator, File::OpenError error) {
+    switch (error) {
+    case File::OpenError::ACCESS_DENIED:                    return String::alloc(allocator, "access denied");
+    case File::OpenError::INVALID_PATH:                     return String::alloc(allocator, "invalid file path");
+    case File::OpenError::IS_DIRECTORY:                     return String::alloc(allocator, "file is a directory");
+    case File::OpenError::TOO_MANY_SYMLINKS:                return String::alloc(allocator, "too many symlinks");
+    case File::OpenError::PROCESS_OPEN_FILES_LIMIT_REACHED: return String::alloc(allocator, "process open files limit has been reached");
+    case File::OpenError::SYSTEM_OPEN_FILES_LIMIT_REACHED:  return String::alloc(allocator, "system open files limit has been reached");
+    case File::OpenError::PATH_TOO_LONG:                    return String::alloc(allocator, "file path is too long");
+    case File::OpenError::KERNEL_OUT_OF_MEMORY:             return String::alloc(allocator, "kernel out of memory");
+    case File::OpenError::OUT_OF_SPACE:                     return String::alloc(allocator, "disk out of space");
+    case File::OpenError::IS_SOCKET:                        return String::alloc(allocator, "file is a socket");
+    case File::OpenError::FILE_TOO_BIG:                     return String::alloc(allocator, "file is too big");
+    case File::OpenError::READONLY_FILE:                    return String::alloc(allocator, "file is readonly");
+    }
 
+    OK_UNREACHABLE();
+}
+
+String File::error_string(Allocator* allocator, File::ReadError error) {
+    switch (error) {
+    case File::ReadError::IO: return String::alloc(allocator, "I/O error");
+    }
+
+    OK_UNREACHABLE();
+}
+
+String File::error_string(Allocator* allocator, File::WriteError error) {
+    switch (error) {
+    case WriteError::NOT_ALLOWED:  return String::alloc(allocator, "operation not allowed");
+    case WriteError::OUT_OF_SPACE: return String::alloc(allocator, "out of space");
+    case WriteError::BAD_DATA:     return String::alloc(allocator, "bad data");
+    }
+
+    OK_UNREACHABLE();
+}
+
+#else
+
+String File::error_string(Allocator* allocator, DWORD error) {
+    constexpr DWORD LANGUAGE_ID = 0;
+    constexpr DWORD ERROR_BUFFER_SIZE = 1024;
+
+    char* error_buffer = allocator->alloc<char>(ERROR_BUFFER_SIZE);
+
+    DWORD result = FormatMessage(FORMAT_MESSAGE_FROM_SYSTEM,
+                                 nullptr,
+                                 error,
+                                 LANGUAGE_ID,
+                                 error_buffer,
+                                 ERROR_BUFFER_SIZE,
+                                 nullptr);
+
+    OK_ASSERT(result != 0);
+
+    return String::from_cstr_set_allocator(allocator, error_buffer, ERROR_BUFFER_SIZE);
+}
+
+#endif // Platform check.
+
+void File::seek_to(U64 seek_offset) {
+    this->offset = seek_offset;
+#if OK_UNIX
+    OK_ASSERT(lseek(fd, seek_offset, SEEK_SET) != (off_t)-1);
+#else
+    LONG higher_order_bits = 0;
+    DWORD lower_order_bits = SetFilePointer(handle, (LONG)seek_offset, &higher_order_bits, FILE_BEGIN);
+    OK_ASSERT(lower_order_bits != INVALID_SET_FILE_POINTER);
+#endif // Platform check.
+}
+
+U64 File::seek_end() {
+#if OK_UNIX
+    off_t seek_res = lseek(fd, 0, SEEK_END);
+    OK_ASSERT(seek_res != (off_t)-1);
+    offset = seek_res;
     return seek_res;
+#else
+    long higher_order_bits = 0;
+    DWORD lower_order_bits = SetFilePointer(handle, 0, &higher_order_bits, FILE_END);
+    OK_ASSERT(lower_order_bits != INVALID_SET_FILE_POINTER);
+
+    offset = (U64)higher_order_bits << 32 | (U64)lower_order_bits;
+    return offset;
+#endif // Platform check.
 }
 
-UZ File::size() const {
-    off_t res = seek_end();
-    seek_start();
+UZ File::size() {
+    UZ prev_offset = this->offset;
+    U64 res = seek_end();
+    seek_to(prev_offset);
     return res;
 }
 
-static inline S64 _read(int fd, void* buffer, UZ count) {
-#if OK_UNIX
-    return ::read(fd, buffer, count);
-#elif OK_WINDOWS
-    return ::_read(fd, buffer, (unsigned int)count);
-#endif // OK_UNIX
-}
-
 Optional<File::ReadError> File::read(U8* buf, UZ count, UZ* n_read) {
-    S64 r = ok::_read(fd, buf, count);
+#if OK_UNIX
+    S64 r = ::read(fd, buf, count);
 
     if (r < 0) {
         switch (errno) {
-        case EIO: return ReadError::IO_ERROR;
+        case EIO: return ReadError::IO;
         case EFAULT: OK_PANIC_FMT("The buffer (%p) is mapped outside the current process", (void*)buf);
         default: OK_UNREACHABLE();
         }
@@ -1635,20 +1914,103 @@ Optional<File::ReadError> File::read(U8* buf, UZ count, UZ* n_read) {
     *n_read = r;
 
     return {};
+#elif OK_WINDOWS
+    bool ok = ReadFile(handle, (void*)buf, (DWORD)count, (LPDWORD)n_read, nullptr);
+    if (!ok) return GetLastError();
+    return {};
+#endif // Platform check
 }
 
 Optional<File::ReadError> File::read_full(Allocator* a, List<U8>* out) {
-    UZ sz = size();
-    *out = List<U8>::alloc(a, sz);
+    UZ file_offset = offset;
 
-    UZ n_read;
-    auto err = read(out->items, sz, &n_read);
+    UZ file_size = size();
+    *out = List<U8>::alloc(a, file_size);
 
-    if (err.has_value()) return err;
+    Optional<ReadError> err{};
+
+    seek_start();
+    UZ n_read = 0;
+    err = read(out->items, file_size, &n_read);
+
+    if (err.has_value()) goto end;
 
     out->count = n_read;
 
+end:
+    seek_to(file_offset);
+
+    return err;
+}
+
+Optional<File::RemoveError> File::remove() {
+    int res = ::remove(this->path);
+    if (res != -1)     return {};
+
+    switch (errno) {
+    case EPERM:
+    case EACCES:       return RemoveError::ACCESS_DENIED;
+    case EBUSY:        return RemoveError::CURRENTLY_IN_USE;
+    case EIO:          return RemoveError::IO;
+    case ENAMETOOLONG: return RemoveError::PATH_TOO_LONG;
+    case ENOTDIR:
+    case ENOENT:       return RemoveError::DOES_NOT_EXIST;
+    case ENOMEM:       return RemoveError::KERNEL_OUT_OF_MEMORY;
+    case EROFS:        return RemoveError::READ_ONLY_FS;
+    default: OK_UNREACHABLE();
+    }
+}
+
+Optional<File::CloseError> File::close() const {
+#if OK_UNIX
+    int ret = ::close(fd);
+    if (ret == 0) return {};
+
+    switch (ret) {
+    case EBADF:  return CloseError::BAD_FILE_DESCRIPTOR;
+    case EINTR:  return CloseError::INTERRUPTED_BY_SIGNAL;
+    case EIO:    return CloseError::IO;
+    case ENOSPC:
+    case EDQUOT: return CloseError::NOT_ENOUGH_SPACE;
+    default: OK_UNREACHABLE();
+    }
+#else
+    bool ok = CloseHandle(handle);
+    if (ok) return {};
+    return GetLastError();
+#endif // Platform check.
+}
+
+Optional<File::WriteError> File::write(U8* data, UZ count) {
+#if OK_UNIX
+    S64 ret = ::write(fd, (const void*)data, count);
+
+    if (ret != -1) return {};
+
+    switch (errno) {
+    case EBADF:  return WriteError::NOT_ALLOWED;
+    case ENOSPC: return WriteError::OUT_OF_SPACE;
+    case EINVAL: return WriteError::BAD_DATA;
+    default:     OK_UNREACHABLE();
+    }
+#else
+    // We first seek to the start of the file, and then set that as the end of file,
+    // so when the write proceeds, it will flush the buffer to disk and set a the new
+    // end of file to the length of the supplied buffer, overriding the file contents
+    // fully.
+    seek_start();
+    SetEndOfFile(handle);
+
+    DWORD n_written = 0;
+    bool ok = WriteFile(handle,
+                        data,
+                        (DWORD)count,
+                        &n_written,
+                        nullptr);
+
+    if (!ok) return GetLastError();
     return {};
+#endif // Platform check.
 }
 
 // SUBPROCESS API IMPLEMENTATION
@@ -1939,6 +2301,26 @@ bool is_digit(char c) {
 
 bool is_alpha(char c) {
     return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z');
+}
+
+Optional<File::OpenError> create_temp_file(File* file) {
+#if OK_UNIX
+    U64 timestamp = millis_timestamp();
+
+    String file_path = String::alloc(temp_allocator, "/tmp/");
+    file_path.reserve(13);
+
+    for (U8 i = 0; i < 8; ++i) {
+        U8 c0 = (timestamp >> (i * 4)) & 15;
+        U8 c1 = (timestamp >> (64 - ((i + 1) * 4))) & 15;
+        U8 c = 'a' + (c0 ^ c1);
+        file_path.push(c);
+    }
+
+    return File::open(file, file_path.cstr());
+#else
+    OK_TODO();
+#endif // Platform check.
 }
 
 // HASHES IMPLEMENTATION

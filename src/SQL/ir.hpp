@@ -459,7 +459,7 @@ struct CompiledQuery {
 };
 
 bool ir_compile_query(Query *in_query, IrContext *ctx, CompiledQuery *out_query);
-String stringify_ir(Allocator*, IREmitter*);
+String stringify_ir(Allocator *, CompiledQuery *);
 }; // namespace xmdb::SQL
 
 #endif // XMDB_IR_HPP

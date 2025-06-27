@@ -25,5 +25,5 @@ int main() {
     CompiledQuery compiled_query{};
 
     OK_ASSERT(ir_compile_query(&query.value, &ir_ctx, &compiled_query));
-    ok::println(stringify_ir(&arena, &ir_ctx.ir_emitter));
+    ok::println(stringify_ir(&arena, &compiled_query));
 }
