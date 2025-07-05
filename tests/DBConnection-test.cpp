@@ -3,6 +3,7 @@
 
 #include <Core/DBPool.hpp>
 #include <Core/DBConnection.hpp>
+#include <Core/Core.hpp>
 
 using namespace ok::literals;
 using namespace xmdb;
@@ -17,16 +18,20 @@ TEST(DBConnection, execute) {
     SELECT column1, column2 FROM MyTable;)sql"_sv;
 
     String error{};
-    TypedCompiledQuery query{};
-    ASSERT_TRUE(compile_and_type_check_source(&arena, source, &query, &error));
+
+    QueryResults query_results{};
 
     DBPool db_pool{&arena};
     DBDescriptor *default_db = db_pool.get_db("default"_sv);
     DBConnection db_conn{&db_pool, default_db};
 
-    QueryResults query_results{};
+    bool ok = compile_and_execute_source(&arena,
+                                         &db_conn,
+                                         source,
+                                         &query_results,
+                                         &error);
 
-    db_conn.execute(&query, &query_results);
+    ASSERT_TRUE(ok);
 
     ASSERT_TRUE(query_results.ok);
     ASSERT_TRUE(query_results.value.has_value());

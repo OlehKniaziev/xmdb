@@ -7,6 +7,7 @@ add_library(LibCore
   DBDescriptor.cpp
   DBTable.cpp
   QueryExecutionContext.cpp
+  Core.cpp
 )
 
 set_property(TARGET LibCore PROPERTY POSITION_INDEPENDENT_CODE 1)
