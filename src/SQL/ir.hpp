@@ -30,27 +30,27 @@ enum ColumnType {
 struct TableSchema {
     static TableSchema untyped(Allocator* a) {
         TableSchema schema;
-        schema.column_names = List<Optional<String>>::alloc(a);
-        schema.column_types = {};
+        schema.columns_names = List<Optional<String>>::alloc(a);
+        schema.columns_types = {};
         return schema;
     }
 
     static TableSchema typed(Allocator* a) {
         TableSchema schema = TableSchema::untyped(a);
-        schema.column_types = List<ColumnType>::alloc(a);
+        schema.columns_types = List<ColumnType>::alloc(a);
         return schema;
     }
 
     inline bool find_column(StringView name) const {
-        for (UZ i = 0; i < column_names.count; ++i) {
-            if (column_names[i].has_value() && column_names[i].value == name) return true;
+        for (UZ i = 0; i < columns_names.count; ++i) {
+            if (columns_names[i].has_value() && columns_names[i].value == name) return true;
         }
 
         return false;
     }
 
-    List<Optional<String>> column_names;
-    Optional<List<ColumnType>> column_types;
+    List<Optional<String>> columns_names;
+    Optional<List<ColumnType>> columns_types;
 };
 
 enum IRInstructionOperator : U32 {

@@ -256,7 +256,7 @@ static inline bool compile_create_stmt(CreateStmt* stmt, IrContext* ctx) {
     auto* create_table_stmt = static_cast<CreateTableStmt*>(stmt);
 
     TableSchema* table_schema = ctx->alloc_table_schema(ctx->active_db_id, stmt->name, true);
-    OK_ASSERT(table_schema->column_types.has_value());
+    OK_ASSERT(table_schema->columns_types.has_value());
 
     for (UZ i = 0; i < create_table_stmt->column_names.count; ++i) {
         String column_type_string = create_table_stmt->column_types[i];
@@ -264,8 +264,8 @@ static inline bool compile_create_stmt(CreateStmt* stmt, IrContext* ctx) {
         TRY(parse_type(column_type_string.view(), stmt->token, ctx, &column_type));
 
         String column_name = create_table_stmt->column_names[i];
-        table_schema->column_names.push(column_name.copy(ctx->allocator));
-        table_schema->column_types.value.push(column_type);
+        table_schema->columns_names.push(column_name.copy(ctx->allocator));
+        table_schema->columns_types.value.push(column_type);
     }
 
     emit_CreateTable(&ctx->ir_emitter, stmt->token, create_table_stmt->name.view(), table_schema);
@@ -888,7 +888,7 @@ const char *stringify_op(S64 op) {
 }
 
 const char *stringify_op(TableSchema *op) {
-    String s = String::format(ok::temp_allocator, "<table schema with %zu columns>", op->column_names.count);
+    String s = String::format(ok::temp_allocator, "<table schema with %zu columns>", op->columns_names.count);
     return s.cstr();
 }
 

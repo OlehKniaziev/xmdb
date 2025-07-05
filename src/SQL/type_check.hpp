@@ -28,6 +28,11 @@ struct TypingContextError {
     String message;
 };
 
+struct TypedCompiledQuery {
+    CompiledQuery untyped;
+    Table<U32, TypedTableSchema> table_types;
+};
+
 struct TypingContext {
     TypingContext(Allocator *allocator, StringView source);
 
@@ -39,7 +44,7 @@ struct TypingContext {
     Optional<TypingContextError> error{};
 };
 
-bool type_check_query(CompiledQuery *query, TypingContext *ctx);
+bool type_check_query(CompiledQuery *query, TypingContext *ctx, TypedCompiledQuery *out);
 };
 
 #endif // XMDB_SQL_TYPE_CHECK_HPP

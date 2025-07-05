@@ -5,7 +5,7 @@
 #include "util.hpp"
 
 namespace xmdb::SQL {
-bool compile_and_type_check_source(ok::ArenaAllocator *arena, StringView source, CompiledQuery *compiled_query, String *error) {
+bool compile_and_type_check_source(ok::ArenaAllocator *arena, StringView source, TypedCompiledQuery *typed_query, String *error) {
     Parser parser{arena, source};
 
     Optional<Query> query = parser.query();
@@ -18,13 +18,13 @@ bool compile_and_type_check_source(ok::ArenaAllocator *arena, StringView source,
 
     IrContext ir_ctx{arena, source};
 
-    if (!ir_compile_query(&query.value, &ir_ctx, compiled_query)) {
+    if (!ir_compile_query(&query.value, &ir_ctx, &typed_query->untyped)) {
         // TODO: Report error.
         return false;
     }
 
     TypingContext t_ctx{arena, source};
-    if (!type_check_query(compiled_query, &t_ctx)) {
+    if (!type_check_query(&typed_query->untyped, &t_ctx, typed_query)) {
         // TODO: Report error.
         return false;
     }

@@ -27,8 +27,9 @@ TEST(ir, basic) {
 
     ASSERT_TRUE(ir_compile_query(&query.value, &ir_ctx, &compiled_query));
 
+    TypedCompiledQuery typed_query{};
     TypingContext t_ctx{&arena, source};
-    ASSERT_TRUE(type_check_query(&compiled_query, &t_ctx));
+    ASSERT_TRUE(type_check_query(&compiled_query, &t_ctx, &typed_query));
 }
 
 TEST(ir, select) {
@@ -50,8 +51,9 @@ TEST(ir, select) {
 
     ASSERT_TRUE(ir_compile_query(&query.value, &ir_ctx, &compiled_query));
 
+    TypedCompiledQuery typed_query{};
     TypingContext t_ctx{&arena, source};
-    ASSERT_TRUE(type_check_query(&compiled_query, &t_ctx));
+    ASSERT_TRUE(type_check_query(&compiled_query, &t_ctx, &typed_query));
 }
 
 TEST(ir, create_database) {
@@ -68,8 +70,9 @@ TEST(ir, create_database) {
 
     ASSERT_TRUE(ir_compile_query(&query.value, &ir_ctx, &compiled_query));
 
+    TypedCompiledQuery typed_query{};
     TypingContext t_ctx{&arena, source};
-    ASSERT_TRUE(type_check_query(&compiled_query, &t_ctx));
+    ASSERT_TRUE(type_check_query(&compiled_query, &t_ctx, &typed_query));
 }
 
 TEST(ir, create_table) {
@@ -85,8 +88,9 @@ TEST(ir, create_table) {
 
     ASSERT_TRUE(ir_compile_query(&query.value, &ir_ctx, &compiled_query));
 
+    TypedCompiledQuery typed_query{};
     TypingContext t_ctx{&arena, source};
-    ASSERT_TRUE(type_check_query(&compiled_query, &t_ctx));
+    ASSERT_TRUE(type_check_query(&compiled_query, &t_ctx, &typed_query));
 }
 
 TEST(ir, drop_database) {
@@ -101,8 +105,9 @@ TEST(ir, drop_database) {
     CompiledQuery compiled_query{};
     ASSERT_TRUE(ir_compile_query(&query.value, &ir_ctx, &compiled_query));
 
+    TypedCompiledQuery typed_query{};
     TypingContext t_ctx{&arena, source};
-    ASSERT_TRUE(type_check_query(&compiled_query, &t_ctx));
+    ASSERT_TRUE(type_check_query(&compiled_query, &t_ctx, &typed_query));
 }
 
 TEST(ir, drop_table) {
@@ -117,8 +122,9 @@ TEST(ir, drop_table) {
     CompiledQuery compiled_query{};
     ASSERT_TRUE(ir_compile_query(&query.value, &ir_ctx, &compiled_query));
 
+    TypedCompiledQuery typed_query{};
     TypingContext t_ctx{&arena, source};
-    ASSERT_TRUE(type_check_query(&compiled_query, &t_ctx));
+    ASSERT_TRUE(type_check_query(&compiled_query, &t_ctx, &typed_query));
 }
 
 TEST(ir, insert) {
@@ -137,8 +143,9 @@ TEST(ir, insert) {
     CompiledQuery compiled_query{};
     ASSERT_TRUE(ir_compile_query(&query.value, &ir_ctx, &compiled_query));
 
+    TypedCompiledQuery typed_query{};
     TypingContext t_ctx{&arena, source};
-    ASSERT_TRUE(type_check_query(&compiled_query, &t_ctx));
+    ASSERT_TRUE(type_check_query(&compiled_query, &t_ctx, &typed_query));
 }
 
 TEST(ir, update) {
@@ -157,8 +164,9 @@ TEST(ir, update) {
     CompiledQuery compiled_query{};
     ASSERT_TRUE(ir_compile_query(&query.value, &ir_ctx, &compiled_query));
 
+    TypedCompiledQuery typed_query{};
     TypingContext t_ctx{&arena, source};
-    ASSERT_TRUE(type_check_query(&compiled_query, &t_ctx));
+    ASSERT_TRUE(type_check_query(&compiled_query, &t_ctx, &typed_query));
 }
 
 TEST(ir, delete_) {
@@ -177,6 +185,7 @@ TEST(ir, delete_) {
     CompiledQuery compiled_query{};
     ASSERT_TRUE(ir_compile_query(&query.value, &ir_ctx, &compiled_query));
 
+    TypedCompiledQuery typed_query{};
     TypingContext t_ctx{&arena, source};
-    ASSERT_TRUE(type_check_query(&compiled_query, &t_ctx));
+    ASSERT_TRUE(type_check_query(&compiled_query, &t_ctx, &typed_query));
 }

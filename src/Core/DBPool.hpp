@@ -10,10 +10,13 @@ namespace xmdb {
 struct DBPool {
     DBPool(ok::Allocator *);
 
-    QueryExecutionContext *rent_empty_execution_context();
+    DBDescriptor *get_db(StringView);
+
+    QueryExecutionContext *rent_empty_execution_context(DBDescriptor *);
     void return_execution_context(QueryExecutionContext *);
 
     ok::Allocator *allocator;
     QueryExecutionContext *execution_contexts;
+    DBDescriptor *db_descriptors;
 };
 } // namespace xmdb

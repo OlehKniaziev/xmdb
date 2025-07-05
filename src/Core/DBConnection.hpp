@@ -6,13 +6,20 @@
 #include "ok.hpp"
 
 namespace xmdb {
-struct DBConnection {
-    explicit DBConnection(DBPool *);
+struct QueryResults {
+    bool ok;
+    // UZ rows_affected;
+    Optional<DBTable *> value;
+};
 
-    void execute(SQL::CompiledQuery *query);
+struct DBConnection {
+    explicit DBConnection(DBPool *, DBDescriptor *);
+
+    void execute(SQL::TypedCompiledQuery *query, QueryResults *results);
 
     void close();
 
     DBPool *db_pool;
+    DBDescriptor *db;
 };
 };

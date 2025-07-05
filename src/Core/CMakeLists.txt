@@ -4,6 +4,8 @@ add_library(LibCore
   DBConnection.cpp
   DBPool.cpp
   DBValue.cpp
+  DBDescriptor.cpp
+  DBTable.cpp
   QueryExecutionContext.cpp
 )
 

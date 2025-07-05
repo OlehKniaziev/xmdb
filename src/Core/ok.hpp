@@ -475,6 +475,105 @@ struct Slice : public ArrayBase<Slice<T>, T> {
 };
 
 template <typename T>
+struct MultiListBase {
+    T *items;
+};
+
+template <typename T = void, typename... Rest>
+struct MultiListMethods {
+    static void grow(Allocator *allocator, UZ old_size, UZ new_size, void *untyped_list, UZ base_offset) {
+        MultiListBase<T> *list = reinterpret_cast<MultiListBase<T> *>((U8 *)untyped_list + base_offset);
+        list->items = allocator->resize(list->items, old_size, new_size);
+        // This is very, very bad. I am sorry.
+        UZ next_base_offset = base_offset + sizeof(void *);
+        MultiListMethods<Rest...>::grow(allocator, old_size, new_size, untyped_list, next_base_offset);
+    }
+
+    static void init(Allocator *allocator, UZ capacity, void *untyped_list, UZ base_offset) {
+        MultiListBase<T> *list = reinterpret_cast<MultiListBase<T> *>((U8 *)untyped_list + base_offset);
+        list->items = allocator->alloc<T>(capacity);
+        UZ next_base_offset = base_offset + sizeof(void *);
+        MultiListMethods<Rest...>::init(allocator, capacity, untyped_list, next_base_offset);
+    }
+};
+
+template <>
+struct MultiListMethods<void> {
+    static void grow(Allocator *allocator, UZ old_size, UZ new_size, void *list, UZ base_offset) {
+        OK_UNUSED(allocator);
+        OK_UNUSED(old_size);
+        OK_UNUSED(new_size);
+        OK_UNUSED(list);
+        OK_UNUSED(base_offset);
+    }
+
+    static void init(Allocator *allocator, UZ capacity, void *untyped_list, UZ base_offset) {
+        OK_UNUSED(allocator);
+        OK_UNUSED(capacity);
+        OK_UNUSED(untyped_list);
+        OK_UNUSED(base_offset);
+    }
+};
+
+template <typename... Types>
+struct MultiList : public ArrayBase<MultiList<Types...>, Types>..., public MultiListBase<Types>... {
+    static MultiList<Types...> alloc(Allocator *allocator, UZ capacity = 7) {
+        MultiList<Types...> list{};
+        list.allocator = allocator;
+        list.capacity = capacity;
+        MultiListMethods<Types...>::init(allocator, capacity, &list, 0);
+        list.count = 0;
+        return list;
+    }
+
+    void push(Types... args) {
+        if (count >= capacity) {
+            UZ new_cap = capacity * 2;
+            MultiListMethods<Types...>::grow(allocator, capacity, new_cap, this, 0);
+            capacity = new_cap;
+        }
+        _push_impl(count, args...);
+        ++count;
+    }
+
+    void _push_impl(UZ idx) {
+        OK_UNUSED(idx);
+    }
+
+    template <typename X, typename... Xs>
+    void _push_impl(UZ idx, const X &x, Xs... xs) {
+        this->MultiListBase<X>::items[idx] = x;
+        _push_impl(idx, xs...);
+    }
+
+    template <typename T>
+    T *get_items() {
+        return static_cast<MultiListBase<T> *>(this)->items;
+    }
+
+    template <typename T>
+    const T *get_items() const {
+        return static_cast<const MultiListBase<T> *>(this)->items;
+    }
+
+    template <typename T>
+    T &at(UZ idx) {
+        OK_ASSERT(idx < count);
+        return this->MultiListBase<T>::items[idx];
+    }
+
+    template <typename T>
+    const T &at(UZ idx) const {
+        OK_ASSERT(idx < count);
+        return this->MultiListBase<T>::items[idx];
+    }
+
+    Allocator *allocator;
+    UZ capacity;
+    UZ count;
+};
+
+template <typename T>
 struct LinkedList {
     struct Node {
         Node *prev;

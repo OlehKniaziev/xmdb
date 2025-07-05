@@ -16,7 +16,7 @@ DBValue DBValue::cmp(ok::Allocator *allocator, DBValue other) {
         computation_data->lhs = u.b;
         computation_data->rhs = other.u.b;
 
-        ComputedTableStreamData<S64> computation{[](void *data) -> Optional<S64> {
+        ComputedTableStream<S64> computation{[](void *data) -> Optional<S64> {
             StreamPair<bool> *stream_pair = static_cast<StreamPair<bool> *>(data);
             Optional<bool> lhs = stream_pair->lhs.next();
             Optional<bool> rhs = stream_pair->rhs.next();

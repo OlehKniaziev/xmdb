@@ -16,9 +16,10 @@ struct DBValue {
         DBTable *table;
         TableStream<bool> b;
         TableStream<S64> integer;
+        TableStream<String> string;
     } u;
 
-    static DBValue b(TableStream<bool> b) {
+    static DBValue boolean(TableStream<bool> b) {
         DBValue value{};
         value.type = SQL::Type::TYPE_BOOL;
         value.u.b = b;
@@ -36,6 +37,13 @@ struct DBValue {
         DBValue value{};
         value.type = SQL::Type::TYPE_TABLE;
         value.u.table = table;
+        return value;
+    }
+
+    static DBValue string(TableStream<String> string) {
+        DBValue value{};
+        value.type = SQL::Type::TYPE_STRING;
+        value.u.string = string;
         return value;
     }
 

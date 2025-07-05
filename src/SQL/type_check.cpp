@@ -103,18 +103,18 @@ static inline bool type_check_ir_instruction(U32 ip, CompiledQuery *ir_emitter, 
         Triple<String, StringView, TableSchema*> operands = operands_of_FetchTable(ir_emitter, ip);
         TableSchema *table_schema = operands.op3;
 
-        OK_ASSERT(table_schema->column_types.has_value());
+        OK_ASSERT(table_schema->columns_types.has_value());
 
         List<Type> column_types = List<Type>::alloc(ctx->allocator);
 
-        for (UZ i = 0; i < table_schema->column_types.value.count; ++i) {
-            ColumnType column_type = table_schema->column_types.value[i];
+        for (UZ i = 0; i < table_schema->columns_types.value.count; ++i) {
+            ColumnType column_type = table_schema->columns_types.value[i];
             Type type = column_type_to_type_table[column_type];
             column_types.push(type);
         }
 
         TypedTableSchema typed_table_schema = {
-            .column_names = table_schema->column_names.slice(),
+            .column_names = table_schema->columns_names.slice(),
             .column_types = column_types.slice(),
         };
 
@@ -229,10 +229,13 @@ static inline bool type_check_ir_instruction(U32 ip, CompiledQuery *ir_emitter, 
     }
 }
 
-bool type_check_query(CompiledQuery *query, TypingContext *ctx) {
+bool type_check_query(CompiledQuery *query, TypingContext *ctx, TypedCompiledQuery *typed_query) {
     for (UZ i = 0; i < query->instructions.count; ++i) {
         TRY(type_check_ir_instruction(i, query, ctx));
     }
+
+    typed_query->untyped = *query;
+    typed_query->table_types = ctx->table_types;
 
     return true;
 }
