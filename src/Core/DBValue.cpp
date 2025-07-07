@@ -13,10 +13,10 @@ DBValue DBValue::cmp(ok::Allocator *allocator, DBValue other) {
     switch (type) {
     case SQL::TYPE_BOOL: {
         StreamPair<bool> *computation_data = allocator->alloc<StreamPair<bool>>();
-        computation_data->lhs = u.b;
-        computation_data->rhs = other.u.b;
+        computation_data->lhs = u.boolean;
+        computation_data->rhs = other.u.boolean;
 
-        ComputedTableStream<S64> computation{[](void *data) -> Optional<S64> {
+        auto computation = [](void *data) -> Optional<S64> {
             StreamPair<bool> *stream_pair = static_cast<StreamPair<bool> *>(data);
             Optional<bool> lhs = stream_pair->lhs.next();
             Optional<bool> rhs = stream_pair->rhs.next();
@@ -30,9 +30,9 @@ DBValue DBValue::cmp(ok::Allocator *allocator, DBValue other) {
             }
 
             return (S64)lhs.value - (S64)rhs.value;
-        }, computation_data};
+        };
 
-        TableStream<S64> result = TableStream<S64>::computed(computation);
+        TableStream<S64> result = TableStream<S64>::computed(computation, computation_data);
         return DBValue::integer(result);
     }
     default: OK_TODO();

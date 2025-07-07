@@ -54,6 +54,11 @@
     abort(); \
 } while (0)
 
+#define OK_TODO_MSG_FMT(msg, ...) do { \
+    fprintf(stderr, "%s:%d: TODO: " msg "\n", __FILE__, __LINE__, __VA_ARGS__); \
+    abort(); \
+} while (0)
+
 #define OK_UNUSED(arg) (void)(arg)
 
 #define OK_UNREACHABLE() do { \
@@ -837,6 +842,15 @@ struct OptionalBase {
         return static_cast<const Self<T>*>(this);
     }
 
+    template <typename O>
+    bool operator ==(const OptionalBase<Self, O>& other) const {
+        auto* lhs = self_cast();
+        auto* rhs = other.self_cast();
+        if (!lhs->has_value() && !rhs->has_value()) return true;
+
+        return lhs->has_value() && rhs->has_value() && lhs->get_unchecked() == rhs->get_unchecked();
+    }
+
     explicit operator bool() const {
         return self_cast()->has_value();
     }
@@ -869,7 +883,6 @@ struct Optional : public OptionalBase<Optional, T> {
         OK_ASSERT(has_value());
         return get_unchecked();
     }
-
 
     bool _has_value;
     T value;
@@ -956,6 +969,20 @@ template <typename T>
 struct Hash<HashPtr<T>> {
     static U64 hash(const HashPtr<T>& ptr) {
         return Hash<T>::hash(*ptr.value);
+    }
+};
+
+template <typename T>
+struct Hash<T*> {
+    static U64 hash(const T* ptr) {
+        return reinterpret_cast<U64>(ptr);
+    }
+};
+
+template <typename T>
+struct Hash<const T*> {
+    static U64 hash(const T* ptr) {
+        return reinterpret_cast<U64>(ptr);
     }
 };
 

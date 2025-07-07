@@ -14,9 +14,9 @@ void QueryExecutionContext::put_var(U32 ip, StringView name, DBValue value) {
 }
 
 DBValue QueryExecutionContext::fetch_column(DBTable *table, StringView column_name) {
-    for (UZ i = 0; i < table->column_count; ++i) {
-        if (table->column_names[i] == column_name) {
-            return table->column_values[i];
+    for (UZ i = 0; i < table->columns_count; ++i) {
+        if (table->columns_names[i] == column_name) {
+            return table->columns_values[i];
         }
     }
 
@@ -64,14 +64,17 @@ void QueryExecutionContext::emit_column(DBValue column_value, StringView column_
 }
 
 DBTable *QueryExecutionContext::emit_query(U32 columns_count, SQL::ColumnType *columns_types) {
-    emitted_columns.count -= columns_count;
     const StringView *columns_names_ptr = emitted_columns.get_items<StringView>();
+    columns_names_ptr += emitted_columns_offset;
     const DBValue *columns_values_ptr = emitted_columns.get_items<DBValue>();
+    columns_values_ptr += emitted_columns_offset;
 
     StringView *columns_names = allocator->alloc<StringView>(columns_count);
     DBValue *columns_values = allocator->alloc<DBValue>(columns_count);
     memcpy(columns_names, columns_names_ptr, columns_count * sizeof(*columns_names));
     memcpy(columns_values, columns_values_ptr, columns_count * sizeof(*columns_values));
+
+    emitted_columns_offset += columns_count;
 
     DBTable *table = DBTable::alloc(allocator,
                                     ""_sv,
@@ -81,5 +84,63 @@ DBTable *QueryExecutionContext::emit_query(U32 columns_count, SQL::ColumnType *c
                                     columns_values);
     last_emitted_query = table;
     return table;
+}
+
+void QueryExecutionContext::insert_column(DBTable *table, StringView column_name, DBValue column_value) {
+    OK_UNUSED(table);
+    columns_to_insert.push(column_name, column_value);
+}
+
+void QueryExecutionContext::insert_row(DBTable *table) {
+    StringView *columns_names_ptr = columns_to_insert.get_items<StringView>();
+    DBValue *columns_values_ptr = columns_to_insert.get_items<DBValue>();
+
+    StringView *columns_names = allocator->alloc<StringView>(columns_to_insert.count);
+    DBValue *columns_values = allocator->alloc<DBValue>(columns_to_insert.count);
+    memcpy(columns_names, columns_names_ptr, sizeof(*columns_names) * columns_to_insert.count);
+    memcpy(columns_values, columns_values_ptr, sizeof(*columns_values) * columns_to_insert.count);
+
+    // FIXME(oleh): Should probably introduce a way to fetch a pointer to a value in the table,
+    // and instead of inserting the list again just modify it.
+    Optional<ok::MultiList<UZ, StringView *, DBValue *>> rows = rows_to_insert.get(table);
+    if (rows.has_value()) {
+        rows.value.push(columns_to_insert.count, columns_names, columns_values);
+        rows_to_insert.put(table, rows.value);
+    } else {
+        ok::MultiList<UZ, StringView *, DBValue *> rows = ok::MultiList<UZ, StringView *, DBValue *>::alloc(allocator);
+        rows.push(columns_to_insert.count, columns_names, columns_values);
+        rows_to_insert.put(table, rows);
+    }
+
+    columns_to_insert.count = 0;
+}
+
+void QueryExecutionContext::commit_insert() {
+    OK_TABLE_FOREACH(rows_to_insert, table, rows, {
+        UZ *rows_to_insert_columns_count = rows.get_items<UZ>();
+        StringView **rows_to_insert_columns_names = rows.get_items<StringView *>();
+        DBValue **rows_to_insert_columns_values = rows.get_items<DBValue *>();
+
+        for (UZ i = 0; i < rows.count; ++i) {
+            UZ columns_to_insert_count = rows_to_insert_columns_count[i];
+            StringView *columns_to_insert_names = rows_to_insert_columns_names[i];
+            DBValue *columns_to_insert_values = rows_to_insert_columns_values[i];
+
+            for (UZ j = 0; j < columns_to_insert_count; ++j) {
+                StringView column_name = columns_to_insert_names[j];
+                for (UZ c = 0; c < table->columns_count; ++c) {
+                    if (table->columns_names[c] != column_name) continue;
+
+                    DBValue column_value = columns_to_insert_values[j];
+                    DBValue old_value = table->columns_values[c];
+                    DBValue new_value = DBValue::concat(allocator, old_value, column_value);
+
+                    table->columns_values[c] = new_value;
+                }
+            }
+        }
+    });
+
+    rows_to_insert.clear();
 }
 } // namespace xmdb

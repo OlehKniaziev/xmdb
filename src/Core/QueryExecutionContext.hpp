@@ -17,10 +17,18 @@ struct QueryExecutionContext {
 
     DBTable *emit_query(U32, SQL::ColumnType *);
 
+    void insert_column(DBTable *, StringView, DBValue);
+    void insert_row(DBTable *);
+
+    void commit_insert();
+
     ok::Allocator *allocator;
     QueryExecutionContext *next;
     ok::Table<U32, DBValue> vars;
     ok::MultiList<StringView, DBValue> emitted_columns;
+    UZ emitted_columns_offset;
+    ok::MultiList<StringView, DBValue> columns_to_insert;
+    ok::Table<DBTable *, ok::MultiList<UZ, StringView *, DBValue *>> rows_to_insert;
     DBDescriptor *current_db;
     Optional<DBTable *> last_emitted_query;
 };

@@ -53,43 +53,6 @@ struct TableSchema {
     Optional<List<ColumnType>> columns_types;
 };
 
-enum IRInstructionOperator : U32 {
-    IRInstructionOperator_Eq,
-    IRInstructionOperator_Gt,
-    IRInstructionOperator_Lt,
-
-    IRInstructionOperator_FetchColumn,
-    IRInstructionOperator_FetchTable,
-
-    IRInstructionOperator_EmitColumn,
-    IRInstructionOperator_EmitQuery,
-
-    IRInstructionOperator_UseDatabase,
-
-    IRInstructionOperator_CreateDatabase,
-    IRInstructionOperator_CreateTable,
-
-    IRInstructionOperator_DropDatabase,
-    IRInstructionOperator_DropTable,
-
-    IRInstructionOperator_InsertColumn,
-    IRInstructionOperator_InsertRow,
-    IRInstructionOperator_CommitInsert,
-
-    IRInstructionOperator_UpdateColumn,
-    IRInstructionOperator_CommitUpdate,
-
-    IRInstructionOperator_DeleteTable,
-
-    IRInstructionOperator_ConstInt,
-    IRInstructionOperator_ConstString,
-    IRInstructionOperator_ConstTrue,
-    IRInstructionOperator_ConstFalse,
-    IRInstructionOperator_ConstNull,
-
-    IRInstructionOperator_Max,
-};
-
 #define ENUM_IR_CONTRACTS                                                                                                 \
     INSTR_VAR_2(Eq, U32, U32)                                                                                          \
     INSTR_VAR_2(Lt, U32, U32)                                                                                          \
@@ -114,6 +77,53 @@ enum IRInstructionOperator : U32 {
     INSTR_VAR_0(ConstTrue)                                                                                             \
     INSTR_VAR_0(ConstFalse)                                                                                            \
     INSTR_VAR_0(ConstNull)
+
+#define INSTR_0(instr) IRInstructionOperator_##instr,
+#define INSTR_VAR_0(instr) IRInstructionOperator_##instr,
+#define INSTR_1(instr, _op1) IRInstructionOperator_##instr,
+#define INSTR_VAR_1(instr, _op1) IRInstructionOperator_##instr,
+#define INSTR_2(instr, _op1, _op2) IRInstructionOperator_##instr,
+#define INSTR_VAR_2(instr, _op1, _op2) IRInstructionOperator_##instr,
+#define INSTR_3(instr, _op1, _op2, _op3) IRInstructionOperator_##instr,
+#define INSTR_VAR_3(instr, _op1, _op2, _op3) IRInstructionOperator_##instr,
+
+enum IRInstructionOperator : U32 {
+    ENUM_IR_CONTRACTS
+};
+
+#undef INSTR_VAR_0
+#undef INSTR_VAR_1
+#undef INSTR_VAR_2
+#undef INSTR_VAR_3
+#undef INSTR_0
+#undef INSTR_1
+#undef INSTR_2
+#undef INSTR_3
+
+#define INSTR_0(instr) case IRInstructionOperator_##instr: return #instr;
+#define INSTR_VAR_0(instr) case IRInstructionOperator_##instr: return #instr;
+#define INSTR_1(instr, _op1) case IRInstructionOperator_##instr: return #instr;
+#define INSTR_VAR_1(instr, _op1) case IRInstructionOperator_##instr: return #instr;
+#define INSTR_2(instr, _op1, _op2) case IRInstructionOperator_##instr: return #instr;
+#define INSTR_VAR_2(instr, _op1, _op2) case IRInstructionOperator_##instr: return #instr;
+#define INSTR_3(instr, _op1, _op2, _op3) case IRInstructionOperator_##instr: return #instr;
+#define INSTR_VAR_3(instr, _op1, _op2, _op3) case IRInstructionOperator_##instr: return #instr;
+
+static inline const char *ir_instruction_operator_name(IRInstructionOperator op) {
+    switch (op) {
+        ENUM_IR_CONTRACTS
+    }
+    OK_UNREACHABLE();
+}
+
+#undef INSTR_VAR_0
+#undef INSTR_VAR_1
+#undef INSTR_VAR_2
+#undef INSTR_VAR_3
+#undef INSTR_0
+#undef INSTR_1
+#undef INSTR_2
+#undef INSTR_3
 
 struct IRInstruction {
     inline bool is_table_generating() const {

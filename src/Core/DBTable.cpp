@@ -2,23 +2,23 @@
 
 namespace xmdb {
 DBTable *DBTable::alloc(ok::Allocator *allocator,
-                          ok::StringView name,
-                          UZ column_count,
-                          ok::StringView *column_names,
-                          SQL::ColumnType *column_types,
-                        DBValue *column_values) {
+                        ok::StringView name,
+                        UZ columns_count,
+                        ok::StringView *columns_names,
+                        SQL::ColumnType *columns_types,
+                        DBValue *columns_values) {
     DBTable *table = allocator->alloc<DBTable>();
     table->name = name;
-    table->column_count = column_count;
-    table->column_names = column_names;
-    if (column_values) {
-        table->column_values = column_values;
+    table->columns_count = columns_count;
+    table->columns_names = columns_names;
+    if (columns_values) {
+        table->columns_values = columns_values;
     } else {
-        table->column_values = allocator->alloc<DBValue>(column_count);
+        table->columns_values = allocator->alloc<DBValue>(columns_count);
 
-        for (UZ i = 0; i < column_count; ++i) {
-            SQL::ColumnType column_type = column_types[i];
-            DBValue *column_value = &table->column_values[i];
+        for (UZ i = 0; i < columns_count; ++i) {
+            SQL::ColumnType column_type = columns_types[i];
+            DBValue *column_value = &table->columns_values[i];
 
             switch (column_type) {
             case SQL::COLUMN_INTEGER: {
@@ -37,7 +37,7 @@ DBTable *DBTable::alloc(ok::Allocator *allocator,
             }
         }
     }
-    table->column_types = column_types;
+    table->columns_types = columns_types;
     table->indices = ok::Table<UZ, DBIndex>::alloc(allocator);
     return table;
 }

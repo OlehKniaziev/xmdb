@@ -116,7 +116,55 @@ static void execute_instruction(TypedCompiledQuery *query, UZ i, QueryExecutionC
         ctx->put_var(i, var_name, var_value);
         break;
     }
-    default: OK_TODO();
+    case IRInstructionOperator_ConstInt: {
+        Tuple<String, S64> operands = operands_of_ConstInt(&query->untyped, i);
+        TableStream<S64> stream = TableStream<S64>::once(operands.op2);
+
+        StringView var_name = operands.op1.view();
+        DBValue var_value = DBValue::integer(stream);
+        ctx->put_var(i, var_name, var_value);
+        break;
+    }
+    case IRInstructionOperator_ConstString: {
+        Tuple<String, StringView> operands = operands_of_ConstString(&query->untyped, i);
+        String string_constant = operands.op2.to_string(ctx->allocator);
+        TableStream<String> stream = TableStream<String>::once(string_constant);
+
+        StringView var_name = operands.op1.view();
+        DBValue var_value = DBValue::string(stream);
+        ctx->put_var(i, var_name, var_value);
+        break;
+    }
+    case IRInstructionOperator_InsertColumn: {
+        Triple<U32, U32, StringView> operands = operands_of_InsertColumn(&query->untyped, i);
+        DBValue table_value = ctx->fetch_var(operands.op1);
+        OK_ASSERT(table_value.type == SQL::TYPE_TABLE);
+
+        DBTable *table = table_value.u.table;
+        DBValue column_value = ctx->fetch_var(operands.op2);
+        StringView column_name = operands.op3;
+
+        ctx->insert_column(table, column_name, column_value);
+        break;
+    }
+    case IRInstructionOperator_InsertRow: {
+        U32 table_ip = operands_of_InsertRow(&query->untyped, i);
+        DBValue table_value = ctx->fetch_var(table_ip);
+        OK_ASSERT(table_value.type == SQL::TYPE_TABLE);
+
+        DBTable *table = table_value.u.table;
+        ctx->insert_row(table);
+
+        break;
+    }
+    case IRInstructionOperator_CommitInsert: { // NOTE(oleh): This instruction has no operands!
+        ctx->commit_insert();
+        break;
+    }
+    default: {
+        const char *operator_name = ir_instruction_operator_name(instr.op);
+        OK_TODO_MSG_FMT("Handling of ir operator '%s'", operator_name);
+    }
     }
 }
 
