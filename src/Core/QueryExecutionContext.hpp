@@ -22,6 +22,9 @@ struct QueryExecutionContext {
 
     void commit_insert();
 
+    void update_column(DBTable *, StringView, DBValue);
+    void commit_update();
+
     ok::Allocator *allocator;
     QueryExecutionContext *next;
     ok::Table<U32, DBValue> vars;
@@ -29,7 +32,9 @@ struct QueryExecutionContext {
     UZ emitted_columns_offset;
     ok::MultiList<StringView, DBValue> columns_to_insert;
     ok::Table<DBTable *, ok::MultiList<UZ, StringView *, DBValue *>> rows_to_insert;
+    ok::MultiList<StringView, DBValue> columns_to_update;
     DBDescriptor *current_db;
+    Optional<DBTable *> table_to_update;
     Optional<DBTable *> last_emitted_query;
 };
 } // namespace xmdb

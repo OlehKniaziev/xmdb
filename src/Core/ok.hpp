@@ -858,62 +858,66 @@ struct OptionalBase {
 
 template <typename T>
 struct Optional : public OptionalBase<Optional, T> {
+    using ValueType = T;
+
     Optional() : _has_value{false} {}
 
-    Optional(T value) : _has_value{true}, value{value} {}
+    Optional(ValueType value) : _has_value{true}, value{value} {}
 
     inline bool has_value() const {
         return _has_value;
     }
 
-    inline T& get_unchecked() {
+    inline ValueType& get_unchecked() {
         return value;
     }
 
-    inline T& get() {
+    inline ValueType& get() {
         OK_ASSERT(has_value());
         return get_unchecked();
     }
 
-    inline const T& get_unchecked() const {
+    inline const ValueType& get_unchecked() const {
         return value;
     }
 
-    inline const T& get() const {
+    inline const ValueType& get() const {
         OK_ASSERT(has_value());
         return get_unchecked();
     }
 
     bool _has_value;
-    T value;
+    ValueType value;
 
     static const Optional<T> NONE;
 };
 
 template <typename T>
 struct Optional<T*> : public OptionalBase<Optional, T*> {
+    using ValueType = T*;
+
     Optional() : value{nullptr} {}
 
-    Optional(T* value) : value{value} {}
+    Optional(ValueType value) : value{value} {}
 
     inline bool has_value() const {
         return value != nullptr;
     }
 
-    inline T& get_unchecked() {
-        return *value;
+    inline ValueType& get_unchecked() {
+        return value;
     }
 
-    inline T& get() {
+    inline ValueType& get() {
         OK_ASSERT(has_value());
         return get_unchecked();
     }
 
-    inline const T& get_unchecked() const {
+    inline const ValueType& get_unchecked() const {
         return *value;
     }
 
-    inline const T& get() const {
+    inline const ValueType& get() const {
         OK_ASSERT(has_value());
         return get_unchecked();
     }
@@ -928,7 +932,7 @@ struct Optional<T*> : public OptionalBase<Optional, T*> {
         return Optional<const Base*>{static_cast<const Base*>(value)};
     }
 
-    T* value;
+    ValueType value;
 
     static const Optional<T> NONE;
 };

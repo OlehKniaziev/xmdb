@@ -161,6 +161,22 @@ static void execute_instruction(TypedCompiledQuery *query, UZ i, QueryExecutionC
         ctx->commit_insert();
         break;
     }
+    case IRInstructionOperator_UpdateColumn: {
+        Triple<U32, U32, StringView> operands = operands_of_UpdateColumn(&query->untyped, i);
+
+        DBValue table_value = ctx->fetch_var(operands.op1);
+        OK_ASSERT(table_value.type == SQL::TYPE_TABLE);
+        DBTable *table = table_value.u.table;
+
+        DBValue column_value = ctx->fetch_var(operands.op2);
+        StringView column_name = operands.op3;
+        ctx->update_column(table, column_name, column_value);
+        break;
+    }
+    case IRInstructionOperator_CommitUpdate: { // NOTE(oleh): This instruction has no operands!
+        ctx->commit_update();
+        break;
+    }
     default: {
         const char *operator_name = ir_instruction_operator_name(instr.op);
         OK_TODO_MSG_FMT("Handling of ir operator '%s'", operator_name);

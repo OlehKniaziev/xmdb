@@ -33,7 +33,9 @@ QueryExecutionContext *DBPool::rent_empty_execution_context(DBDescriptor *db) {
     ctx->emitted_columns_offset = 0;
     ctx->columns_to_insert = ok::MultiList<StringView, DBValue>::alloc(allocator);
     ctx->rows_to_insert = ok::Table<DBTable *, ok::MultiList<UZ, StringView *, DBValue *>>::alloc(allocator);
+    ctx->columns_to_update = ok::MultiList<StringView, DBValue>::alloc(allocator);
     ctx->current_db = db;
+    ctx->table_to_update = {};
     ctx->last_emitted_query = {};
     return ctx;
 }

@@ -136,11 +136,41 @@ void QueryExecutionContext::commit_insert() {
                     DBValue new_value = DBValue::concat(allocator, old_value, column_value);
 
                     table->columns_values[c] = new_value;
+                    break;
                 }
             }
         }
     });
 
     rows_to_insert.clear();
+}
+
+void QueryExecutionContext::update_column(DBTable *table, StringView column_name, DBValue column_value) {
+    if (!table_to_update.has_value()) {
+        table_to_update = table;
+    } else if (table_to_update.value != table) {
+        OK_PANIC("Table to update does not match the given table");
+    }
+
+    columns_to_update.push(column_name, column_value);
+}
+
+void QueryExecutionContext::commit_update() {
+    DBTable *table = table_to_update.get();
+    StringView *columns_to_update_names = columns_to_update.get_items<StringView>();
+    DBValue *columns_to_update_values = columns_to_update.get_items<DBValue>();
+
+    for (UZ i = 0; i < columns_to_update.count; ++i) {
+        StringView column_name = columns_to_update_names[i];
+        for (UZ c = 0; c < table->columns_count; ++c) {
+            if (table->columns_names[c] != column_name) continue;
+            DBValue new_value = columns_to_update_values[i];
+            table->columns_values[c] = new_value;
+            break;
+        }
+    }
+
+    columns_to_update.count = 0;
+    table_to_update = {};
 }
 } // namespace xmdb
