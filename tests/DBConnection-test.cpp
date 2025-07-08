@@ -351,7 +351,7 @@ TEST(DBConnection, execute_multiple_queries_with_the_same_connection) {
     ASSERT_TRUE(ok) << error.cstr();
     ASSERT_TRUE(query_results.ok);
 
-    source = "CREATE TABLE Table (column1 int);"_sv;
+    source = "CREATE TABLE MyTable (column1 int);"_sv;
     ok = compile_and_execute_source(&arena,
                                     &db_conn,
                                     source,
@@ -361,7 +361,7 @@ TEST(DBConnection, execute_multiple_queries_with_the_same_connection) {
     ASSERT_TRUE(ok) << error.cstr();
     ASSERT_TRUE(query_results.ok);
 
-    source = "SELECT column1 FROM Table;"_sv;
+    source = "SELECT column1 FROM MyTable;"_sv;
     ok = compile_and_execute_source(&arena,
                                     &db_conn,
                                     source,

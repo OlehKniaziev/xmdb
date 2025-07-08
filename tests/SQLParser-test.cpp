@@ -158,8 +158,7 @@ TEST(SQLParser, update_stmt_with_filter) {
     EXPECT_EQ(values[0]->value, "some_age"_sv);
 
     ASSERT_TRUE(update_stmt.value->filter.has_value());
-    EXPECT_EQ(update_stmt.value->filter.value->type, Expr::IDENT);
-    EXPECT_EQ(static_cast<IdentifierExpr*>(update_stmt.value->filter.value)->value, "true"_sv);
+    EXPECT_EQ(update_stmt.value->filter.value->type, Expr::TRUE_LIT);
 }
 
 TEST(SQLParser, update_stmt_without_filter) {
@@ -192,13 +191,12 @@ TEST(SQLParser, delete_stmt_with_filter) {
     auto delete_stmt = parser.delete_stmt();
     ASSERT_TRUE(delete_stmt.has_value());
 
-    EXPECT_EQ(delete_stmt.value->table->type, Expr::IDENT);
-    EXPECT_EQ(static_cast<IdentifierExpr*>(delete_stmt.value->table)->value, "Users"_sv);
+    ASSERT_EQ(delete_stmt.value->table->type, Expr::IDENT);
+    ASSERT_EQ(static_cast<IdentifierExpr*>(delete_stmt.value->table)->value, "Users"_sv);
 
     ASSERT_TRUE(delete_stmt.value->filter.has_value());
 
-    EXPECT_EQ(delete_stmt.value->filter.value->type, Expr::IDENT);
-    EXPECT_EQ(static_cast<IdentifierExpr*>(delete_stmt.value->filter.value)->value, "false"_sv);
+    ASSERT_EQ(delete_stmt.value->filter.value->type, Expr::FALSE_LIT);
 }
 
 TEST(SQLParser, delete_stmt_without_filter) {

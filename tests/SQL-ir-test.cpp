@@ -77,7 +77,7 @@ TEST(ir, create_database) {
 
 TEST(ir, create_table) {
     ok::ArenaAllocator arena{};
-    auto source = "CREATE TABLE Table (id int); SELECT id FROM Table;"_sv;
+    auto source = "CREATE TABLE MyTable (id int); SELECT id FROM MyTable;"_sv;
     Parser parser{&arena, source};
 
     auto query = parser.query();
@@ -112,7 +112,7 @@ TEST(ir, drop_database) {
 
 TEST(ir, drop_table) {
     ok::ArenaAllocator arena{};
-    auto source = "CREATE TABLE Table (id int); DROP TABLE Table;"_sv;
+    auto source = "CREATE TABLE MyTable (id int); DROP TABLE MyTable;"_sv;
     Parser parser{&arena, source};
 
     auto query = parser.query();
