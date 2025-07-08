@@ -82,8 +82,6 @@ static inline SourceLocation locate_token(StringView source, Token token) {
     };
 }
 
-
-
 inline StringView token_type_to_string_view(Token::Type type) {
     return token_types_pretty[type];
 }

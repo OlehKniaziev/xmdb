@@ -107,12 +107,17 @@ ok::Optional<Token> Lexer::next() {
 
         OK_ASSERT(is_valid_ident_char(cur));
 
-        StringView ident = take_while(is_valid_ident_char);
+        StringView ident_sv = take_while(is_valid_ident_char);
+
+        String ident = ident_sv.to_string(ok::temp_allocator);
+        for (UZ i = 0; i < ident.count(); ++i) {
+            ident[i] = toupper(ident[i]);
+        }
 
         Optional<Token::Type> kw_token_type = token_table.get(ident);
 
         token.type = kw_token_type.or_else(Token::IDENT);
-        token.data = ident;
+        token.data = ident_sv;
 
         return token;
     }
