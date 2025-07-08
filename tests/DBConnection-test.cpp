@@ -256,3 +256,34 @@ TEST(DBConnection, create_new_db_and_execute_create_insert_and_select_on_table_w
     ASSERT_EQ(column2_value.u.string.next(), ok::Optional<StringView>{"1"_sv});
     ASSERT_EQ(column2_value.u.string.next(), ok::Optional<StringView>::NONE);
 }
+
+TEST(DBConnection, create_and_drop_empty_table) {
+    ok::ArenaAllocator arena{};
+    StringView source = R"sql(
+    CREATE TABLE MyTable (
+        column1 int,
+        column2 text
+    );
+    DROP TABLE MyTable;)sql"_sv;
+
+    String error{};
+
+    QueryResults query_results{};
+
+    DBPool db_pool{&arena};
+    DBDescriptor *default_db = db_pool.get_db("default"_sv);
+    DBConnection db_conn{&db_pool, default_db};
+
+    bool ok = compile_and_execute_source(&arena,
+                                         &db_conn,
+                                         source,
+                                         &query_results,
+                                         &error);
+
+    ASSERT_TRUE(ok);
+
+    ASSERT_TRUE(query_results.ok);
+    ASSERT_TRUE(!query_results.value.has_value());
+
+    ASSERT_EQ(default_db->tables.count, 0);
+}

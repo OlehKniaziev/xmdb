@@ -199,6 +199,24 @@ static void execute_instruction(TypedCompiledQuery *query, UZ i, QueryExecutionC
         conn->db = db;
         break;
     }
+    case IRInstructionOperator_DropTable: {
+        StringView table_name = operands_of_DropTable(&query->untyped, i);
+        bool deleted = false;
+
+        for (UZ i = 0; i < conn->db->tables.count; ++i) {
+            if (conn->db->tables[i]->name == table_name) {
+                deleted = true;
+                conn->db->tables.remove_at(i);
+                break;
+            }
+        }
+
+        OK_ASSERT(deleted);
+        break;
+    }
+    case IRInstructionOperator_DropDatabase: {
+        break;
+    }
     default: {
         const char *operator_name = ir_instruction_operator_name(instr.op);
         OK_TODO_MSG_FMT("Handling of ir operator '%s'", operator_name);
