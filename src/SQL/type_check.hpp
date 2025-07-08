@@ -18,6 +18,8 @@ enum Type {
     TYPE_MAX,
 };
 
+Type column_type_to_type(ColumnType);
+
 struct TypedTableSchema {
     Slice<Optional<String>> column_names;
     Slice<Type> column_types;

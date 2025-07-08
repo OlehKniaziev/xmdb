@@ -42,6 +42,10 @@ static Type column_type_to_type_table[COLUMN_MAX] = {
     [COLUMN_BOOLEAN] = TYPE_BOOL,
 };
 
+Type column_type_to_type(ColumnType column_type) {
+    return column_type_to_type_table[column_type];
+}
+
 static const char *type_to_string_table[TYPE_MAX] = {
     [TYPE_INT] = "integer",
     [TYPE_STRING] = "string",

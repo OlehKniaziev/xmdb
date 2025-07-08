@@ -173,4 +173,13 @@ void QueryExecutionContext::commit_update() {
     columns_to_update.count = 0;
     table_to_update = {};
 }
+
+void QueryExecutionContext::delete_table(DBTable *table) {
+    for (UZ i = 0; i < table->columns_count; ++i) {
+        SQL::ColumnType column_type = table->columns_types[i];
+        SQL::Type value_type = column_type_to_type(column_type);
+        DBValue new_value = DBValue::empty(value_type);
+        table->columns_values[i] = new_value;
+    }
+}
 } // namespace xmdb

@@ -25,6 +25,8 @@ struct QueryExecutionContext {
     void update_column(DBTable *, StringView, DBValue);
     void commit_update();
 
+    void delete_table(DBTable *);
+
     ok::Allocator *allocator;
     QueryExecutionContext *next;
     ok::Table<U32, DBValue> vars;

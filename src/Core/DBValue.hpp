@@ -82,6 +82,26 @@ struct DBValue {
         OK_UNREACHABLE();
     }
 
+    static DBValue empty(SQL::Type type) {
+        switch (type) {
+        case SQL::TYPE_BOOL: {
+            TableStream<bool> empty = TableStream<bool>::empty();
+            return DBValue::boolean(empty);
+        }
+        case SQL::TYPE_STRING: {
+            TableStream<String> empty = TableStream<String>::empty();
+            return DBValue::string(empty);
+        }
+        case SQL::TYPE_INT: {
+            TableStream<S64> empty = TableStream<S64>::empty();
+            return DBValue::integer(empty);
+        }
+        default: OK_UNREACHABLE();
+        }
+
+        OK_UNREACHABLE();
+    }
+
     DBValue cmp(ok::Allocator *, DBValue);
 };
 } // namespace xmdb

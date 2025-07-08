@@ -177,6 +177,16 @@ static void execute_instruction(TypedCompiledQuery *query, UZ i, QueryExecutionC
         ctx->commit_update();
         break;
     }
+    case IRInstructionOperator_DeleteTable: {
+        U32 table_ip = operands_of_DeleteTable(&query->untyped, i);
+
+        DBValue table_value = ctx->fetch_var(table_ip);
+        OK_ASSERT(table_value.type == SQL::TYPE_TABLE);
+        DBTable *table = table_value.u.table;
+
+        ctx->delete_table(table);
+        break;
+    }
     default: {
         const char *operator_name = ir_instruction_operator_name(instr.op);
         OK_TODO_MSG_FMT("Handling of ir operator '%s'", operator_name);
