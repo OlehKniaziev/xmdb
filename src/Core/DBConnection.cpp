@@ -187,6 +187,18 @@ static void execute_instruction(TypedCompiledQuery *query, UZ i, QueryExecutionC
         ctx->delete_table(table);
         break;
     }
+    case IRInstructionOperator_CreateDatabase: {
+        StringView database_name = operands_of_CreateDatabase(&query->untyped, i);
+        conn->db_pool->create_db(database_name);
+        break;
+    }
+    case IRInstructionOperator_UseDatabase: {
+        StringView database_name = operands_of_UseDatabase(&query->untyped, i);
+        DBDescriptor *db = conn->db_pool->get_db(database_name);
+        ctx->current_db = db;
+        conn->db = db;
+        break;
+    }
     default: {
         const char *operator_name = ir_instruction_operator_name(instr.op);
         OK_TODO_MSG_FMT("Handling of ir operator '%s'", operator_name);

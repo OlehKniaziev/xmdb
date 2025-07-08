@@ -4,8 +4,8 @@ using namespace ok::literals;
 
 namespace xmdb {
 DBPool::DBPool(ok::Allocator *allocator) : allocator{allocator}, execution_contexts{nullptr} {
-    DBDescriptor *default_db = DBDescriptor::alloc(allocator, "default"_sv);
-    db_descriptors = default_db;
+    const StringView default_db_name = "default"_sv;
+    create_db(default_db_name);
 }
 
 DBDescriptor *DBPool::get_db(StringView db_name) {
@@ -16,6 +16,12 @@ DBDescriptor *DBPool::get_db(StringView db_name) {
     }
 
     OK_PANIC_FMT("No database descriptor with name '" OK_SV_FMT "' found", OK_SV_ARG(db_name));
+}
+
+void DBPool::create_db(StringView db_name) {
+    DBDescriptor *db = DBDescriptor::alloc(allocator, db_name);
+    db->next = db_descriptors;
+    db_descriptors = db;
 }
 
 QueryExecutionContext *DBPool::rent_empty_execution_context(DBDescriptor *db) {
