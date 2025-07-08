@@ -256,7 +256,7 @@ static inline bool compile_create_stmt(CreateStmt* stmt, IrContext* ctx) {
     auto* create_table_stmt = static_cast<CreateTableStmt*>(stmt);
 
     TableSchema* table_schema = ctx->alloc_table_schema(ctx->active_db_id, stmt->name, true);
-    OK_ASSERT(table_schema->column_types.has_value());
+    OK_ASSERT(table_schema->columns_types.has_value());
 
     for (UZ i = 0; i < create_table_stmt->column_names.count; ++i) {
         String column_type_string = create_table_stmt->column_types[i];
@@ -264,8 +264,8 @@ static inline bool compile_create_stmt(CreateStmt* stmt, IrContext* ctx) {
         TRY(parse_type(column_type_string.view(), stmt->token, ctx, &column_type));
 
         String column_name = create_table_stmt->column_names[i];
-        table_schema->column_names.push(column_name.copy(ctx->allocator));
-        table_schema->column_types.value.push(column_type);
+        table_schema->columns_names.push(column_name.copy(ctx->allocator));
+        table_schema->columns_types.value.push(column_type);
     }
 
     emit_CreateTable(&ctx->ir_emitter, stmt->token, create_table_stmt->name.view(), table_schema);
@@ -888,11 +888,11 @@ const char *stringify_op(S64 op) {
 }
 
 const char *stringify_op(TableSchema *op) {
-    String s = String::format(ok::temp_allocator, "<table schema with %zu columns>", op->column_names.count);
+    String s = String::format(ok::temp_allocator, "<table schema with %zu columns>", op->columns_names.count);
     return s.cstr();
 }
 
-String stringify_ir(Allocator* allocator, IREmitter* emitter) {
+String stringify_ir(Allocator* allocator, CompiledQuery* emitter) {
     String buffer = String::alloc(allocator);
 
     Slice<IRInstruction> instructions = emitter->instructions.slice();
@@ -981,7 +981,7 @@ switch (instr.op) {
     return buffer;
 }
 
-bool ir_compile_query(Query* q, IrContext* ctx) {
+bool ir_compile_query(Query *q, IrContext *ctx, CompiledQuery *out_query) {
     for (UZ i = 0; i < q->stmts.count; ++i) {
         auto* stmt = q->stmts[i];
 
@@ -992,6 +992,12 @@ bool ir_compile_query(Query* q, IrContext* ctx) {
             TRY(compile_unoptimizable_stmt(stmt, ctx));
         }
     }
+
+    out_query->instructions = ctx->ir_emitter.instructions.slice();
+    out_query->tokens = ctx->ir_emitter.tokens.slice();
+    out_query->strings = ctx->ir_emitter.strings.slice();
+    out_query->integers = ctx->ir_emitter.integers.slice();
+    out_query->schemas = ctx->ir_emitter.schemas.slice();
 
     return true;
 }

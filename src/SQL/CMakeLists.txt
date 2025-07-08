@@ -6,6 +6,7 @@ add_library(LibSQL
   constructor_linux.cpp
   ir.cpp
   type_check.cpp
+  SQL.cpp
 )
 
 set_property(TARGET LibSQL PROPERTY POSITION_INDEPENDENT_CODE 1)
