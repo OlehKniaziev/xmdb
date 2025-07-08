@@ -215,6 +215,34 @@ static void execute_instruction(TypedCompiledQuery *query, UZ i, QueryExecutionC
         break;
     }
     case IRInstructionOperator_DropDatabase: {
+        StringView database_name = operands_of_DropDatabase(&query->untyped, i);
+        bool deleted = false;
+
+        DBDescriptor *prev_db = nullptr;
+        DBDescriptor *db = conn->db_pool->db_descriptors;
+        // NOTE(oleh): No databases exist, signal an error. Or should this have been caught by
+        // semantic analysis?
+        if (db == nullptr) OK_TODO();
+
+        while (db != nullptr) {
+            if (db->name == database_name) {
+                if (prev_db) {
+                    prev_db->next = db->next;
+                }
+
+                if (db == conn->db_pool->db_descriptors) {
+                    conn->db_pool->db_descriptors = nullptr;
+                }
+
+                deleted = true;
+                break;
+            }
+
+            prev_db = db;
+            db = db->next;
+        }
+
+        OK_ASSERT(deleted);
         break;
     }
     default: {
