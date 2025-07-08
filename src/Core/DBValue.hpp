@@ -7,6 +7,9 @@
 namespace xmdb {
 struct DBTable;
 
+struct Null {
+};
+
 struct DBValue {
     DBValue() : u{0} {
     }
@@ -17,6 +20,7 @@ struct DBValue {
         TableStream<bool> boolean;
         TableStream<S64> integer;
         TableStream<String> string;
+        TableStream<Null> null;
     } u;
 
     static DBValue boolean(TableStream<bool> b) {
@@ -44,6 +48,13 @@ struct DBValue {
         DBValue value{};
         value.type = SQL::Type::TYPE_STRING;
         value.u.string = string;
+        return value;
+    }
+
+    static DBValue null(TableStream<Null> null) {
+        DBValue value{};
+        value.type = SQL::Type::TYPE_NULL;
+        value.u.null = null;
         return value;
     }
 

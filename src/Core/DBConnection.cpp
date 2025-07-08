@@ -135,6 +135,27 @@ static void execute_instruction(TypedCompiledQuery *query, UZ i, QueryExecutionC
         ctx->put_var(i, var_name, var_value);
         break;
     }
+    case IRInstructionOperator_ConstTrue: {
+        String var_name = operands_of_ConstTrue(&query->untyped, i);
+        TableStream<bool> stream = TableStream<bool>::once(true);
+        DBValue var_value = DBValue::boolean(stream);
+        ctx->put_var(i, var_name.view(), var_value);
+        break;
+    }
+    case IRInstructionOperator_ConstFalse: {
+        String var_name = operands_of_ConstFalse(&query->untyped, i);
+        TableStream<bool> stream = TableStream<bool>::once(false);
+        DBValue var_value = DBValue::boolean(stream);
+        ctx->put_var(i, var_name.view(), var_value);
+        break;
+    }
+    case IRInstructionOperator_ConstNull: {
+        String var_name = operands_of_ConstNull(&query->untyped, i);
+        TableStream<Null> stream = TableStream<Null>::once({});
+        DBValue var_value = DBValue::null(stream);
+        ctx->put_var(i, var_name.view(), var_value);
+        break;
+    }
     case IRInstructionOperator_InsertColumn: {
         Triple<U32, U32, StringView> operands = operands_of_InsertColumn(&query->untyped, i);
         DBValue table_value = ctx->fetch_var(operands.op1);
@@ -244,10 +265,6 @@ static void execute_instruction(TypedCompiledQuery *query, UZ i, QueryExecutionC
 
         OK_ASSERT(deleted);
         break;
-    }
-    default: {
-        const char *operator_name = ir_instruction_operator_name(instr.op);
-        OK_TODO_MSG_FMT("Handling of ir operator '%s'", operator_name);
     }
     }
 }
