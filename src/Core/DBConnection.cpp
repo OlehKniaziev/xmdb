@@ -2,8 +2,10 @@
 
 namespace xmdb {
 using namespace SQL;
+using namespace ok::literals;
 
-DBConnection::DBConnection(DBPool *pool, DBDescriptor *db) : db_pool{pool}, db{db} {}
+DBConnection::DBConnection(DBPool *pool, DBDescriptor *db) :
+    db_pool{pool}, db{db}, ir_ctx{pool->allocator, ""_sv} {}
 
 static inline ColumnType type_to_column_type(Type type) {
     switch (type) {

@@ -25,17 +25,17 @@ struct TypedTableSchema {
     Slice<Type> column_types;
 };
 
-struct TypingContextError {
-    SourceLocation location;
-    String message;
-};
-
 struct TypedCompiledQuery {
     CompiledQuery untyped;
     Table<U32, TypedTableSchema> table_types;
 };
 
 struct TypingContext {
+    struct Error {
+        SourceLocation location;
+        String message;
+    };
+
     TypingContext(Allocator *allocator, StringView source);
 
     Allocator *allocator;
@@ -43,7 +43,7 @@ struct TypingContext {
     Table<U32, TypedTableSchema> table_types;
     List<U32> emitted_columns;
     StringView source; // used only for error reporting
-    Optional<TypingContextError> error{};
+    Optional<Error> error{};
 };
 
 bool type_check_query(CompiledQuery *query, TypingContext *ctx, TypedCompiledQuery *out);

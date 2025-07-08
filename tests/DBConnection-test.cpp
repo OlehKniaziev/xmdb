@@ -319,3 +319,69 @@ TEST(DBConnection, create_and_drop_empty_database) {
         ASSERT_NE(db->name, "DB"_sv);
     }
 }
+
+TEST(DBConnection, execute_multiple_queries_with_the_same_connection) {
+    ok::ArenaAllocator arena{};
+    StringView source = "CREATE DATABASE DB;"_sv;
+
+    String error{};
+
+    QueryResults query_results{};
+
+    DBPool db_pool{&arena};
+    DBDescriptor *default_db = db_pool.get_db("default"_sv);
+    DBConnection db_conn{&db_pool, default_db};
+
+    bool ok = compile_and_execute_source(&arena,
+                                         &db_conn,
+                                         source,
+                                         &query_results,
+                                         &error);
+
+    ASSERT_TRUE(ok) << error.cstr();
+    ASSERT_TRUE(query_results.ok);
+
+    source = "USE DB;"_sv;
+    ok = compile_and_execute_source(&arena,
+                                    &db_conn,
+                                    source,
+                                    &query_results,
+                                    &error);
+
+    ASSERT_TRUE(ok) << error.cstr();
+    ASSERT_TRUE(query_results.ok);
+
+    source = "CREATE TABLE Table (column1 int);"_sv;
+    ok = compile_and_execute_source(&arena,
+                                    &db_conn,
+                                    source,
+                                    &query_results,
+                                    &error);
+
+    ASSERT_TRUE(ok) << error.cstr();
+    ASSERT_TRUE(query_results.ok);
+
+    source = "SELECT column1 FROM Table;"_sv;
+    ok = compile_and_execute_source(&arena,
+                                    &db_conn,
+                                    source,
+                                    &query_results,
+                                    &error);
+
+    ASSERT_TRUE(ok) << error.cstr();
+    ASSERT_TRUE(query_results.ok);
+
+    ASSERT_TRUE(query_results.value.has_value());
+
+    DBTable *results_table = query_results.value.value;
+    ASSERT_EQ(results_table->name, ""_sv);
+    ASSERT_EQ(results_table->columns_count, 1);
+
+    ASSERT_EQ(results_table->columns_names[0], "column1"_sv);
+    ASSERT_EQ(results_table->columns_types[0], SQL::COLUMN_INTEGER);
+
+    DBValue column1_value = results_table->columns_values[0];
+
+    ASSERT_EQ(column1_value.type, SQL::TYPE_INT);
+    ASSERT_EQ(column1_value.u.integer.next(), ok::Optional<S64>::NONE);
+}

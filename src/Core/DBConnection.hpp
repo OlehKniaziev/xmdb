@@ -21,5 +21,6 @@ struct DBConnection {
 
     DBPool *db_pool;
     DBDescriptor *db;
+    SQL::IrContext ir_ctx;
 };
 };

@@ -448,6 +448,7 @@ struct IrContext {
         Error error;
         error.location = locate_token(source, token);
         error.message = message;
+        this->error = error;
     }
 
     Allocator* allocator;
