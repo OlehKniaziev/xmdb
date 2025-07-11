@@ -1,0 +1,77 @@
+dialog {
+    background-color: var(--color-main-light);
+    border: none;
+    border-radius: 20px;
+    padding: 64px 124px 80px 124px;
+}
+
+dialog::backdrop {
+    background-color: var(--color-brown);
+    opacity: 0.4;
+}
+
+dialog:focus {
+    outline: none;
+}
+
+.vertical-container {
+    display: flex;
+    flex-direction: column;        /* or column */
+    justify-content: flex-start; /* or center, flex-start, flex-end */
+    align-items: center;        /* or stretch, flex-start */
+    align-items: stretch; /* makes child items fill nav height */
+    height: 100%;
+    gap: 32px;
+    margin-top: 24px;
+    padding: 40px 80px;
+    border: 2px solid var(--color-darker);
+    border-radius: 20px;
+    box-shadow: 0 4px 4px 0 rgba(69, 33, 3, 0.25);
+}
+
+.horizontal-container {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+}
+
+dialog h1 {
+    color: var(--color-black);
+    font-family: var(--font-header);
+    font-size: 40px;
+    font-weight: 600;
+    display: block;
+    margin: 0;
+    text-align: center;
+}
+
+dialog input {
+    background-color: var(--color-darker);
+    border: none;
+    border-radius: 10px;
+    font-family: var(--font-main);
+    font-size: 20px;
+    padding: 22px 32px;
+}
+
+dialog input:focus {
+    outline: 1px solid var(--color-accent-middle);
+}
+
+dialog label {
+    font-family: var(--font-main);
+    font-size: 16px;
+    width: 150px;
+}
+
+dialog button {
+    display: block;
+    background-color: var(--color-accent-dark);
+    color: var(--color-main-light);
+    border: none;
+    border-radius: 10px;
+    margin: auto;
+    padding: 19px 85px;
+    font-family: var(--font-main);
+    font-size: 24px;
+}
