@@ -1,5 +1,7 @@
 import Editor, { useMonaco } from "@monaco-editor/react";
 import { useEffect } from "react";
+import BottomPanel from "./BottomPanel";
+import { Panel, PanelGroup, PanelResizeHandle } from "react-resizable-panels";
 
 function QueryEditor() {
   const monaco = useMonaco();
@@ -30,11 +32,22 @@ function QueryEditor() {
     }
   }, [monaco]);
   return (
-    <Editor
-      defaultLanguage="sql"
-      defaultValue="-- start writing your code here"
-      theme="warm-orange"
-    />
+    <>
+      <PanelGroup direction="vertical">
+        <Panel>
+          <Editor
+            defaultLanguage="sql"
+            defaultValue="-- start writing your code here"
+            theme="warm-orange"
+            className="editor-style"
+          />
+        </Panel>
+        <PanelResizeHandle />
+        <Panel minSize={6} defaultSize={20}>
+          <BottomPanel />
+        </Panel>
+      </PanelGroup>
+    </>
   );
 }
 

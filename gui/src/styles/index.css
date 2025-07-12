@@ -1,0 +1,36 @@
+@import url('https://fonts.googleapis.com/css2?family=Fragment+Mono:ital@0;1&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Azeret+Mono:ital,wght@0,100..900;1,100..900&family=Fragment+Mono:ital@0;1&display=swap');
+
+:root{
+    --color-dark-beige: #D0B8AC;
+    --color-darker: #EFE5DC;
+    --color-main-light: #FBFEFB;
+    --color-brown: #452103;
+    --color-black: #210f04;
+    --color-accent-dark: #690500;
+    --color-accent-middle: #934B00;
+    --color-accent-bright: #BB6B00;
+
+    --font-main: "Fragment Mono", sans-serif;
+    --font-header: "Azeret Mono", sans-serif;
+}
+
+#root {
+    height: 100%;
+}
+
+#main {
+    height: 100%;
+}
+
+html {
+    background-color: var(--color-main-light);
+}
+
+body {
+   padding: 0;
+   margin: 0;
+   height: 100vh;
+   width: 100vw;
+}
+

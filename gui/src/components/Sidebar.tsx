@@ -8,22 +8,26 @@ export default function Sidebar() {
   const tables = ["users", "orders", "products", "invoices"];
 
   return (
-    <div className="sidebar-container">
-      <div className="sidebar">
-        <button onClick={() => setIsOpen(!isOpen)}>
-          {isOpen ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
-          <span className="ml-2">Tables</span>
-        </button>
+      <div className="sidebar-container">
+        <div className="sidebar">
+          <button onClick={() => setIsOpen(!isOpen)}>
+            {isOpen ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
+            <span className="ml-2">Tables</span>
+          </button>
 
-        {isOpen && (
-          <ul>
-            {tables.map((table) => (
-              <li key={table}>{table}</li>
-            ))}
-          </ul>
-        )}
+          {isOpen && (
+            <ul>
+              {tables.map((table) => (
+                <li key={table}>{table}</li>
+              ))}
+            </ul>
+          )}
+        </div>
+        <input
+          type="text"
+          className="sidebar-search-button"
+          placeholder="Search..."
+        />
       </div>
-      <input type="text" className="sidebar-search-button" placeholder="Search..."/>
-    </div>
   );
 }

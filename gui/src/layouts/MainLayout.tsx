@@ -4,6 +4,7 @@ import Toolbar from "../components/Toolbar";
 import { Outlet } from "react-router-dom";
 import { useState } from "react";
 import TabBar from "../components/TabBar";
+import { Panel, PanelGroup, PanelResizeHandle } from "react-resizable-panels";
 
 export default function MainLayout() {
   const [activeView, setActiveView] = useState(null);
@@ -14,13 +15,20 @@ export default function MainLayout() {
         <Toolbar />
       </div>
       <div className="main-content">
-        <Sidebar />
-        <div className="content-container">
-          <TabBar activeView={activeView} />
-          <div className="content-style">
-            <Outlet />
-          </div>
-        </div>
+        <PanelGroup direction="horizontal">
+          <Panel minSize={1} maxSize={20} defaultSize={16}>
+            <Sidebar />
+          </Panel>
+          <PanelResizeHandle />
+          <Panel>
+            <div className="content-container">
+              <TabBar activeView={activeView} />
+              <div className="content-style">
+                <Outlet />
+              </div>
+            </div>
+          </Panel>
+        </PanelGroup>
       </div>
     </div>
   );
