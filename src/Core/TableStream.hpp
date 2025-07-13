@@ -7,16 +7,19 @@ namespace xmdb {
 template <typename T>
 struct ComputedTableStream {
     using Computation = Optional<T> (*)(void *);
+    using Reset = void (*)(void *);
 
-    ComputedTableStream(Computation computation, void *data) : computation{computation}, data{data} {}
+    ComputedTableStream(Computation computation, Reset reset, void *data) : computation{computation}, reset{reset}, data{data} {}
 
     Computation computation;
+    Reset reset;
     void *data;
 };
 
 template <typename T>
 struct InMemoryTableStream {
-    InMemoryTableStream(ok::Slice<T> values) : values{values} {}
+    explicit InMemoryTableStream(ok::Slice<T> values) : offset{0}, values{values} {}
+    UZ offset;
     Slice<T> values;
 };
 
@@ -29,8 +32,10 @@ struct TableStream {
         ONCE,
     };
 
-    static TableStream<T> computed(ComputedTableStream<T>::Computation computation, void *data) {
-        ComputedTableStream<T> computed_stream{computation, data};
+    static TableStream<T> computed(ComputedTableStream<T>::Computation computation,
+                                   ComputedTableStream<T>::Reset reset,
+                                   void *data) {
+        ComputedTableStream<T> computed_stream{computation, reset, data};
         return TableStream<T> {
             .type = COMPUTED,
             .u = {
@@ -39,11 +44,11 @@ struct TableStream {
         };
     }
 
-    static TableStream<T> in_memory(InMemoryTableStream<T> in_memory) {
+    static TableStream<T> in_memory(Slice<T> values) {
         return TableStream<T> {
             .type = IN_MEMORY,
             .u = {
-                .in_memory = in_memory,
+                .in_memory = InMemoryTableStream<T> {values},
             },
         };
     }
@@ -68,7 +73,10 @@ struct TableStream {
         return TableStream<T> {
             .type = ONCE,
             .u = {
-                .once = value,
+                .once = {
+                    .value = value,
+                    .has_value = true,
+                },
             },
         };
     }
@@ -78,24 +86,45 @@ struct TableStream {
         streams->a = lhs;
         streams->b = rhs;
 
-        return TableStream<T>::computed([](void *streams_ptr) {
+        auto computation = [](void *streams_ptr) -> Optional<T> {
             ok::Pair<TableStream<T>, TableStream<T>> *streams = static_cast<ok::Pair<TableStream<T>, TableStream<T>> *>(streams_ptr);
 
             Optional<T> lhs_value = streams->a.next();
             if (lhs_value) return lhs_value;
             return streams->b.next();
-        }, streams);
+        };
+        auto reset = [](void *streams_ptr) -> void {
+            ok::Pair<TableStream<T>, TableStream<T>> *streams = static_cast<ok::Pair<TableStream<T>, TableStream<T>> *>(streams_ptr);
+            streams->a.reset();
+            streams->b.reset();
+        };
+
+        return TableStream<T>::computed(computation,
+                                        reset,
+                                        streams);
     }
 
+    struct Once {
+        T value;
+        bool has_value;
+    };
+
     Optional<T> next();
+    void reset();
 
     Type type;
     union {
         ComputedTableStream<T> computed;
         InMemoryTableStream<T> in_memory;
         T constant;
-        Optional<T> once;
+        Once once;
     } u;
+};
+
+template <typename T>
+struct StreamPair {
+    TableStream<T> lhs;
+    TableStream<T> rhs;
 };
 
 template <typename T>
@@ -105,10 +134,9 @@ Optional<T> TableStream<T>::next() {
         return u.computed.computation(u.computed.data);
     }
     case IN_MEMORY: {
-        if (u.in_memory.values.count > 0) {
-            const T &item = u.in_memory.values[0];
-            u.in_memory.values.items += 1;
-            u.in_memory.values.count -= 1;
+        if (u.in_memory.offset < u.in_memory.values.count) {
+            const T &item = u.in_memory.values[u.in_memory.offset];
+            u.in_memory.offset += 1;
             return item;
         }
 
@@ -118,9 +146,9 @@ Optional<T> TableStream<T>::next() {
         return u.constant;
     }
     case ONCE: {
-        if (u.once.has_value()) {
+        if (u.once.has_value) {
             T value = u.once.value;
-            u.once = {};
+            u.once.has_value = false;
             return value;
         }
 
@@ -129,5 +157,24 @@ Optional<T> TableStream<T>::next() {
     }
 
     OK_UNREACHABLE();
+}
+
+template <typename T>
+void TableStream<T>::reset() {
+    switch (type) {
+    case COMPUTED: {
+        u.computed.reset(u.computed.data);
+        break;
+    }
+    case IN_MEMORY: {
+        u.in_memory.offset = 0;
+        break;
+    }
+    case ONCE: {
+        u.once.has_value = true;
+        break;
+    }
+    case CONSTANT: break;
+    }
 }
 } // namespace xmdb

@@ -78,6 +78,7 @@ TEST(DBConnection, execute_create_insert_and_select_on_table_with_one_row) {
     DBTable *results_table = query_results.value.value;
     ASSERT_EQ(results_table->name, ""_sv);
     ASSERT_EQ(results_table->columns_count, 2);
+    ASSERT_EQ(results_table->rows_count, 1);
 
     ASSERT_EQ(results_table->columns_names[0], "column1"_sv);
     ASSERT_EQ(results_table->columns_names[1], "column2"_sv);

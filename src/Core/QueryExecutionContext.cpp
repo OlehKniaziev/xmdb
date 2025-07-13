@@ -55,33 +55,44 @@ void QueryExecutionContext::create_table(StringView table_name, SQL::TableSchema
                                         column_types.count,
                                         column_names,
                                         column_types.items,
-                                        column_values);
+                                        column_values,
+                                        0);
     current_db->tables.push(new_table);
 }
 
-void QueryExecutionContext::emit_column(DBValue column_value, StringView column_name) {
-    emitted_columns.push(column_name, column_value);
+void QueryExecutionContext::emit_column(DBTable *table, DBValue column_value, StringView column_name) {
+    emitted_columns.push(column_name, column_value, table);
 }
 
 DBTable *QueryExecutionContext::emit_query(U32 columns_count, SQL::ColumnType *columns_types) {
     const StringView *columns_names_ptr = emitted_columns.get_items<StringView>();
-    columns_names_ptr += emitted_columns_offset;
     const DBValue *columns_values_ptr = emitted_columns.get_items<DBValue>();
-    columns_values_ptr += emitted_columns_offset;
+    DBTable **tables = emitted_columns.get_items<DBTable *>();
 
     StringView *columns_names = allocator->alloc<StringView>(columns_count);
     DBValue *columns_values = allocator->alloc<DBValue>(columns_count);
     memcpy(columns_names, columns_names_ptr, columns_count * sizeof(*columns_names));
     memcpy(columns_values, columns_values_ptr, columns_count * sizeof(*columns_values));
 
-    emitted_columns_offset += columns_count;
+    // FIXME(oleh): This is gonna be wrong once the row filtering is added.
+    UZ rows_count = 0;
+
+    for (UZ i = 0; i < emitted_columns.count; ++i) {
+        DBTable *table = tables[i];
+        if (table->rows_count > rows_count) {
+            rows_count = table->rows_count;
+        }
+    }
+
+    emitted_columns.count = 0;
 
     DBTable *table = DBTable::alloc(allocator,
                                     ""_sv,
                                     columns_count,
                                     columns_names,
                                     columns_types,
-                                    columns_values);
+                                    columns_values,
+                                    rows_count);
     last_emitted_query = table;
     return table;
 }
@@ -140,6 +151,8 @@ void QueryExecutionContext::commit_insert() {
                 }
             }
         }
+
+        table->rows_count += rows.count;
     });
 
     rows_to_insert.clear();

@@ -5,7 +5,9 @@ using namespace ok::literals;
 namespace xmdb {
 DBPool::DBPool(ok::Allocator *allocator) : allocator{allocator}, execution_contexts{nullptr} {
     const StringView default_db_name = "default"_sv;
-    create_db(default_db_name);
+    DBDescriptor *db = create_db(default_db_name);
+    DBUser admin{"admin"_sv, "admin"_sv, PERM_READ | PERM_WRITE | PERM_ADMIN};
+    db->users.push(admin);
 }
 
 DBDescriptor *DBPool::get_db(StringView db_name) {
@@ -18,15 +20,24 @@ DBDescriptor *DBPool::get_db(StringView db_name) {
     OK_PANIC_FMT("No database descriptor with name '" OK_SV_FMT "' found", OK_SV_ARG(db_name));
 }
 
-void DBPool::create_db(StringView db_name) {
+DBDescriptor *DBPool::create_db(StringView db_name) {
     DBDescriptor *db = DBDescriptor::alloc(allocator, db_name);
     db->next = db_descriptors;
     db_descriptors = db;
+    return db;
 }
 
 QueryExecutionContext *DBPool::rent_empty_execution_context(DBDescriptor *db) {
     if (execution_contexts) {
         QueryExecutionContext *ctx = execution_contexts;
+        ctx->current_db = db;
+        ctx->vars.clear();
+        ctx->emitted_columns.count = 0;
+        ctx->columns_to_insert.count = 0;
+        ctx->rows_to_insert.clear();
+        ctx->columns_to_update.count = 0;
+        ctx->table_to_update = {};
+        ctx->last_emitted_query = {};
         execution_contexts = execution_contexts->next;
         return ctx;
     }
@@ -35,8 +46,7 @@ QueryExecutionContext *DBPool::rent_empty_execution_context(DBDescriptor *db) {
     ctx->allocator = allocator;
     ctx->next = nullptr;
     ctx->vars = ok::Table<U32, DBValue>::alloc(allocator);
-    ctx->emitted_columns = ok::MultiList<StringView, DBValue>::alloc(allocator);
-    ctx->emitted_columns_offset = 0;
+    ctx->emitted_columns = ok::MultiList<StringView, DBValue, DBTable *>::alloc(allocator);
     ctx->columns_to_insert = ok::MultiList<StringView, DBValue>::alloc(allocator);
     ctx->rows_to_insert = ok::Table<DBTable *, ok::MultiList<UZ, StringView *, DBValue *>>::alloc(allocator);
     ctx->columns_to_update = ok::MultiList<StringView, DBValue>::alloc(allocator);

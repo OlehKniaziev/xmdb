@@ -6,6 +6,7 @@ add_library(LibCore
   DBValue.cpp
   DBDescriptor.cpp
   DBTable.cpp
+  DBUser.cpp
   QueryExecutionContext.cpp
   Core.cpp
 )

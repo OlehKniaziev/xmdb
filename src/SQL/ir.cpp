@@ -697,7 +697,11 @@ Optional<U32> compile_graph_node(StmtGraph* g, U32 node_id, IrContext* ctx) {
                     column_name = ident->value.view();
                 }
 
-                emit_EmitColumn(&ctx->ir_emitter, expr_node->up.expr->token, expr_node_id.value, column_name);
+                emit_EmitColumn(&ctx->ir_emitter,
+                                expr_node->up.expr->token,
+                                table_node_id.value,
+                                expr_node_id.value,
+                                column_name);
             }
         }
         ctx->pop_namespace();
@@ -982,6 +986,19 @@ switch (instr.op) {
 }
 
 bool ir_compile_query(Query *q, IrContext *ctx, CompiledQuery *out_query) {
+    ctx->table_stack.count = 0;
+    // NOTE(oleh): We always aren in the NS_GLOBAL namespace.
+    ctx->namespace_stack.count = 1;
+    ctx->active_db_id = 0;
+    ctx->error = {};
+
+    ctx->ir_emitter.instructions.count = 0;
+    ctx->ir_emitter.tokens.count = 0;
+    ctx->ir_emitter.strings.count = 0;
+    ctx->ir_emitter.integers.count = 0;
+    ctx->ir_emitter.schemas.count = 0;
+    ctx->ir_emitter.temps_count = 0;
+
     for (UZ i = 0; i < q->stmts.count; ++i) {
         auto* stmt = q->stmts[i];
 

@@ -592,6 +592,20 @@ struct LinkedList {
         return list;
     }
 
+    Node* pop_front() {
+        if (head == nullptr) return nullptr;
+
+        Node *node = head;
+        if (head == tail) {
+            head = nullptr;
+            tail = nullptr;
+            return node;
+        }
+
+        head = head->next;
+        return node;
+    }
+
     void prepend(const T& value) {
         Node *node = allocator->alloc<Node>();
         node->value = value;
@@ -864,6 +878,13 @@ struct Optional : public OptionalBase<Optional, T> {
 
     Optional(ValueType value) : _has_value{true}, value{value} {}
 
+    static Optional<T> empty() {
+        U8 buf[sizeof(Optional<T>)];
+        Optional<T> *opt = reinterpret_cast<Optional<T> *>(buf);
+        opt->_has_value = false;
+        return *opt;
+    }
+
     inline bool has_value() const {
         return _has_value;
     }
@@ -998,8 +1019,8 @@ struct Hash<U32> {
 };
 
 template <>
-struct Hash<UZ> {
-    static U64 hash(const UZ& val) {
+struct Hash<U64> {
+    static U64 hash(const U64& val) {
         return val;
     }
 };
@@ -1368,7 +1389,7 @@ Optional<V> Table<K, V>::get(const K& key) {
         idx = (idx + 1) % capacity;
     } while (idx != initial_idx);
 
-    return {};
+    return Optional<V>::empty();
 }
 
 template <typename TKey, typename TValue>
@@ -1385,7 +1406,7 @@ Optional<TValue> Table<TKey, TValue>::get(const K& key) {
         idx = (idx + 1) % capacity;
     } while (idx != initial_idx);
 
-    return {};
+    return Optional<TValue>::empty();
 }
 
 template <typename K, typename V>

@@ -153,13 +153,13 @@ static inline bool type_check_ir_instruction(U32 ip, CompiledQuery *ir_emitter, 
 
         for (UZ i = ctx->emitted_columns.count - columns_to_emit_count; i < ctx->emitted_columns.count; ++i) {
             U32 emit_column_ip = ctx->emitted_columns[i];
-            Tuple<U32, StringView> emit_column_ops = operands_of_EmitColumn(ir_emitter, emit_column_ip);
+            Triple<U32, U32, StringView> emit_column_ops = operands_of_EmitColumn(ir_emitter, emit_column_ip);
 
-            Type column_type = ctx->ir_instruction_types.get(emit_column_ops.op1).get();
+            Type column_type = ctx->ir_instruction_types.get(emit_column_ops.op2).get();
 
             Optional<String> column_name{};
-            if (emit_column_ops.op2.count != 0)
-                column_name = emit_column_ops.op2.to_string(ctx->allocator);
+            if (emit_column_ops.op3.count != 0)
+                column_name = emit_column_ops.op3.to_string(ctx->allocator);
 
             column_names.push(column_name);
             column_types.push(column_type);
