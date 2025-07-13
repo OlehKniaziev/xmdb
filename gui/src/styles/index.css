@@ -34,3 +34,10 @@ body {
    width: 100vw;
 }
 
+.start-text {
+    font-family: var(--font-header);
+    font-weight: 500;
+    color: var(--color-black);
+    padding-left: 32px;
+}
+

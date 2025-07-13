@@ -21,7 +21,7 @@ dialog:focus {
     align-items: center;        /* or stretch, flex-start */
     align-items: stretch; /* makes child items fill nav height */
     height: 100%;
-    gap: 32px;
+    gap: 24px;
     margin-top: 24px;
     padding: 40px 80px;
     border: 2px solid var(--color-darker);
@@ -38,7 +38,7 @@ dialog:focus {
 dialog h1 {
     color: var(--color-black);
     font-family: var(--font-header);
-    font-size: 40px;
+    font-size: 38px;
     font-weight: 600;
     display: block;
     margin: 0;
@@ -50,8 +50,8 @@ dialog input {
     border: none;
     border-radius: 10px;
     font-family: var(--font-main);
-    font-size: 20px;
-    padding: 22px 32px;
+    font-size: 16px;
+    padding: 18px 32px;
 }
 
 dialog input:focus {
@@ -71,7 +71,7 @@ dialog button {
     border: none;
     border-radius: 10px;
     margin: auto;
-    padding: 19px 85px;
+    padding: 16px 64px;
     font-family: var(--font-main);
-    font-size: 24px;
+    font-size: 20px;
 }

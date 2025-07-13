@@ -109,7 +109,16 @@ a {
     border: none;
     background: var(--color-accent-dark);
     cursor: pointer;
+    transition: background 0s ease;
 }
+
+.toolbar-btn:hover {
+    background-color: var(--color-darker);
+}
+
+/* .toolbar-btn:hover img {
+    content:url("src/assets/icons/sql-server-dark-outline.png");
+} */
 
 .sidebar-container {
     /* max-width: 330px; */

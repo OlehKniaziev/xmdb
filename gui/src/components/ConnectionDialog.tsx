@@ -16,16 +16,20 @@ function ConnectionDialog() {
       <form autoComplete="off" onSubmit={event => {event.preventDefault()}}> 
         <div className="vertical-container">
           <div className="horizontal-container">
-            <label htmlFor="hostname">Hostname / IP:</label>
-            <input name="hostname" type="text"></input>
+            <label htmlFor="hostname">Hostname:</label>
+            <input name="hostname" type="text" placeholder="Hostname..."></input>
           </div>
           <div className="horizontal-container">
-            <label htmlFor="user">User:</label>
-            <input name="user" type="text"></input>
+            <label htmlFor="database">Database name:</label>
+            <input name="database" type="text" placeholder="Database name..."></input>
+          </div>
+          <div className="horizontal-container">
+            <label htmlFor="user">Username:</label>
+            <input name="user" type="text" placeholder="Username..."></input>
           </div>
           <div className="horizontal-container">
             <label htmlFor="password">Password:</label>
-            <input name="password" type="password"></input>
+            <input name="password" type="password" placeholder="Password..."></input>
           </div>
           <button onClick={() => dialogRef.current?.close()}>Connect</button>
         </div>
