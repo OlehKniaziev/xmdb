@@ -9,7 +9,7 @@ import {
 } from "react";
 import "../styles/bars-style.css";
 import "../styles/forms-style.css";
-import { useConnectionStore } from "../data/connection-data";
+import { useConnectionStore } from "../data/global-states";
 
 export type ConnectionEditHandle = {
   open: () => void;

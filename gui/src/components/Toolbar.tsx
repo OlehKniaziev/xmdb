@@ -1,19 +1,73 @@
 import { useEffect, useRef } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import ConnectionEdit, { type ConnectionEditHandle } from "./ConnectionEdit";
+import {
+  useConnectionStore,
+  useOutputMessagesStore,
+  useQueryResponceStore,
+  useQueryStore,
+} from "../data/global-states";
+import type { QueryResponse } from "../data/query-response";
 
 export default function Toolbar() {
   const location = useLocation();
   const navigate = useNavigate();
 
+  const { query, setQuery } = useQueryStore();
+  const { setMessage } = useOutputMessagesStore();
+  const { ConnectionId, Hostname, Database, Username } = useConnectionStore();
+  const { setQueryResponce } = useQueryResponceStore();
+
   const dialogRef = useRef<ConnectionEditHandle>(null);
 
   function newQueryHomeOnClick() {
     navigate("/query");
+    setQuery("-- start writing your code here");
+    setMessage("Output messages will be shown here");
   }
 
   function editConnectionOnClick() {
     dialogRef.current?.open();
+  }
+
+  async function executeQuery() {
+    // console.log(query);
+    if (ConnectionId && Hostname && Database && Username) {
+      try {
+        const resp = await fetch(`${Hostname!.toString()}/run-query`, {
+          method: "POST",
+          body: JSON.stringify({
+            query,
+            connection_id: ConnectionId,
+          }),
+        });
+
+        if (resp.status == 200) {
+          const body = await resp.json();
+          const q = body as QueryResponse;
+          if(q.ok === true) {
+            setMessage("Query executed successfully.");
+            console.log(q);
+            setQueryResponce(q);
+          } else {
+            setQueryResponce(q);
+            setMessage(`Error: ${q.error_message}`);
+          }
+        } else {
+          setQueryResponce();
+          setMessage("Could not execute query. Network error.");
+        }
+      } catch (e: any) {
+        console.error(e);
+        setQueryResponce();
+        setMessage(`${e.name}: ${e.message}`);
+      }
+    }
+  }
+
+  function newQueryOnClick() {
+    setQuery("-- start writing your code here");
+    setMessage("Output messages will be shown here");
   }
 
   useEffect(() => {
@@ -40,12 +94,13 @@ export default function Toolbar() {
   if (location.pathname === "/query") {
     buttons = (
       <>
-        {/* <div className="btn-label-container">
+        <div className="btn-label-container">
           <button
             name="newQueryBtn"
             className="toolbar-btn"
             data-src="src/assets/icons/sql-server.png"
             data-hover="src/assets/icons/sql-server-dark-outline.png"
+            onClick={newQueryOnClick}
           >
             <img
               alt="New query icon"
@@ -54,7 +109,8 @@ export default function Toolbar() {
           </button>
           <label htmlFor="newQueryBtn">New Query</label>
         </div>
-        <div className="btn-label-container">
+
+        {/* <div className="btn-label-container">
           <button
             name="openQueryBtn"
             className="toolbar-btn"
@@ -89,6 +145,7 @@ export default function Toolbar() {
             className="toolbar-btn"
             data-src="src/assets/icons/play-button.png"
             data-hover="src/assets/icons/play-button-dark-outline.png"
+            onClick={executeQuery}
           >
             <img
               alt="Execute query icon"

@@ -1,37 +1,41 @@
 import { useState } from "react";
-import { sampleData } from "../data/query-responce";
+import { sampleData } from "../data/query-response";
 import QueryResponse from "./QueryResponse";
+import { useOutputMessagesStore, useQueryResponceStore } from "../data/global-states";
 
 function BottomPanel() {
   const [activeTab, setActiveTab] = useState<"messages" | "results">(
     "messages"
   );
 
-  return (
-      <div className="bottom-panel">
-        <div className="tab-header">
-          <button
-            className={activeTab === "messages" ? "active-tab-bottom" : ""}
-            onClick={() => setActiveTab("messages")}
-          >
-            Messages
-          </button>
-          <button
-            className={activeTab === "results" ? "active-tab-bottom" : ""}
-            onClick={() => setActiveTab("results")}
-          >
-            Results
-          </button>
-        </div>
+  const { message } = useOutputMessagesStore();
+  const { response } = useQueryResponceStore();
 
-        <div className="tab-content">
-          {activeTab === "messages" ? (
-            <div className="messages-style">Output messages here</div>
-          ) : (
-            <QueryResponse response={sampleData} />
-          )}
-        </div>
+  return (
+    <div className="bottom-panel">
+      <div className="tab-header">
+        <button
+          className={activeTab === "messages" ? "active-tab-bottom" : ""}
+          onClick={() => setActiveTab("messages")}
+        >
+          Messages
+        </button>
+        <button
+          className={activeTab === "results" ? "active-tab-bottom" : ""}
+          onClick={() => setActiveTab("results")}
+        >
+          Results
+        </button>
       </div>
+
+      <div className="tab-content">
+        {activeTab === "messages" ? (
+          <div className="messages-style">{message}</div>
+        ) : (
+          <QueryResponse response={response} />
+        )}
+      </div>
+    </div>
   );
 }
 
