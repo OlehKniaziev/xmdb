@@ -6,14 +6,24 @@
 #include <SQL/global_state.hpp>
 
 #include "http.hpp"
+#include "Config.hpp"
 
-constexpr U16 XMDB_SERVER_PORT = 6969;
+using namespace xmdb::server;
 
-int main() {
+int main(int argc, char **argv) {
     xmdb::init_global_state();
 
-    printf("Starting the server on port %u\n", XMDB_SERVER_PORT);
-    xmdb::server::run_http_server(XMDB_SERVER_PORT);
+    ok::Slice<char *> args = {argv, (UZ)argc};
+
+    Config config = Config::parse(args);
+
+    switch (config.protocol) {
+    case Protocol::HTTP: {
+        printf("Starting the server on port %u\n", config.port);
+        run_http_server(config.port);
+        break;
+    }
+    }
 
     return 0;
 }

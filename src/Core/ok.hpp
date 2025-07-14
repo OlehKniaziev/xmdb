@@ -1229,10 +1229,11 @@ Slice<T> ArrayBase<Self, T>::slice(UZ start, UZ end) {
     auto* self = self_cast();
     UZ count = self->get_count();
 
+    OK_ASSERT(start <= count);
     OK_ASSERT(end >= start);
     OK_ASSERT(end <= count);
 
-    return Slice<T>{self->get_items(), end - start};
+    return Slice<T>{self->get_items() + start, end - start};
 }
 
 template <typename Self, typename T>
@@ -1252,10 +1253,11 @@ Slice<const T> ArrayBase<Self, T>::slice(UZ start, UZ end) const {
     auto* self = self_cast();
     UZ count = self->get_count();
 
+    OK_ASSERT(start <= count);
     OK_ASSERT(end >= start);
     OK_ASSERT(end <= count);
 
-    return Slice<const T>{self->get_items(), end - start};
+    return Slice<const T>{self->get_items() + start, end - start};
 }
 
 template <typename Self, typename T>
