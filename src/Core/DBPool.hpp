@@ -11,7 +11,7 @@ struct DBPool {
     DBPool(ok::Allocator *);
 
     DBDescriptor *get_db(StringView);
-    void create_db(StringView);
+    DBDescriptor *create_db(StringView);
 
     QueryExecutionContext *rent_empty_execution_context(DBDescriptor *);
     void return_execution_context(QueryExecutionContext *);

@@ -10,7 +10,7 @@ struct QueryExecutionContext {
     void put_var(U32, StringView, DBValue);
 
     DBValue fetch_column(DBTable *, StringView);
-    void emit_column(DBValue, StringView);
+    void emit_column(DBTable *, DBValue, StringView);
 
     DBTable *fetch_table(StringView);
     void create_table(StringView, SQL::TableSchema *);
@@ -30,8 +30,7 @@ struct QueryExecutionContext {
     ok::Allocator *allocator;
     QueryExecutionContext *next;
     ok::Table<U32, DBValue> vars;
-    ok::MultiList<StringView, DBValue> emitted_columns;
-    UZ emitted_columns_offset;
+    ok::MultiList<StringView, DBValue, DBTable *> emitted_columns;
     ok::MultiList<StringView, DBValue> columns_to_insert;
     ok::Table<DBTable *, ok::MultiList<UZ, StringView *, DBValue *>> rows_to_insert;
     ok::MultiList<StringView, DBValue> columns_to_update;

@@ -8,7 +8,6 @@
 namespace xmdb {
 struct QueryResults {
     bool ok;
-    // UZ rows_affected;
     Optional<DBTable *> value;
 };
 

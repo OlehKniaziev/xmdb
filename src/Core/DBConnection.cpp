@@ -93,10 +93,15 @@ static void execute_instruction(TypedCompiledQuery *query, UZ i, QueryExecutionC
         break;
     }
     case IRInstructionOperator_EmitColumn: {
-        Tuple<U32, StringView> operands = operands_of_EmitColumn(&query->untyped, i);
-        DBValue column_value = ctx->fetch_var(operands.op1);
-        StringView column_name = operands.op2;
-        ctx->emit_column(column_value, column_name);
+        Triple<U32, U32, StringView> operands = operands_of_EmitColumn(&query->untyped, i);
+
+        DBValue table_value = ctx->fetch_var(operands.op1);
+        OK_ASSERT(table_value.type == SQL::TYPE_TABLE);
+        DBTable *table = table_value.u.table;
+
+        DBValue column_value = ctx->fetch_var(operands.op2);
+        StringView column_name = operands.op3;
+        ctx->emit_column(table, column_value, column_name);
         break;
     }
     case IRInstructionOperator_EmitQuery: {

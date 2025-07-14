@@ -1,3 +1,3 @@
 #!/bin/sh
 set -xe
-git ls-files | grep "^.*\.[ch]pp$" | etags -
+git ls-files --recurse-submodules | grep '^.*\.[ch]\(pp\)\?$' | etags -

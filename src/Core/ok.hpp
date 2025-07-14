@@ -592,6 +592,20 @@ struct LinkedList {
         return list;
     }
 
+    Node* pop_front() {
+        if (head == nullptr) return nullptr;
+
+        Node *node = head;
+        if (head == tail) {
+            head = nullptr;
+            tail = nullptr;
+            return node;
+        }
+
+        head = head->next;
+        return node;
+    }
+
     void prepend(const T& value) {
         Node *node = allocator->alloc<Node>();
         node->value = value;
@@ -864,6 +878,13 @@ struct Optional : public OptionalBase<Optional, T> {
 
     Optional(ValueType value) : _has_value{true}, value{value} {}
 
+    static Optional<T> empty() {
+        U8 buf[sizeof(Optional<T>)];
+        Optional<T> *opt = reinterpret_cast<Optional<T> *>(buf);
+        opt->_has_value = false;
+        return *opt;
+    }
+
     inline bool has_value() const {
         return _has_value;
     }
@@ -998,8 +1019,8 @@ struct Hash<U32> {
 };
 
 template <>
-struct Hash<UZ> {
-    static U64 hash(const UZ& val) {
+struct Hash<U64> {
+    static U64 hash(const U64& val) {
         return val;
     }
 };
@@ -1208,10 +1229,11 @@ Slice<T> ArrayBase<Self, T>::slice(UZ start, UZ end) {
     auto* self = self_cast();
     UZ count = self->get_count();
 
+    OK_ASSERT(start <= count);
     OK_ASSERT(end >= start);
     OK_ASSERT(end <= count);
 
-    return Slice<T>{self->get_items(), end - start};
+    return Slice<T>{self->get_items() + start, end - start};
 }
 
 template <typename Self, typename T>
@@ -1231,10 +1253,11 @@ Slice<const T> ArrayBase<Self, T>::slice(UZ start, UZ end) const {
     auto* self = self_cast();
     UZ count = self->get_count();
 
+    OK_ASSERT(start <= count);
     OK_ASSERT(end >= start);
     OK_ASSERT(end <= count);
 
-    return Slice<const T>{self->get_items(), end - start};
+    return Slice<const T>{self->get_items() + start, end - start};
 }
 
 template <typename Self, typename T>
@@ -1368,7 +1391,7 @@ Optional<V> Table<K, V>::get(const K& key) {
         idx = (idx + 1) % capacity;
     } while (idx != initial_idx);
 
-    return {};
+    return Optional<V>::empty();
 }
 
 template <typename TKey, typename TValue>
@@ -1385,7 +1408,7 @@ Optional<TValue> Table<TKey, TValue>::get(const K& key) {
         idx = (idx + 1) % capacity;
     } while (idx != initial_idx);
 
-    return {};
+    return Optional<TValue>::empty();
 }
 
 template <typename K, typename V>

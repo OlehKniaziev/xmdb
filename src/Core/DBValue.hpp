@@ -113,6 +113,8 @@ struct DBValue {
         OK_UNREACHABLE();
     }
 
+    void reset();
+
     DBValue cmp(ok::Allocator *, DBValue);
 };
 } // namespace xmdb
