@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import "../styles/bars-style.css";
 import "../styles/forms-style.css";
-import { useConnectionStore } from "../data/connection-data";
+import { useConnectionStore } from "../data/global-states";
 
 function ConnectionDialog() {
   // const [isConnected, setIsConnected] = useState(false);
@@ -28,7 +28,7 @@ function ConnectionDialog() {
     }
 
     try {
-      const resp = await fetch(hostname!.toString(), {
+      const resp = await fetch(`${hostname!.toString()}/connect`, {
         method: "POST",
         body: JSON.stringify({
           db_name: database.toString(),

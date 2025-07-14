@@ -2,9 +2,12 @@ import Editor, { useMonaco } from "@monaco-editor/react";
 import { useEffect } from "react";
 import BottomPanel from "./BottomPanel";
 import { Panel, PanelGroup, PanelResizeHandle } from "react-resizable-panels";
+import { useQueryStore } from "../data/global-states";
 
 function QueryEditor() {
   const monaco = useMonaco();
+  const { query, setQuery } = useQueryStore();
+
   useEffect(() => {
     if (monaco) {
       monaco.editor.defineTheme("warm-orange", {
@@ -38,8 +41,10 @@ function QueryEditor() {
           <Editor
             defaultLanguage="sql"
             defaultValue="-- start writing your code here"
+            value={query}
             theme="warm-orange"
             className="editor-style"
+            onChange={(val) => setQuery(val || "")}
           />
         </Panel>
         <PanelResizeHandle />
