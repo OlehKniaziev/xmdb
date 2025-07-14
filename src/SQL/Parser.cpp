@@ -1,11 +1,11 @@
 #include "Parser.hpp"
 #include <cstddef>
 
-#define SET_TOKEN_MISMATCH(got, ...)                                                                                   \
+#define SET_TOKEN_MISMATCH(p, got, ...)                                                                                   \
     do {                                                                                                               \
         Token::Type expected_arr[] = {__VA_ARGS__};                                                                    \
         ::ok::Slice<Token::Type> expected = {expected_arr, OK_ARR_LEN(expected_arr)};                                  \
-        set_token_mismatch((got), expected);                                                                           \
+        p->set_token_mismatch((got), expected);                                                                           \
     } while (0)
 
 using namespace ok::literals;
@@ -70,8 +70,18 @@ Optional<Expr*> parse_expression_prim(Parser* parser) {
         return Expr::alloc_null(parser->arena, token.value);
     }
     case Token::KW_SELECT: return parse_select_expr(parser).upcast<Expr>();
-
-    default: OK_TODO();
+    default: {
+        SET_TOKEN_MISMATCH(parser,
+                           token.value,
+                           Token::IDENT,
+                           Token::INTEGER,
+                           Token::STRING,
+                           Token::KW_TRUE,
+                           Token::KW_FALSE,
+                           Token::KW_NULL,
+                           Token::KW_SELECT);
+        return {};
+    }
     }
 }
 }; // namespace
@@ -245,7 +255,7 @@ Optional<DropStmt*> Parser::drop_stmt() {
         auto token = get_cur_token_or_signal_eof();
         TRY(token);
 
-        SET_TOKEN_MISMATCH(token.value, Token::KW_TABLE, Token::KW_DATABASE);
+        SET_TOKEN_MISMATCH(this, token.value, Token::KW_TABLE, Token::KW_DATABASE);
         return {};
     }
 
@@ -296,7 +306,7 @@ Optional<CreateStmt*> Parser::create_stmt() {
     } else {
         auto token = get_cur_token_or_signal_eof();
         TRY(token);
-        SET_TOKEN_MISMATCH(token.value, Token::KW_CREATE);
+        SET_TOKEN_MISMATCH(this, token.value, Token::KW_CREATE);
         return {};
     }
 
@@ -372,7 +382,7 @@ Optional<Token> Parser::expect(Token::Type token_type) {
         return tokens[pos++];
     }
 
-    SET_TOKEN_MISMATCH(tokens[pos], token_type);
+    SET_TOKEN_MISMATCH(this, tokens[pos], token_type);
 
     return {};
 }
