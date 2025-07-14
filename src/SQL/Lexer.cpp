@@ -105,7 +105,11 @@ ok::Optional<Token> Lexer::next() {
             return token;
         }
 
-        OK_ASSERT(is_valid_ident_char(cur));
+        if (!is_valid_ident_char(cur)) {
+            token.type = Token::ILLEGAL;
+            token.data = source.view(pos, pos + 1);
+            return token;
+        }
 
         StringView ident_sv = take_while(is_valid_ident_char);
 
