@@ -40,7 +40,7 @@ export default function Toolbar() {
   if (location.pathname === "/query") {
     buttons = (
       <>
-        <div className="btn-label-container">
+        {/* <div className="btn-label-container">
           <button
             name="newQueryBtn"
             className="toolbar-btn"
@@ -82,7 +82,7 @@ export default function Toolbar() {
             ></img>
           </button>
           <label htmlFor="saveQueryBtn">Save</label>
-        </div>
+        </div> */}
         <div className="btn-label-container">
           <button
             name="executeQueryBtn"
@@ -97,7 +97,7 @@ export default function Toolbar() {
           </button>
           <label htmlFor="executeQueryBtn">Execute</label>
         </div>
-        <div className="btn-label-container">
+        {/* <div className="btn-label-container">
           <button
             name="insertMediaBtn"
             className="toolbar-btn"
@@ -110,7 +110,7 @@ export default function Toolbar() {
             ></img>
           </button>
           <label htmlFor="insertMediaBtn">Insert media</label>
-        </div>
+        </div> */}
       </>
     );
   } else if (location.pathname === "/settings") {

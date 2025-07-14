@@ -10,6 +10,7 @@
     --color-accent-dark: #690500;
     --color-accent-middle: #934B00;
     --color-accent-bright: #BB6B00;
+    --color-accent-bright-red: #b60900;
 
     --font-main: "Fragment Mono", sans-serif;
     --font-header: "Azeret Mono", sans-serif;
@@ -39,5 +40,9 @@ body {
     font-weight: 500;
     color: var(--color-black);
     padding-left: 32px;
+}
+
+button:focus {
+    outline: none;
 }
 

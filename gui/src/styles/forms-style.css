@@ -3,6 +3,7 @@ dialog {
     border: none;
     border-radius: 20px;
     padding: 64px 124px 80px 124px;
+    position: relative;
 }
 
 dialog::backdrop {
@@ -66,7 +67,7 @@ dialog label {
 
 dialog button {
     display: block;
-    background-color: var(--color-accent-dark);
+    background-color: var(--color-accent-middle);
     color: var(--color-main-light);
     border: none;
     border-radius: 10px;
@@ -74,4 +75,54 @@ dialog button {
     padding: 16px 64px;
     font-family: var(--font-main);
     font-size: 20px;
+    cursor: pointer;
+    transition: 0.2s background ease-in;
+}
+
+dialog button:hover {
+    background-color: var(--color-accent-bright);
+}
+
+dialog .button-danger {
+    background-color: var(--color-accent-dark);
+}
+
+dialog .button-danger:hover {
+    background-color: var(--color-accent-bright-red);
+}
+
+.error-message-hidden {
+    display: none;
+}
+
+.error-message-dialog {
+    font-family: var(--font-header);
+    font-weight: 600;
+    color: var(--color-accent-dark);
+    text-align: center;
+    margin: 0;
+}
+
+.close-button-dialog {
+    background-color: transparent;
+    color: var(--color-black);
+    padding: 0;
+    margin: 0;
+    display: inline;
+    position: absolute;
+    top: 2rem;
+    right: 2rem;
+}
+
+.close-button-dialog img {
+    width: 56px;
+    height: 56px;
+}
+
+.close-button-dialog:hover {
+    background-color: transparent;
+}
+
+.close-button-dialog:hover img {
+    content: url("src/assets/icons/close-icon-red.svg");
 }

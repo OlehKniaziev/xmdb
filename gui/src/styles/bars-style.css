@@ -116,10 +116,6 @@ a {
     background-color: var(--color-darker);
 }
 
-/* .toolbar-btn:hover img {
-    content:url("src/assets/icons/sql-server-dark-outline.png");
-} */
-
 .sidebar-container {
     /* max-width: 330px; */
     border-right: 1px solid var(--color-brown);
