@@ -109,6 +109,11 @@ a {
     border: none;
     background: var(--color-accent-dark);
     cursor: pointer;
+    transition: background 0s ease;
+}
+
+.toolbar-btn:hover {
+    background-color: var(--color-darker);
 }
 
 .sidebar-container {
