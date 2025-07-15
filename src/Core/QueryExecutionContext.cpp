@@ -194,5 +194,7 @@ void QueryExecutionContext::delete_table(DBTable *table) {
         DBValue new_value = DBValue::empty(value_type);
         table->columns_values[i] = new_value;
     }
+
+    table->rows_count = 0;
 }
 } // namespace xmdb
