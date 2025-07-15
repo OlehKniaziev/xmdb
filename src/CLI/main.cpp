@@ -141,7 +141,7 @@ int main(int argc, char **argv) {
                 continue;
             }
 
-            printf(WEB_SV_FMT "\n", error_message);
+            printf(WEB_SV_FMT "\n", WEB_SV_ARG(error_message));
             continue;
         } else {
             web_json_array column_names;
