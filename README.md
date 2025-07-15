@@ -3,4 +3,4 @@ XMDB is a media-first relational database which supports most popular video, aud
 column types.
 
 ## Demo
-![xmdb demo](./demos/general.mkv)
+![](./demos/general.gif)
