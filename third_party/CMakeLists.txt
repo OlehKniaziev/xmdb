@@ -1,10 +1,10 @@
 add_custom_command(
-  OUTPUT libweb.a
+  OUTPUT "${CMAKE_CURRENT_SOURCE_DIR}/libweb/libweb.a"
   COMMAND bash ./build.sh
   WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/libweb"
 )
 
-add_custom_target(build_libweb DEPENDS libweb.a)
+add_custom_target(build_libweb DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/libweb/libweb.a")
 
 add_library(libweb STATIC IMPORTED GLOBAL)
 add_dependencies(libweb build_libweb)
