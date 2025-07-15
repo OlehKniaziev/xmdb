@@ -414,7 +414,7 @@ void Parser::set_token_mismatch(Token got, ok::Slice<Token::Type> expected) {
         for (size_t i = 0; i < expected.count; i++) {
             auto expected_sv = token_type_to_string_view(expected[i]);
             message.format_append(OK_SV_FMT, OK_SV_ARG(expected_sv));
-            if (i != expected.count - 1) message.append("or "_sv);
+            if (i != expected.count - 1) message.append(" or "_sv);
         }
 
         message.format_append(", but got " OK_SV_FMT " instead", OK_SV_ARG(got_sv));
