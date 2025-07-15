@@ -6,4 +6,9 @@
         if (!(x)) return {};                                                                                            \
     } while (0)
 
+namespace xmdb {
+[[noreturn]]
+void dief(const char *fmt, ...);
+} // namespace xmdb
+
 #endif // XMDB_UTIL_HPP

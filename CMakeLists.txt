@@ -14,6 +14,7 @@ add_subdirectory(third_party)
 add_subdirectory(src/Core)
 add_subdirectory(src/SQL)
 add_subdirectory(src/Server)
+add_subdirectory(src/CLI)
 
 include(FetchContent)
 FetchContent_Declare(

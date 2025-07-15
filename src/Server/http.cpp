@@ -1,3 +1,5 @@
+#include <cmath>
+
 #include <Core/DBDescriptor.hpp>
 #include <Core/ok.hpp>
 #include <Core/Core.hpp>
@@ -106,19 +108,22 @@ DECLARE_HANDLER(run_query_handler) {
 
     web_json_object json_obj = json.Object;
 
-    web_string_view connection_id_web_sv, query;
-    if (!WebJsonObjectGetStringView(&json_obj, WEB_SV_LIT("connection_id"), &connection_id_web_sv)) {
+    F64 connection_id_f64;
+    web_string_view query;
+    if (!WebJsonObjectGetNumber(&json_obj, WEB_SV_LIT("connection_id"), &connection_id_f64)) {
         return HTTP_STATUS_BAD_REQUEST;
     }
     if (!WebJsonObjectGetStringView(&json_obj, WEB_SV_LIT("query"), &query)) {
         return HTTP_STATUS_BAD_REQUEST;
     }
 
-    S64 connection_id;
-    ok::StringView connection_id_sv{(const char *)connection_id_web_sv.Items, connection_id_web_sv.Count};
-    if (!ok::parse_int64(connection_id_sv, &connection_id) || connection_id <= 0) {
+    F64 integral;
+    ConnectionId connection_id;
+    if (connection_id_f64 < 0.0 || modf(connection_id_f64, &integral) != 0.0) {
         return HTTP_STATUS_BAD_REQUEST;
     }
+
+    connection_id = (ConnectionId)connection_id_f64;
 
     Optional<ConnectionData> connection_data_opt = get_connection_data(connection_id);
     if (!connection_data_opt.has_value()) {
@@ -173,6 +178,8 @@ DECLARE_HANDLER(run_query_handler) {
             xmdb::DBTableOutlet table_outlet = results_table->use();
 
             for (UZ r = 0; r < results_table->rows_count; ++r) {
+                WebJsonPrepareArrayElement();
+
                 WebJsonBeginObject();
 
                 for (UZ i = 0; i < results_table->columns_count; ++i) {
@@ -279,6 +286,8 @@ DECLARE_HANDLER(run_query_handler) {
 
     web_string_view json_response = WebJsonEnd();
     ctx->Content = json_response;
+
+    WebHttpContextAddHeader(ctx, WEB_SV_LIT("Content-Type"), WEB_SV_LIT("application/json"));
     return HTTP_STATUS_OK;
 }
 
