@@ -9,6 +9,7 @@ add_library(LibCore
   DBUser.cpp
   QueryExecutionContext.cpp
   Core.cpp
+  util.cpp
 )
 
 set_property(TARGET LibCore PROPERTY POSITION_INDEPENDENT_CODE 1)

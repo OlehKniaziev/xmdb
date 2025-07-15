@@ -1612,10 +1612,12 @@ struct File {
 void println(const char*);
 void println(StringView);
 void println(String);
+void println();
 
 void eprintln(const char*);
 void eprintln(String);
 void eprintln(StringView);
+void eprintln();
 
 String to_string(Allocator*, S32);
 String to_string(Allocator*, U32);
@@ -2428,6 +2430,10 @@ void println(String string) {
     ::printf("%s\n", string.cstr());
 }
 
+void println() {
+    ::printf("\n");
+}
+
 void eprintln(const char* msg) {
     ::fprintf(stderr, "%s\n", msg);
 }
@@ -2438,6 +2444,10 @@ void eprintln(StringView sv) {
 
 void eprintln(String string) {
     ::fprintf(stderr, "%s\n", string.cstr());
+}
+
+void eprintln() {
+    ::fprintf(stderr, "\n");
 }
 
 bool is_whitespace(char c) {

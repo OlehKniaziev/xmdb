@@ -1,25 +1,11 @@
 #include "Config.hpp"
+#include <Core/util.hpp>
 
 namespace xmdb::server {
 constexpr const Protocol XMDB_DEFAULT_PROTOCOL = Protocol::HTTP;
 constexpr const U16 XMDB_DEFAULT_PORT = 6969;
 
 using namespace ok::literals;
-
-[[noreturn]]
-static void dief(const char *fmt, ...) {
-    UZ fmt_len = strlen(fmt);
-    char *new_fmt = (char *)calloc(fmt_len + 2, 1);
-    memcpy(new_fmt, fmt, fmt_len);
-    new_fmt[fmt_len] = '\n';
-    fmt = new_fmt;
-
-    va_list args;
-    va_start(args, fmt);
-    vfprintf(stderr, fmt, args);
-    va_end(args);
-    exit(1);
-}
 
 Config Config::parse(ok::Slice<char *> args) {
     // char *program_name = args[0];
