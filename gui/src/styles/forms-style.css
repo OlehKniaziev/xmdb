@@ -126,3 +126,8 @@ dialog .button-danger:hover {
 .close-button-dialog:hover img {
     content: url("src/assets/icons/close-icon-red.svg");
 }
+
+
+.connect-button img {
+    height: 24px;
+}

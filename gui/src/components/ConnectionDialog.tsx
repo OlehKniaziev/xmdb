@@ -6,6 +6,7 @@ import { useConnectionStore } from "../data/global-states";
 function ConnectionDialog() {
   // const [isConnected, setIsConnected] = useState(false);
   const [errorMessage, setErrorMessage] = useState("No error");
+  const [isLoading, setIsLoading] = useState(false);
   const { setId, addInfo } = useConnectionStore();
 
   const dialogRef = useRef<HTMLDialogElement>(null);
@@ -22,12 +23,17 @@ function ConnectionDialog() {
     const user = formData.get("user");
     const password = formData.get("password");
 
+    setIsLoading(true);
+    
     if (!hostname || !database || !user || !password) {
+      await new Promise((resolve) => setTimeout(resolve, 100));
+      setIsLoading(false);
       setErrorMessage("Please fill out all the fields!");
       return;
     }
 
     try {
+      setIsLoading(true);
       const resp = await fetch(`${hostname!.toString()}/connect`, {
         method: "POST",
         body: JSON.stringify({
@@ -37,6 +43,8 @@ function ConnectionDialog() {
           password_hash: password.toString(),
         }),
       });
+
+      await new Promise((resolve) => setTimeout(resolve, 100));
 
       if (resp.status == 200) {
         const body = await resp.text();
@@ -50,6 +58,8 @@ function ConnectionDialog() {
       }
     } catch (e: any) {
       setErrorMessage("Could not connect to the server. Try again!");
+    } finally {
+      setIsLoading(false);
     }
   }
 
@@ -88,12 +98,20 @@ function ConnectionDialog() {
           </div>
           <p
             className={
-              errorMessage === "No error" ? "error-message-hidden" : "error-message-dialog"
+              errorMessage === "No error"
+                ? "error-message-hidden"
+                : "error-message-dialog"
             }
           >
             {errorMessage}
           </p>
-          <button>Connect</button>
+          <button className="connect-button">
+            {isLoading ? (
+              <img src="src/assets/loading.svg" alt="loading..."></img>
+            ) : (
+              <span>Connect</span>
+            )}
+          </button>
         </div>
       </form>
     </dialog>
