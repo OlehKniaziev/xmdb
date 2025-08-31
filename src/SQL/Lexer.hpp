@@ -103,13 +103,18 @@ struct Lexer {
     StringView take_while(F pred) {
         size_t start = pos;
 
-        while (pos < source.count && pred(source[pos])) pos++;
+        skip_while(pred);
 
         return source.view(start, pos);
     }
 
+    template <typename F>
+    void skip_while(F pred) {
+        while (pos < source.count && pred(source[pos])) ++pos;
+    }
+
     inline void skip_whitespace() {
-        while (pos < source.count && ok::is_whitespace(source.data[pos])) pos++;
+        skip_while(ok::is_whitespace);
     }
 
     StringView source;
