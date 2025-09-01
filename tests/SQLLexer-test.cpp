@@ -32,3 +32,9 @@ TEST(Lexer, Next) {
     EXPECT_EQ(users_token.type, Token::IDENT);
     EXPECT_EQ(users_token.data, "Users"_sv);
 }
+
+TEST(Lexer, Comments) {
+    Lexer lexer{"-- SELECT +/*-/123error fro t;ebl\nSELECT"_sv};
+
+    EXPECT_EQ(lexer.next().get().type, Token::KW_SELECT);
+}

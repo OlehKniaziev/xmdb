@@ -27,6 +27,17 @@ ok::Optional<Token> Lexer::next() {
     Token token{};
 
     switch ((cur = source.data[pos])) {
+    case '-': {
+        ++pos;
+        if (source.count > pos && source.data[pos] == '-') {
+            skip_while([](U8 c) { return c != '\n'; });
+            return next();
+        }
+
+        token.type = Token::ILLEGAL;
+        token.data = source.view(pos - 1, pos);
+        return token;
+    }
     case ',': {
         token.type = Token::COMMA;
         token.data = source.view(pos, pos + 1);
