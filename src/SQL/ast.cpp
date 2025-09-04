@@ -8,6 +8,7 @@ U64 Expr::ok_hash_value() const {
     case Expr::NULL_LIT:
     case Expr::TRUE_LIT:
     case Expr::FALSE_LIT:
+    case Expr::STAR:
         return hash;
     case Expr::INTEGER_LIT: {
         auto* this_int = static_cast<const IntegerExpr*>(this);
@@ -36,8 +37,9 @@ U64 Expr::ok_hash_value() const {
 
         return hash;
     }
-    default: OK_UNREACHABLE();
     }
+
+    OK_UNREACHABLE();
 }
 
 bool Expr::operator ==(const Expr& other) const {

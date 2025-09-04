@@ -935,7 +935,7 @@ struct Optional<T*> : public OptionalBase<Optional, T*> {
     }
 
     inline const ValueType& get_unchecked() const {
-        return *value;
+        return value;
     }
 
     inline const ValueType& get() const {

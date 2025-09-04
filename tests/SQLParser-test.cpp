@@ -1,12 +1,13 @@
 #include <gtest/gtest.h>
 #include "SQL/Parser.hpp"
+#include "SQL/util.hpp"
 
 using namespace xmdb::SQL;
 using namespace ok::literals;
 
 TEST(SQLParser, primary_expression) {
     ok::ArenaAllocator arena{};
-    auto source = R"(some_very_nice_expression 999 "a string literal!" TRUE FALSE NULL)"_sv;
+    auto source = R"(some_very_nice_expression 999 "a string literal!" TRUE FALSE NULL *)"_sv;
     Parser parser{&arena, source};
 
     auto ident = parser.expression();
@@ -35,6 +36,10 @@ TEST(SQLParser, primary_expression) {
     auto null_expr = parser.expression();
     ASSERT_TRUE(null_expr.has_value());
     EXPECT_EQ(null_expr.value->type, Expr::NULL_LIT);
+
+    auto star_expr = parser.expression();
+    ASSERT_TRUE(star_expr.has_value());
+    EXPECT_EQ(star_expr.value->type, Expr::STAR);
 }
 
 TEST(SQLParser, binary_expression) {
@@ -98,6 +103,23 @@ TEST(SQLParser, select_expr) {
     EXPECT_EQ(select_expr->exprs.count, 2);
     EXPECT_EQ(select_expr->exprs[0]->type, Expr::IDENT);
     EXPECT_EQ(select_expr->exprs[1]->type, Expr::IDENT);
+
+    EXPECT_EQ(select_expr->table->type, Expr::IDENT);
+}
+
+TEST(SQLParser, select_star_expr) {
+    ok::ArenaAllocator arena{};
+    auto source = "SELECT * FROM my_table;"_sv;
+    Parser parser{&arena, source};
+
+    auto select = parser.expression();
+    ASSERT_TRUE(select.has_value()) << format_error(&arena, parser.error.get().location, parser.error.get().message.view()).cstr();
+    ASSERT_TRUE(select.value->type == Expr::SELECT);
+
+    auto select_expr = static_cast<SelectExpr*>(select.value);
+
+    EXPECT_EQ(select_expr->exprs.count, 1);
+    EXPECT_EQ(select_expr->exprs[0]->type, Expr::STAR);
 
     EXPECT_EQ(select_expr->table->type, Expr::IDENT);
 }

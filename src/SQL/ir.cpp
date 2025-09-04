@@ -167,7 +167,7 @@ static Optional<U32> compile_ident(IdentifierExpr* ident, IrContext* ctx) {
             return {};
         }
 
-            return emit_FetchColumn(&ctx->ir_emitter, ident->token, table_location, column_name);
+        return emit_FetchColumn(&ctx->ir_emitter, ident->token, table_location, column_name);
     }
     case IrContext::NS_GLOBAL: {
         StringView table_name = ident->value.view();
@@ -334,6 +334,8 @@ struct StmtGraphNode {
 
         LEAF,
 
+        STAR,
+
         MAX,
     };
 
@@ -352,7 +354,6 @@ struct StmtGraphNode {
         node.edges = edges;
         return node;
     }
-
 
     inline Type type() const {
         return (Type) (flags & 0xFF);
@@ -411,7 +412,7 @@ static U32 expr_to_node(StmtGraph* g, Expr* expr) {
     auto existing_node = g->node_indices.get(ok::HashPtr{expr});
     if (existing_node.has_value()) return existing_node.value;
 
-    Slice<U32> edges{nullptr, 0};
+    Slice<U32> edges{};
     StmtGraphNode::Type node_type{};
 
     switch (expr->type) {
@@ -475,7 +476,10 @@ static U32 expr_to_node(StmtGraph* g, Expr* expr) {
 
         break;
     }
-    default: OK_UNREACHABLE();
+    case Expr::STAR: {
+        node_type = StmtGraphNode::STAR;
+        break;
+    }
     }
 
     StmtGraphNode graph_node = StmtGraphNode::expr(node_type, expr, edges);
@@ -613,63 +617,89 @@ static void to_string(ok::String* string, StmtGraph* g, U32 node_idx, bool type_
     }
 }
 
-Optional<U32> compile_graph_node(StmtGraph* g, U32 node_id, IrContext* ctx) {
+Optional<Slice<U32>> compile_graph_node(StmtGraph* g, U32 node_id, IrContext* ctx);
+
+Optional<U32> compile_graph_node_single(StmtGraph *g, U32 node_id, IrContext *ctx) {
+    Optional<Slice<U32>> result = compile_graph_node(g, node_id, ctx);
+    TRY(result);
+    if (result.value.count != 1) {
+        U32 first = result.value[0];
+        StmtGraphNode node = g->nodes[first];
+        OK_ASSERT(node.type() == StmtGraphNode::LEAF);
+        String error_msg = String::format(ctx->allocator, "expected 1 value, got %zu instead", result.value.count);
+        ctx->error_on(node.up.expr->token, error_msg);
+        return {};
+    }
+    return result.value[0];
+}
+
+Optional<Slice<U32>> compile_graph_node(StmtGraph* g, U32 node_id, IrContext* ctx) {
     auto* node = &g->nodes[node_id];
-    if (node->is_visited()) return node->ir_id;
+    if (node->is_visited()) {
+        List<U32> result_nodes_ids = List<U32>::alloc(ctx->allocator, 5);
+        result_nodes_ids.push(node->ir_id);
+        return result_nodes_ids.slice();
+    }
 
     node->make_visited();
 
     IREmitter* e = &ctx->ir_emitter;
+
+    List<U32> result_nodes_ids = List<U32>::alloc(ctx->allocator, 5);
 
     switch (node->type()) {
     case StmtGraphNode::LEAF: {
         auto expr_id = compile_expr(node->up.expr, ctx);
         TRY(expr_id);
         node->ir_id = expr_id.value;
-        return node->ir_id;
+        result_nodes_ids.push(node->ir_id);
+        break;
     }
     case StmtGraphNode::EQ: {
         auto lhs_node = node->edges[0];
         auto rhs_node = node->edges[1];
 
-        auto lhs = compile_graph_node(g, lhs_node, ctx);
+        auto lhs = compile_graph_node_single(g, lhs_node, ctx);
         TRY(lhs);
-        auto rhs = compile_graph_node(g, rhs_node, ctx);
+        auto rhs = compile_graph_node_single(g, rhs_node, ctx);
         TRY(rhs);
 
         node->ir_id = emit_Eq(e, node->up.expr->token, lhs.value, rhs.value);
-        return node->ir_id;
+        result_nodes_ids.push(node->ir_id);
+        break;
     }
     case StmtGraphNode::LT: {
         auto lhs_node = node->edges[0];
         auto rhs_node = node->edges[1];
 
-        auto lhs = compile_graph_node(g, lhs_node, ctx);
+        auto lhs = compile_graph_node_single(g, lhs_node, ctx);
         TRY(lhs);
-        auto rhs = compile_graph_node(g, rhs_node, ctx);
+        auto rhs = compile_graph_node_single(g, rhs_node, ctx);
         TRY(rhs);
 
         node->ir_id = emit_Lt(e, node->up.expr->token, lhs.value, rhs.value);
-        return node->ir_id;
+        result_nodes_ids.push(node->ir_id);
+        break;
     }
     case StmtGraphNode::GT: {
         auto lhs_node = node->edges[0];
         auto rhs_node = node->edges[1];
 
-        auto lhs = compile_graph_node(g, lhs_node, ctx);
+        auto lhs = compile_graph_node_single(g, lhs_node, ctx);
         TRY(lhs);
-        auto rhs = compile_graph_node(g, rhs_node, ctx);
+        auto rhs = compile_graph_node_single(g, rhs_node, ctx);
         TRY(rhs);
 
         node->ir_id = emit_Gt(e, node->up.expr->token, lhs.value, rhs.value);
-        return node->ir_id;
+        result_nodes_ids.push(node->ir_id);
+        break;
     }
     case StmtGraphNode::SELECT: {
         OK_ASSERT(node->edges.count != 0);
         U32 table_node_edge = node->edges[node->edges.count - 1];
         StmtGraphNode table_node = g->nodes[table_node_edge];
 
-        Optional<U32> table_node_id = compile_graph_node(g, table_node_edge, ctx);
+        Optional<U32> table_node_id = compile_graph_node_single(g, table_node_edge, ctx);
         TRY(table_node_id);
 
         Optional<TableSchema*> table_schema = ctx->get_table_schema_by_id(table_node_id.value);
@@ -680,7 +710,7 @@ Optional<U32> compile_graph_node(StmtGraph* g, U32 node_id, IrContext* ctx) {
             return {};
         }
 
-        UZ columns_count = node->edges.count - 1;
+        UZ columns_count = 0;
 
         ctx->push_table(table_node_id.value);
         {
@@ -688,26 +718,35 @@ Optional<U32> compile_graph_node(StmtGraph* g, U32 node_id, IrContext* ctx) {
                 U32 edge_id = node->edges[i];
 
                 StmtGraphNode* expr_node = &g->nodes[edge_id];
-                Optional<U32> expr_node_id = compile_graph_node(g, edge_id, ctx);
-                TRY(expr_node_id);
+                Optional<Slice<U32>> expr_node_ids = compile_graph_node(g, edge_id, ctx);
+                TRY(expr_node_ids);
+
+                columns_count += expr_node_ids.value.count;
+
+                // NOTE(oleh): If we outputted more than 1 value, it means that we already have called
+                // the emit column procedure.
+                if (expr_node_ids.value.count > 1) continue;
 
                 StringView column_name = ""_sv;
+
                 if (expr_node->up.expr->type == Expr::IDENT) {
                     IdentifierExpr* ident = static_cast<IdentifierExpr*>(expr_node->up.expr);
                     column_name = ident->value.view();
                 }
 
+                U32 id = expr_node_ids.value[0];
                 emit_EmitColumn(&ctx->ir_emitter,
                                 expr_node->up.expr->token,
                                 table_node_id.value,
-                                expr_node_id.value,
+                                id,
                                 column_name);
             }
         }
         ctx->pop_namespace();
 
         node->ir_id = emit_EmitQuery(&ctx->ir_emitter, node->up.expr->token, columns_count);
-        return node->ir_id;
+        result_nodes_ids.push(node->ir_id);
+        break;
     }
     case StmtGraphNode::INSERT: {
         OK_ASSERT(node->edges.count != 0);
@@ -715,7 +754,7 @@ Optional<U32> compile_graph_node(StmtGraph* g, U32 node_id, IrContext* ctx) {
         U32 table_node_edge = node->edges[0];
         StmtGraphNode table_node = g->nodes[table_node_edge];
 
-        Optional<U32> table_node_id = compile_graph_node(g, table_node_edge, ctx);
+        Optional<U32> table_node_id = compile_graph_node_single(g, table_node_edge, ctx);
         TRY(table_node_id);
 
         Optional<TableSchema*> table_schema = ctx->get_table_schema_by_id(table_node_id.value);
@@ -753,7 +792,7 @@ Optional<U32> compile_graph_node(StmtGraph* g, U32 node_id, IrContext* ctx) {
                     U32 value_edge = node->edges[values_start + j];
                     StmtGraphNode *value_edge_node = &g->nodes[value_edge];
 
-                    Optional<U32> value_id = compile_graph_node(g, value_edge, ctx);
+                    Optional<U32> value_id = compile_graph_node_single(g, value_edge, ctx);
                     TRY(value_id);
 
                     StringView column_name = insert_stmt->columns[j].view();
@@ -773,7 +812,8 @@ Optional<U32> compile_graph_node(StmtGraph* g, U32 node_id, IrContext* ctx) {
         ctx->pop_namespace();
 
         node->ir_id = emit_CommitInsert(&ctx->ir_emitter, insert_stmt->token);
-        return node->ir_id;
+        result_nodes_ids.push(node->ir_id);
+        break;
     }
     case StmtGraphNode::UPDATE: {
         OK_ASSERT(node->edges.count != 0);
@@ -781,7 +821,7 @@ Optional<U32> compile_graph_node(StmtGraph* g, U32 node_id, IrContext* ctx) {
         U32 table_node_edge = node->edges[0];
         StmtGraphNode table_node = g->nodes[table_node_edge];
 
-        Optional<U32> table_node_id = compile_graph_node(g, table_node_edge, ctx);
+        Optional<U32> table_node_id = compile_graph_node_single(g, table_node_edge, ctx);
         TRY(table_node_id);
 
         Optional<TableSchema*> table_schema = ctx->get_table_schema_by_id(table_node_id.value);
@@ -812,7 +852,7 @@ Optional<U32> compile_graph_node(StmtGraph* g, U32 node_id, IrContext* ctx) {
                 U32 value_edge = node->edges[i];
                 StmtGraphNode *value_edge_node = &g->nodes[value_edge];
 
-                Optional<U32> value_edge_id = compile_graph_node(g, value_edge, ctx);
+                Optional<U32> value_edge_id = compile_graph_node_single(g, value_edge, ctx);
                 TRY(value_edge_id);
 
                 emit_UpdateColumn(&ctx->ir_emitter,
@@ -825,7 +865,8 @@ Optional<U32> compile_graph_node(StmtGraph* g, U32 node_id, IrContext* ctx) {
         ctx->pop_namespace();
 
         node->ir_id = emit_CommitUpdate(&ctx->ir_emitter, update_stmt->token);
-        return node->ir_id;
+        result_nodes_ids.push(node->ir_id);
+        break;
     }
     case StmtGraphNode::DELETE: {
         OK_ASSERT(node->edges.count == 1);
@@ -833,7 +874,7 @@ Optional<U32> compile_graph_node(StmtGraph* g, U32 node_id, IrContext* ctx) {
         U32 table_node_edge = node->edges[0];
         StmtGraphNode table_node = g->nodes[table_node_edge];
 
-        Optional<U32> table_node_id = compile_graph_node(g, table_node_edge, ctx);
+        Optional<U32> table_node_id = compile_graph_node_single(g, table_node_edge, ctx);
         TRY(table_node_id);
 
         Optional<TableSchema*> table_schema = ctx->get_table_schema_by_id(table_node_id.value);
@@ -853,10 +894,38 @@ Optional<U32> compile_graph_node(StmtGraph* g, U32 node_id, IrContext* ctx) {
         ctx->pop_namespace();
 
         node->ir_id = emit_DeleteTable(&ctx->ir_emitter, node->up.stmt->token, table_node_id.value);
-        return node->ir_id;
+        result_nodes_ids.push(node->ir_id);
+        break;
     }
-    default: OK_TODO();
+    case StmtGraphNode::STAR: {
+        OK_ASSERT(node->edges.count == 0);
+
+        Expr *expr = node->up.expr;
+
+        IrContext::Namespace current_namespace = ctx->current_namespace();
+        if (current_namespace == IrContext::NS_GLOBAL) {
+            OK_UNREACHABLE();
+        }
+
+        U32 table_id = ctx->current_table_id();
+        TableSchema *table = ctx->get_table_schema_by_id(table_id).get();
+
+        for (UZ i = 0; i < table->columns_names.count; ++i) {
+            StringView column_name = table->columns_names[i].or_else(String::alloc(ctx->allocator, "")).view();
+            // FIXME(oleh): This probably should just output values with the 'FetchColumn' operator.
+            U32 column_value = emit_FetchColumn(e, expr->token, table_id, column_name);
+            U32 column_id = emit_EmitColumn(e, expr->token, table_id, column_value, column_name);
+            result_nodes_ids.push(column_id);
+        }
+
+        break;
     }
+    case StmtGraphNode::MAX: {
+        OK_UNREACHABLE();
+    }
+    }
+
+    return result_nodes_ids.slice();
 }
 
 static inline bool compile_graph(StmtGraph* graph, IrContext* ctx) {
