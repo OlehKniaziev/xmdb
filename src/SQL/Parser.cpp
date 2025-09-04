@@ -11,7 +11,6 @@
 using namespace ok::literals;
 
 namespace xmdb::SQL {
-namespace {
 Optional<SelectExpr*> parse_select_expr(Parser* p) {
     Optional<Token> select_token = p->expect(Token::KW_SELECT);
     TRY(select_token);
@@ -57,6 +56,10 @@ Optional<Expr*> parse_expression_prim(Parser* parser) {
         String value = token.value.data.to_string(parser->arena);
         return StringExpr::alloc(parser->arena, token.value, value);
     }
+    case Token::STAR: {
+        ++parser->pos;
+        return StarExpr::alloc(parser->arena, token.value);
+    }
     case Token::KW_TRUE: {
         ++parser->pos;
         return Expr::alloc_true(parser->arena, token.value);
@@ -84,7 +87,6 @@ Optional<Expr*> parse_expression_prim(Parser* parser) {
     }
     }
 }
-}; // namespace
 
 Parser::Parser(ok::ArenaAllocator* arena, StringView source) : arena{arena}, source{source} {
     auto tokens = ok::List<Token>::alloc(arena);

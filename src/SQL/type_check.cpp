@@ -146,6 +146,7 @@ static inline bool type_check_ir_instruction(U32 ip, CompiledQuery *ir_emitter, 
     case IRInstructionOperator_EmitQuery: {
         Tuple<String, U32> operands = operands_of_EmitQuery(ir_emitter, ip);
         U32 columns_to_emit_count = operands.op2;
+        printf("%zu %u\n", ctx->emitted_columns.count, columns_to_emit_count);
         OK_ASSERT(ctx->emitted_columns.count >= columns_to_emit_count);
 
         List<Optional<String>> column_names = List<Optional<String>>::alloc(ctx->allocator);

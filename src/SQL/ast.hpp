@@ -31,6 +31,7 @@ struct Expr {
         NULL_LIT,
         BINARY_OP,
         SELECT,
+        STAR,
     };
 
     static Expr* alloc_true(ok::Allocator* allocator, Token token) {
@@ -120,6 +121,15 @@ struct BinaryOpExpr : public Expr {
     Kind kind;
     Expr* lhs;
     Expr* rhs;
+};
+
+struct StarExpr : public Expr {
+    static StarExpr *alloc(ok::Allocator *allocator, Token token) {
+        auto *expr = allocator->alloc<StarExpr>();
+        expr->type = STAR;
+        expr->token = token;
+        return expr;
+    }
 };
 
 struct SelectExpr : public Expr {

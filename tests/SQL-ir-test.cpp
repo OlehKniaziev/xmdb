@@ -56,6 +56,45 @@ TEST(ir, select) {
     ASSERT_TRUE(type_check_query(&compiled_query, &t_ctx, &typed_query));
 }
 
+TEST(ir, select_star) {
+    ok::ArenaAllocator arena{};
+    auto source = R"sql(CREATE TABLE MyTable (
+        column1 int,
+        column2 text,
+        column3 text
+    );
+    SELECT * FROM MyTable;)sql"_sv;
+    Parser parser{&arena, source};
+
+    auto query = parser.query();
+    ASSERT_TRUE(query.has_value());
+
+    IrContext ir_ctx{&arena, source};
+
+    CompiledQuery compiled_query_star{};
+
+    ASSERT_TRUE(ir_compile_query(&query.value, &ir_ctx, &compiled_query_star));
+
+    source = R"sql(CREATE TABLE MyTable (
+        column1 int,
+        column2 text,
+        column3 text
+    );
+    SELECT * FROM MyTable;)sql"_sv;
+    parser = Parser{&arena, source};
+
+    query = parser.query();
+    ASSERT_TRUE(query.has_value());
+
+    ir_ctx = IrContext{&arena, source};
+
+    CompiledQuery compiled_query_regular{};
+
+    ASSERT_TRUE(ir_compile_query(&query.value, &ir_ctx, &compiled_query_regular));
+
+    ASSERT_EQ(stringify_ir(&arena, &compiled_query_star), stringify_ir(&arena, &compiled_query_regular));
+}
+
 TEST(ir, create_database) {
     ok::ArenaAllocator arena{};
     auto source = "CREATE DATABASE DB; USE DB;"_sv;

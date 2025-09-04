@@ -50,6 +50,12 @@ ok::Optional<Token> Lexer::next() {
         pos++;
         return token;
     }
+    case '*': {
+        token.type = Token::STAR;
+        token.data = source.view(pos, pos + 1);
+        ++pos;
+        return token;
+    }
     case ';': {
         token.type = Token::SEMICOLON;
         token.data = source.view(pos, pos + 1);
@@ -117,6 +123,7 @@ ok::Optional<Token> Lexer::next() {
         }
 
         if (!is_valid_ident_char(cur)) {
+            ++pos;
             token.type = Token::ILLEGAL;
             token.data = source.view(pos, pos + 1);
             return token;

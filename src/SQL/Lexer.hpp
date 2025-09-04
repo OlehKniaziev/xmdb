@@ -34,6 +34,7 @@ using ok::Table;
     X("dot", DOT)                                                                                                      \
     X("identifier", IDENT)                                                                                             \
     X("semicolon", SEMICOLON)                                                                                          \
+    X("star", STAR) \
     X("l_paren", L_PAREN)                                                                                              \
     X("r_paren", R_PAREN)                                                                                              \
     X("equals", EQ)                                                                                                    \
