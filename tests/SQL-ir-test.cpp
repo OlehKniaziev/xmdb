@@ -172,7 +172,7 @@ TEST(ir, insert) {
         column1 int,
         column2 text
     );
-    INSERT INTO MyTable (column1) VALUES (1), (2), (3);)sql"_sv;
+    INSERT INTO MyTable (column1, column2) VALUES (1, "1"), (2, "2"), (3, "3");)sql"_sv;
     Parser parser{&arena, source};
 
     auto query = parser.query();
