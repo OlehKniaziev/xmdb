@@ -768,6 +768,16 @@ Optional<Slice<U32>> compile_graph_node(StmtGraph* g, U32 node_id, IrContext* ct
         OK_ASSERT(node->up.stmt->type == Stmt::INSERT);
 
         auto *insert_stmt = static_cast<InsertStmt*>(node->up.stmt);
+        // TODO(oleh): Check if the column names are also valid.
+        UZ mandatory_columns_count = table_schema.value->columns_names.count;
+        if (insert_stmt->columns.count != mandatory_columns_count) {
+            String error_message = String::format(ctx->allocator,
+                                                  "the table has %zu mandatory columns, tried to insert %zu instead",
+                                                  mandatory_columns_count,
+                                                  insert_stmt->columns.count);
+            ctx->error_on(insert_stmt->token, error_message);
+            return {};
+        }
 
         ctx->push_table(table_node_id.value);
         {
