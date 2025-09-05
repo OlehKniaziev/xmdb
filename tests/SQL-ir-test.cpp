@@ -187,6 +187,23 @@ TEST(ir, insert) {
     ASSERT_TRUE(type_check_query(&compiled_query, &t_ctx, &typed_query));
 }
 
+TEST(ir, insert_columns_names_checking) {
+    ok::ArenaAllocator arena{};
+    auto source = R"sql(CREATE TABLE MyTable (
+        column1 int,
+        column2 text
+    );
+    INSERT INTO MyTable (bogus, amogus) VALUES (1, "1"), (2, "2"), (3, "3");)sql"_sv;
+    Parser parser{&arena, source};
+
+    auto query = parser.query();
+    ASSERT_TRUE(query.has_value());
+
+    IrContext ir_ctx{&arena, source};
+    CompiledQuery compiled_query{};
+    ASSERT_FALSE(ir_compile_query(&query.value, &ir_ctx, &compiled_query));
+}
+
 TEST(ir, update) {
     ok::ArenaAllocator arena{};
     auto source = R"sql(CREATE TABLE MyTable (

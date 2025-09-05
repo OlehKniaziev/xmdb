@@ -768,7 +768,7 @@ Optional<Slice<U32>> compile_graph_node(StmtGraph* g, U32 node_id, IrContext* ct
         OK_ASSERT(node->up.stmt->type == Stmt::INSERT);
 
         auto *insert_stmt = static_cast<InsertStmt*>(node->up.stmt);
-        // TODO(oleh): Check if the column names are also valid.
+
         UZ mandatory_columns_count = table_schema.value->columns_names.count;
         if (insert_stmt->columns.count != mandatory_columns_count) {
             String error_message = String::format(ctx->allocator,
@@ -777,6 +777,17 @@ Optional<Slice<U32>> compile_graph_node(StmtGraph* g, U32 node_id, IrContext* ct
                                                   insert_stmt->columns.count);
             ctx->error_on(insert_stmt->token, error_message);
             return {};
+        }
+
+        for (UZ i = 0; i < insert_stmt->columns.count; ++i) {
+            StringView column = insert_stmt->columns[i].view();
+            if (!table_schema.value->find_column(column)) {
+                String error_message = String::format(ctx->allocator,
+                                                      "table does not contain a column named '" OK_SV_FMT "'",
+                                                      OK_SV_ARG(column));
+                ctx->error_on(insert_stmt->token, error_message);
+                return {};
+            }
         }
 
         ctx->push_table(table_node_id.value);
