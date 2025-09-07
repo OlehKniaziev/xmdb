@@ -1,7 +1,6 @@
 #ifndef XMDB_SOURCELOCATION_HPP
 #define XMDB_SOURCELOCATION_HPP
 
-#include <cstdint>
 #include "ok.hpp"
 
 namespace xmdb {

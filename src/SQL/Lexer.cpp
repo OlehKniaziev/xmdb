@@ -1,5 +1,13 @@
 #include "Lexer.hpp"
 
+#ifdef OK_NO_STDLIB
+char toupper(char c) {
+    return c & ~(1 << 5);
+}
+#else
+#include <cctype>
+#endif // OK_NO_STDLIB
+
 namespace xmdb::SQL {
 TokenTable token_table{};
 
