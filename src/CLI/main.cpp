@@ -77,7 +77,7 @@ int main(int argc, char **argv) {
 
         SZ n_read = getline(&line_buffer, &line_buffer_count, stdin);
         if (n_read == -1) {
-            ok::println();
+            printf("\n");
             break;
         }
 

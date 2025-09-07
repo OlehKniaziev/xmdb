@@ -27,9 +27,9 @@
 #ifndef OK_H_
 #define OK_H_
 
+#ifndef OK_NO_STDLIB
 #include <cctype>
 #include <cerrno>
-#include <cstdarg>
 #include <cstdint>
 #include <cstdio>
 #include <cstdlib>
@@ -40,40 +40,65 @@
 #include <fcntl.h>
 #include <sys/types.h>
 
+#define OK_VSNPRINTF vsnprintf
+#endif // OK_NO_STDLIB
+
+#include <stdarg.h>
+
+#ifndef OK_LOG_ERROR
+
+#ifdef OK_NO_STDLIB
+#    define OK_LOG_ERROR(fmt, ...)
+#else
+#    define OK_LOG_ERROR(fmt, ...) fprintf(stderr, fmt, __VA_ARGS__)
+#endif // OK_NO_STDLIB
+
+#endif // OK_LOG_ERROR
+
+#ifndef OK_LOG
+
+#ifdef OK_NO_STDLIB
+#    define OK_LOG(fmt, ...)
+#else
+#    define OK_LOG(fmt, ...) printf(fmt, __VA_ARGS__)
+#endif // OK_NO_STDLIB
+
+#endif // OK_LOG
+
 #ifndef OK_ASSERT
 #define OK_ASSERT(x) do { \
     if (!(x)) { \
-        fprintf(stderr, "%s:%d: Assertion failed: %s\n", __FILE__, __LINE__, #x); \
-        abort(); \
+        OK_LOG_ERROR("%s:%d: Assertion failed: %s\n", __FILE__, __LINE__, #x); \
+        __builtin_trap(); \
     } \
 } while(0)
 #endif // OK_ASSERT
 
 #define OK_TODO() do { \
-    fprintf(stderr, "%s:%d: TODO: Not implemented\n", __FILE__, __LINE__); \
-    abort(); \
+    OK_LOG_ERROR("%s:%d: TODO: Not implemented\n", __FILE__, __LINE__); \
+    __builtin_trap(); \
 } while (0)
 
 #define OK_TODO_MSG_FMT(msg, ...) do { \
-    fprintf(stderr, "%s:%d: TODO: " msg "\n", __FILE__, __LINE__, __VA_ARGS__); \
-    abort(); \
+    OK_LOG_ERROR("%s:%d: TODO: " msg "\n", __FILE__, __LINE__, __VA_ARGS__); \
+    __builtin_trap(); \
 } while (0)
 
 #define OK_UNUSED(arg) (void)(arg)
 
 #define OK_UNREACHABLE() do { \
-    fprintf(stderr, "%s:%d: Encountered unreachable code\n", __FILE__, __LINE__); \
-    abort(); \
+    OK_LOG_ERROR("%s:%d: Encountered unreachable code\n", __FILE__, __LINE__); \
+    __builtin_trap(); \
 } while (0)
 
 #define OK_PANIC(msg) do { \
-    fprintf(stderr, "%s:%d: PROGRAM PANICKED: %s\n", __FILE__, __LINE__, (msg)); \
-    abort(); \
+    OK_LOG_ERROR("%s:%d: PROGRAM PANICKED: %s\n", __FILE__, __LINE__, (msg)); \
+    __builtin_trap(); \
 } while (0)
 
 #define OK_PANIC_FMT(fmt, ...) do { \
-    fprintf(stderr, "%s:%d: PROGRAM PANICKED: " fmt "\n", __FILE__, __LINE__, __VA_ARGS__); \
-    abort(); \
+    OK_LOG_ERROR("%s:%d: PROGRAM PANICKED: " fmt "\n", __FILE__, __LINE__, __VA_ARGS__); \
+    __builtin_trap(); \
 } while (0)
 
 #define OK_ARR_LEN(xs) (sizeof((xs)) / sizeof((xs)[0]))
@@ -115,6 +140,14 @@
 #define OK_ALLOC_PAGE(sz) (VirtualAlloc(nullptr, (sz), MEM_COMMIT | MEM_RESERVE, PAGE_READWRITE))
 #define OK_DEALLOC_PAGE(page, size) (VirtualFree((page), 0, MEM_RELEASE))
 #define OK_ALLOC_SMOL(sz) (HeapAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY, (sz)))
+
+#elif defined(__wasm__)
+
+#define OK_UNIX 0
+#define OK_WINDOWS 0
+#define OK_WASM 1
+
+#include <stdint.h>
 
 #else
 #error "Only UNIX-like systems and Windows are supported"
@@ -158,6 +191,38 @@ using F64 = double;
 #endif // __GNUC__
 
 namespace ok {
+#ifdef OK_NO_STDLIB
+    void *memcpy(void *, const void *, UZ);
+    void *memset(void *, U8, UZ);
+
+    UZ strlen(const char *);
+
+#   ifndef OK_PAGE_SIZE
+#       define OK_PAGE_SIZE 4096
+#   endif // OK_PAGE_SIZE
+
+#   ifndef OK_PAGE_ALIGN
+#       define OK_PAGE_ALIGN OK_PAGE_SIZE
+#   endif // OK_PAGE_ALIGN
+
+#   ifndef OK_VSNPRINTF
+#       error "you have to define `OK_VSNPRINTF` when compiling with `OK_NO_STDLIB`"
+#   endif // OK_VSNPRINTF
+
+#   ifndef OK_ALLOC_PAGE
+#       error "you have to define `OK_ALLOC_PAGE` when compiling with `OK_NO_STDLIB`"
+#   endif // OK_ALLOC_PAGE
+
+#   ifndef OK_DEALLOC_PAGE
+#       error "you have to define `OK_DEALLOC_PAGE` when compiling with `OK_NO_STDLIB`"
+#   endif // OK_DEALLOC_PAGE
+
+#   ifndef OK_ALLOC_SMOL
+#       define OK_ALLOC_SMOL OK_ALLOC_PAGE
+#   endif // OK_ALLOC_SMOL
+
+#endif // OK_NO_STDLIB
+
 // min and max
 template <typename T>
 constexpr const T& max(const T& a) {
@@ -747,7 +812,7 @@ struct StringView : public StringBase<StringView, const char> {
 };
 
 inline namespace literals {
-constexpr StringView operator ""_sv(const char* cstr, UZ len) {
+constexpr StringView operator ""_sv(const char* cstr, unsigned long len) {
     return StringView{cstr, len};
 }
 };
@@ -1552,11 +1617,19 @@ struct File {
         KERNEL_OUT_OF_MEMORY,
         READ_ONLY_FS,
     };
-#else
+#elif OK_WINDOWS
     using OpenError = DWORD;
     using ReadError = DWORD;
     using WriteError = DWORD;
     using CloseError = DWORD;
+    using RemoveError = DWORD;
+#else
+    struct OpenError {};
+    struct ReadError {};
+    struct WriteError {};
+    struct CloseError {};
+    struct RemoveError {};
+
 #endif // Platform check.
 
     static Optional<OpenError> open(File* out, const char* path);
@@ -1566,7 +1639,7 @@ struct File {
     static String error_string(Allocator*, OpenError);
     static String error_string(Allocator*, ReadError);
     static String error_string(Allocator*, WriteError);
-#else
+#elif OK_WINDOWS
     static String error_string(Allocator*, DWORD);
 #endif // Platform check.
 
@@ -1600,7 +1673,7 @@ struct File {
 
 #if OK_UNIX
     int fd;
-#else
+#elif OK_WINDOWS
     HANDLE handle;
 #endif // Platform check.
     UZ offset;
@@ -1612,12 +1685,10 @@ struct File {
 void println(const char*);
 void println(StringView);
 void println(String);
-void println();
 
 void eprintln(const char*);
 void eprintln(String);
 void eprintln(StringView);
-void eprintln();
 
 String to_string(Allocator*, S32);
 String to_string(Allocator*, U32);
@@ -1629,14 +1700,17 @@ bool parse_int64(StringView, S64*);
 Optional<File::OpenError> create_temp_file(File* file);
 
 static inline U32 get_rand() {
+#ifndef OK_NOSTDLIB
 #if OK_UNIX
     return (U32)rand();
-#else
+#elif OK_WINDOWS
     U32 r = 0;
     errno_t err = rand_s(&r);
     OK_ASSERT(err == 0);
     return r;
 #endif // Platform check.
+    OK_TODO();
+#endif // OK_NOSTDLIB
 }
 
 static inline F64 millis_timestamp() {
@@ -1644,17 +1718,40 @@ static inline F64 millis_timestamp() {
     struct timespec ts;
     clock_gettime(CLOCK_REALTIME, &ts);
     return (F64)ts.tv_sec * 1000.0 + (F64)ts.tv_nsec / 1e6;
-#else
+#elif OK_WINDOWS
     LARGE_INTEGER frequency_int = {};
     QueryPerformanceFrequency(&frequency_int);
     F64 frequency = (F64)frequency_int.QuadPart / 1000.0;
     LARGE_INTEGER counter;
     QueryPerformanceCounter(&counter);
     return (F64)counter.QuadPart / frequency;
+#else
+    OK_TODO();
 #endif // Platform check.
 }
 
 #ifdef OK_IMPLEMENTATION
+#ifdef OK_NO_STDLIB
+    void *memcpy(void *dst, const void *src, UZ count) {
+        for (UZ i = 0; i < count; ++i) {
+            *((U8 *)dst + i) = *((U8 *)src + i);
+        }
+        return dst;
+    }
+
+    void *memset(void *ptr, U8 b, UZ c) {
+        for (UZ i = 0; i < c; ++i) {
+            *((U8*)ptr + i) = c;
+        }
+        return ptr;
+    }
+
+    UZ strlen(const char *s) {
+        UZ c = 0;
+        while (*(s + c)) ++c;
+        return c;
+    }
+#endif // OK_NO_STDLIB
 
 FixedBufferAllocator _temp_allocator_impl{};
 Allocator* temp_allocator = &_temp_allocator_impl;
@@ -1833,7 +1930,7 @@ String String::format(Allocator* a, const char* fmt, ...) {
     va_start(sprintf_args, fmt);
     {
         char* sprintf_buf = nullptr;
-        buf_size = vsnprintf(sprintf_buf, 0, fmt, sprintf_args);
+        buf_size = OK_VSNPRINTF(sprintf_buf, 0, fmt, sprintf_args);
         OK_ASSERT(buf_size != -1);
 
         buf_size += 1;
@@ -1844,7 +1941,7 @@ String String::format(Allocator* a, const char* fmt, ...) {
 
     va_start(sprintf_args, fmt);
     {
-        int bytes_written = vsnprintf((char*)buf.data.items, buf_size, fmt, sprintf_args);
+        int bytes_written = OK_VSNPRINTF((char*)buf.data.items, buf_size, fmt, sprintf_args);
         OK_ASSERT(bytes_written != -1);
     }
     va_end(sprintf_args);
@@ -1870,7 +1967,7 @@ void String::format_append(const char* fmt, ...) {
     va_start(sprintf_args, fmt);
     {
         char* sprintf_buf = nullptr;
-        required_buf_size = vsnprintf(sprintf_buf, 0, fmt, sprintf_args);
+        required_buf_size = OK_VSNPRINTF(sprintf_buf, 0, fmt, sprintf_args);
         OK_ASSERT(required_buf_size != -1);
     }
     va_end(sprintf_args);
@@ -1881,7 +1978,7 @@ void String::format_append(const char* fmt, ...) {
     va_start(sprintf_args, fmt);
     {
         char* buf = (char*)data.items + count();
-        int bytes_written = vsnprintf(buf, required_buf_size + 1, fmt, sprintf_args);
+        int bytes_written = OK_VSNPRINTF(buf, required_buf_size + 1, fmt, sprintf_args);
         OK_ASSERT(bytes_written != -1);
     }
     va_end(sprintf_args);
@@ -1948,6 +2045,8 @@ Optional<File::OpenError> File::open(File* out, const char* path) {
     out->handle = file_handle;
     out->path = path;
     return {};
+#else
+    OK_TODO();
 #endif // OK_UNIX
 }
 
@@ -1997,7 +2096,7 @@ String File::error_string(Allocator* allocator, File::WriteError error) {
     OK_UNREACHABLE();
 }
 
-#else
+#elif OK_WINDOWS
 
 String File::error_string(Allocator* allocator, DWORD error) {
     constexpr DWORD LANGUAGE_ID = 0;
@@ -2024,10 +2123,12 @@ void File::seek_to(U64 seek_offset) {
     this->offset = seek_offset;
 #if OK_UNIX
     OK_ASSERT(lseek(fd, seek_offset, SEEK_SET) != (off_t)-1);
-#else
+#elif OK_WINDOWS
     LONG higher_order_bits = 0;
     DWORD lower_order_bits = SetFilePointer(handle, (LONG)seek_offset, &higher_order_bits, FILE_BEGIN);
     OK_ASSERT(lower_order_bits != INVALID_SET_FILE_POINTER);
+#else
+    OK_TODO();
 #endif // Platform check.
 }
 
@@ -2037,13 +2138,15 @@ U64 File::seek_end() {
     OK_ASSERT(seek_res != (off_t)-1);
     offset = seek_res;
     return seek_res;
-#else
+#elif OK_WINDOWS
     long higher_order_bits = 0;
     DWORD lower_order_bits = SetFilePointer(handle, 0, &higher_order_bits, FILE_END);
     OK_ASSERT(lower_order_bits != INVALID_SET_FILE_POINTER);
 
     offset = (U64)higher_order_bits << 32 | (U64)lower_order_bits;
     return offset;
+#else
+    OK_TODO();
 #endif // Platform check.
 }
 
@@ -2073,6 +2176,8 @@ Optional<File::ReadError> File::read(U8* buf, UZ count, UZ* n_read) {
     bool ok = ReadFile(handle, (void*)buf, (DWORD)count, (LPDWORD)n_read, nullptr);
     if (!ok) return GetLastError();
     return {};
+#else
+    OK_TODO();
 #endif // Platform check
 }
 
@@ -2099,6 +2204,7 @@ end:
 }
 
 Optional<File::RemoveError> File::remove() {
+#if OK_UNIX
     int res = ::remove(this->path);
     if (res != -1)     return {};
 
@@ -2114,6 +2220,11 @@ Optional<File::RemoveError> File::remove() {
     case EROFS:        return RemoveError::READ_ONLY_FS;
     default: OK_UNREACHABLE();
     }
+#elif OK_WINDOWS
+    OK_TODO();
+#else
+    OK_TODO();
+#endif // Platform check.
 }
 
 Optional<File::CloseError> File::close() const {
@@ -2129,10 +2240,12 @@ Optional<File::CloseError> File::close() const {
     case EDQUOT: return CloseError::NOT_ENOUGH_SPACE;
     default: OK_UNREACHABLE();
     }
-#else
+#elif OK_WINDOWS
     bool ok = CloseHandle(handle);
     if (ok) return {};
     return GetLastError();
+#else
+    OK_TODO();
 #endif // Platform check.
 }
 
@@ -2148,7 +2261,7 @@ Optional<File::WriteError> File::write(U8* data, UZ count) {
     case EINVAL: return WriteError::BAD_DATA;
     default:     OK_UNREACHABLE();
     }
-#else
+#elif OK_WINDOWS
     // We first seek to the start of the file, and then set that as the end of file,
     // so when the write proceeds, it will flush the buffer to disk and set a the new
     // end of file to the length of the supplied buffer, overriding the file contents
@@ -2165,6 +2278,8 @@ Optional<File::WriteError> File::write(U8* data, UZ count) {
 
     if (!ok) return GetLastError();
     return {};
+#else
+    OK_TODO();
 #endif // Platform check.
 }
 
@@ -2419,35 +2534,27 @@ bool parse_int64(StringView source, S64* out) {
 }
 
 void println(const char* msg) {
-    ::printf("%s\n", msg);
+    OK_LOG("%s\n", msg);
 }
 
 void println(StringView sv) {
-    ::printf(OK_SV_FMT "\n", OK_SV_ARG(sv));
+    OK_LOG(OK_SV_FMT "\n", OK_SV_ARG(sv));
 }
 
 void println(String string) {
-    ::printf("%s\n", string.cstr());
-}
-
-void println() {
-    ::printf("\n");
+    OK_LOG("%s\n", string.cstr());
 }
 
 void eprintln(const char* msg) {
-    ::fprintf(stderr, "%s\n", msg);
+    OK_LOG_ERROR("%s\n", msg);
 }
 
 void eprintln(StringView sv) {
-    ::fprintf(stderr, OK_SV_FMT "\n", OK_SV_ARG(sv));
+    OK_LOG_ERROR(OK_SV_FMT "\n", OK_SV_ARG(sv));
 }
 
 void eprintln(String string) {
-    ::fprintf(stderr, "%s\n", string.cstr());
-}
-
-void eprintln() {
-    ::fprintf(stderr, "\n");
+    OK_LOG_ERROR("%s\n", string.cstr());
 }
 
 bool is_whitespace(char c) {

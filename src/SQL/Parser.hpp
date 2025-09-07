@@ -2,7 +2,6 @@
 #define XMDB_SQLPARSER_H_
 
 #include <Core/SourceLocation.hpp>
-#include <Core/util.hpp>
 
 #include "Lexer.hpp"
 #include "ast.hpp"
