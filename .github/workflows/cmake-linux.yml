@@ -24,5 +24,5 @@ jobs:
 
     - name: Test
       working-directory: ${{github.workspace}}
-      run: ./scripts/test
+      run: ./scripts/test -f
 
