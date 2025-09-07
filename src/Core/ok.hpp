@@ -60,7 +60,7 @@
 #ifdef OK_NO_STDLIB
 #    define OK_LOG(fmt, ...)
 #else
-#    define OK_LOG(fmt, ...) fprintf(stderr, fmt, __VA_ARGS__)
+#    define OK_LOG(fmt, ...) printf(fmt, __VA_ARGS__)
 #endif // OK_NO_STDLIB
 
 #endif // OK_LOG
