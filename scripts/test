@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 import os
 import sys
+import argparse
 import subprocess
 from pathlib import Path
 
@@ -17,19 +18,13 @@ def cmd(arg: list[str] | str, **kwargs) -> None:
     subprocess.run(arg, check=True, **kwargs)
     print("Success.")
 
-def detect_build_dir() -> str:
-    if os.path.exists(DEFAULT_BUILD_DIR):
-        return DEFAULT_BUILD_DIR
-
-    args = sys.argv[1:]
-    if len(args) == 0:
-        print("ERROR: could not determine the binary build directory and no arguments were provided")
-        sys.exit(1)
-
-    return args[0]
-
 def main() -> None:
-    build_dir = detect_build_dir()
+    argparser = argparse.ArgumentParser(prog="test", description="Run all XMDB tests")
+    argparser.add_argument("-d", "--builddir", default="./build")
+    argparser.add_argument("-f", "--fail-on-snap-mismatch", action="store_true")
+    args = argparser.parse_args()
+
+    build_dir = args.builddir
 
     cmd(["cmake", "--build", build_dir])
 
@@ -38,7 +33,9 @@ def main() -> None:
     for snap_test in snap_files:
         snap_test_relative = os.path.basename(str(snap_test))
         snap_file_name = f"./{snap_test_relative}"
-        cmd(f"cd build && ../tests/snap.py -d ../tests/snaps {snap_file_name}", shell=True)
+        snap_script = "../tests/snap.py"
+        snap_cmd = f"{snap_script} -f" if args.fail_on_snap_mismatch else snap_script
+        cmd(f"cd build && {snap_cmd} -d ../tests/snaps {snap_file_name}", shell=True)
 
     cmd(f"cd {build_dir} && ctest", shell=True)
 
