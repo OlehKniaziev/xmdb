@@ -23,6 +23,8 @@ extern "C" void console_error(const char *fmt, ...);
 #define OK_IMPLEMENTATION
 #include <Core/ok.hpp>
 
+#include <SQL/constructor_linux.cpp>
+
 #include <SQL/util.hpp>
 #include <SQL/Lexer.cpp>
 #include <SQL/Parser.cpp>
