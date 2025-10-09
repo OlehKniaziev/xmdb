@@ -16,11 +16,11 @@ Optional<ConnectionData> get_connection_data(ConnectionId id) {
     return db_connections_table.get(id);
 }
 
-ConnectionId gen_connection(xmdb::DBDescriptor *db, xmdb::DBUser user) {
+ConnectionId gen_connection(xmdb::DBDescriptor *db, xmdb::DBUser *user) {
     xmdb::DBConnection *connection = nullptr;
 
     if (connection_free_list.head == nullptr) {
-        connection_free_list.prepend(xmdb::DBConnection{&shared_db_pool, db});
+        connection_free_list.prepend(xmdb::DBConnection{&shared_db_pool, db, user});
         connection = &connection_free_list.head->value;
     } else {
         ConnectionList::Node *conn_node = connection_free_list.pop_front();

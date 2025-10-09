@@ -343,7 +343,6 @@ struct DBSchema {
 
     inline TableSchema* alloc_table_schema(Optional<String> name, bool typed) {
         if (name) {
-            OK_ASSERT(!table_schemas_index.has(name.value)); // FIXME
             table_schemas_index.put(name.value, table_schema_count);
         }
 
@@ -364,11 +363,6 @@ struct DBSchema {
 };
 
 struct IrContext {
-    struct Error {
-        SourceLocation location;
-        String message;
-    };
-
     explicit IrContext(Allocator* allocator, StringView source) :
         allocator{allocator}, source{source}, ir_emitter{allocator} {
         auto default_schema = DBSchema::alloc_default(ok::static_allocator);
@@ -445,7 +439,7 @@ struct IrContext {
     }
 
     inline void error_on(Token token, String message) {
-        Error error;
+        ErrorWithSourceLocation error;
         error.location = locate_token(source, token);
         error.message = message;
         this->error = error;
@@ -458,7 +452,7 @@ struct IrContext {
     List<Namespace> namespace_stack;
     IREmitter ir_emitter;
     U32 active_db_id = 0;
-    Optional<Error> error{};
+    Optional<ErrorWithSourceLocation> error{};
 };
 
 struct CompiledQuery {

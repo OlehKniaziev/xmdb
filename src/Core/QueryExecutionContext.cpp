@@ -3,17 +3,36 @@
 using namespace ok::literals;
 
 namespace xmdb {
+
+#define X(p)                                                                                                           \
+    void CHECK_##p(QueryExecutionContext *ctx) {                                                                       \
+        if ((ctx->user->perm & PERM_##p) == 0) {                                                                       \
+            /* TODO(oleh): Retrieve location from the query executed. */                                               \
+            ctx->error = ErrorWithSourceLocation{                                                                      \
+                    .message = String::format(ctx->allocator, "user " OK_SV_FMT " does not have " #p " permissions",   \
+                                              OK_SV_ARG(ctx->user->name)),                                             \
+                    .location = {}};                                                                                   \
+            longjmp(ctx->jmpbuf, 1);                                                                                   \
+        }                                                                                                              \
+    }
+
+XMDB_ENUM_USER_PERMISSIONS
+
 DBValue QueryExecutionContext::fetch_var(U32 ip) {
+    CHECK_READ(this);
     Optional<DBValue> value = vars.get(ip);
     return value.get();
 }
 
 void QueryExecutionContext::put_var(U32 ip, StringView name, DBValue value) {
     OK_UNUSED(name);
+    CHECK_WRITE(this);
     vars.put(ip, value);
 }
 
 DBValue QueryExecutionContext::fetch_column(DBTable *table, StringView column_name) {
+    CHECK_READ(this);
+
     for (UZ i = 0; i < table->columns_count; ++i) {
         if (table->columns_names[i] == column_name) {
             return table->columns_values[i];
@@ -24,6 +43,8 @@ DBValue QueryExecutionContext::fetch_column(DBTable *table, StringView column_na
 }
 
 DBTable *QueryExecutionContext::fetch_table(StringView table_name) {
+    CHECK_READ(this);
+
     for (UZ i = 0; i < current_db->tables.count; ++i) {
         DBTable *table = current_db->tables[i];
         if (table->name == table_name) {
@@ -35,6 +56,8 @@ DBTable *QueryExecutionContext::fetch_table(StringView table_name) {
 }
 
 void QueryExecutionContext::create_table(StringView table_name, SQL::TableSchema *table_schema) {
+    CHECK_WRITE(this);
+
     if (!table_schema->columns_types.has_value()) {
         OK_TODO();
     }
@@ -50,13 +73,8 @@ void QueryExecutionContext::create_table(StringView table_name, SQL::TableSchema
     }
 
     DBValue *column_values = nullptr;
-    DBTable *new_table = DBTable::alloc(allocator,
-                                        table_name,
-                                        column_types.count,
-                                        column_names,
-                                        column_types.items,
-                                        column_values,
-                                        0);
+    DBTable *new_table = DBTable::alloc(allocator, table_name, column_types.count, column_names, column_types.items,
+                                        column_values, 0);
     current_db->tables.push(new_table);
 }
 
@@ -86,13 +104,8 @@ DBTable *QueryExecutionContext::emit_query(U32 columns_count, SQL::ColumnType *c
 
     emitted_columns.count = 0;
 
-    DBTable *table = DBTable::alloc(allocator,
-                                    ""_sv,
-                                    columns_count,
-                                    columns_names,
-                                    columns_types,
-                                    columns_values,
-                                    rows_count);
+    DBTable *table =
+            DBTable::alloc(allocator, ""_sv, columns_count, columns_names, columns_types, columns_values, rows_count);
     last_emitted_query = table;
     return table;
 }
@@ -127,6 +140,8 @@ void QueryExecutionContext::insert_row(DBTable *table) {
 }
 
 void QueryExecutionContext::commit_insert() {
+    CHECK_WRITE(this);
+
     OK_TABLE_FOREACH(rows_to_insert, table, rows, {
         UZ *rows_to_insert_columns_count = rows.get_items<UZ>();
         StringView **rows_to_insert_columns_names = rows.get_items<StringView *>();
@@ -169,6 +184,8 @@ void QueryExecutionContext::update_column(DBTable *table, StringView column_name
 }
 
 void QueryExecutionContext::commit_update() {
+    CHECK_WRITE(this);
+
     DBTable *table = table_to_update.get();
     StringView *columns_to_update_names = columns_to_update.get_items<StringView>();
     DBValue *columns_to_update_values = columns_to_update.get_items<DBValue>();
@@ -188,6 +205,8 @@ void QueryExecutionContext::commit_update() {
 }
 
 void QueryExecutionContext::delete_table(DBTable *table) {
+    CHECK_WRITE(this);
+
     for (UZ i = 0; i < table->columns_count; ++i) {
         SQL::ColumnType column_type = table->columns_types[i];
         SQL::Type value_type = column_type_to_type(column_type);

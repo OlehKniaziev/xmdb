@@ -2,17 +2,13 @@
 #define XMDB_SQLPARSER_H_
 
 #include <Core/SourceLocation.hpp>
+#include <Core/util.hpp>
 
 #include "Lexer.hpp"
 #include "ast.hpp"
 
 namespace xmdb::SQL {
 struct Parser {
-    struct Error {
-        String message;
-        SourceLocation location;
-    };
-
     explicit Parser(ok::ArenaAllocator*, StringView);
 
     Optional<Stmt*> stmt();
@@ -44,7 +40,7 @@ struct Parser {
     ok::ArenaAllocator* arena;
     StringView source;
     ok::Slice<Token> tokens{};
-    Optional<Error> error{};
+    Optional<ErrorWithSourceLocation> error{};
     size_t pos = 0;
 };
 }; // namespace xmdb

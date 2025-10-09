@@ -9,7 +9,7 @@ struct DBDescriptor {
 
     DBDescriptor *next;
     ok::StringView name;
-    ok::List<DBUser> users;
+    DBUser *users;
     ok::List<DBTable *> tables;
 };
 };

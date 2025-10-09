@@ -422,7 +422,7 @@ void Parser::set_token_mismatch(Token got, ok::Slice<Token::Type> expected) {
         message.format_append(", but got " OK_SV_FMT " instead", OK_SV_ARG(got_sv));
     }
 
-    error = Error{message, token_location};
+    error = ErrorWithSourceLocation{message, token_location};
 }
 
 void Parser::set_eof() {
@@ -435,6 +435,6 @@ void Parser::set_eof() {
     }
 
     auto message = String::alloc(arena, "unexpected EOF");
-    error = Error{message, location};
+    error = ErrorWithSourceLocation{message, location};
 }
 }; // namespace xmdb::SQL

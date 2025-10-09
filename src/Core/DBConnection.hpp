@@ -7,18 +7,19 @@
 
 namespace xmdb {
 struct QueryResults {
-    bool ok;
+    Optional<ErrorWithSourceLocation> error;
     Optional<DBTable *> value;
 };
 
 struct DBConnection {
-    explicit DBConnection(DBPool *, DBDescriptor *);
+    explicit DBConnection(DBPool *, DBDescriptor *, DBUser *);
 
     void execute(SQL::TypedCompiledQuery *query, QueryResults *results);
 
     void close();
 
     DBPool *db_pool;
+    DBUser *user;
     DBDescriptor *db;
     SQL::IrContext ir_ctx;
 };

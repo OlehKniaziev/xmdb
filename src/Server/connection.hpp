@@ -10,9 +10,9 @@ extern xmdb::DBPool shared_db_pool;
 struct ConnectionData {
     xmdb::DBConnection *connection;
     ok::ArenaAllocator temp_arena;
-    xmdb::DBUser user;
+    xmdb::DBUser *user;
 };
 
-ConnectionId gen_connection(xmdb::DBDescriptor *db, xmdb::DBUser user);
+ConnectionId gen_connection(xmdb::DBDescriptor *db, xmdb::DBUser *user);
 Optional<ConnectionData> get_connection_data(ConnectionId);
 } // namespace xmdb::server

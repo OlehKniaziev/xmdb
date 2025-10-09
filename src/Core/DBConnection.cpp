@@ -1,11 +1,13 @@
 #include "DBConnection.hpp"
+#include <csetjmp>
 
 namespace xmdb {
 using namespace SQL;
 using namespace ok::literals;
 
-DBConnection::DBConnection(DBPool *pool, DBDescriptor *db) :
-    db_pool{pool}, db{db}, ir_ctx{pool->allocator, ""_sv} {}
+DBConnection::DBConnection(DBPool *pool, DBDescriptor *db, DBUser *user) :
+    db_pool{pool}, user{user}, db{db}, ir_ctx{pool->allocator, ""_sv} {
+}
 
 static inline ColumnType type_to_column_type(Type type) {
     switch (type) {
@@ -16,8 +18,8 @@ static inline ColumnType type_to_column_type(Type type) {
     case TYPE_FLOAT:  return COLUMN_FLOAT;
     case TYPE_DOUBLE: return COLUMN_DOUBLE;
     case TYPE_NULL:
-    case TYPE_TABLE: OK_PANIC("Unsupported type to column type conversion");
-    case TYPE_MAX: OK_UNREACHABLE();
+    case TYPE_TABLE:  OK_PANIC("Unsupported type to column type conversion");
+    case TYPE_MAX:    OK_UNREACHABLE();
     }
 
     OK_UNREACHABLE();
@@ -277,20 +279,32 @@ static void execute_instruction(TypedCompiledQuery *query, UZ i, QueryExecutionC
 }
 
 void DBConnection::execute(TypedCompiledQuery *query, QueryResults *results) {
-    QueryExecutionContext *ctx = db_pool->rent_empty_execution_context(db);
+    results->error = {};
+    results->value = {};
+
+    QueryExecutionContext *ctx = db_pool->rent_empty_execution_context(db, user);
+
+    jmp_buf buf;
+    int ret = setjmp(buf);
+
+    memcpy(&ctx->jmpbuf, buf, sizeof(jmp_buf));
 
     UZ instructions_count = query->untyped.instructions.count;
+
+    if (ret != 0) {
+        results->error = ctx->error;
+        goto end;
+    }
 
     for (UZ i = 0; i < instructions_count; ++i) {
         execute_instruction(query, i, ctx, this);
     }
 
-    // FIXME(oleh): This should depend on the result of executing query instructions.
-    results->ok = true;
-
     if (ctx->last_emitted_query.has_value()) {
         results->value = ctx->last_emitted_query.value;
     }
+
+end:
 
     db_pool->return_execution_context(ctx);
 }
