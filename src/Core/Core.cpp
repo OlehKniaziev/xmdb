@@ -1,6 +1,7 @@
 #include "Core.hpp"
 
 #include <SQL/SQL.hpp>
+#include <SQL/util.hpp>
 
 namespace xmdb {
 bool compile_and_execute_source(ok::ArenaAllocator *arena,
@@ -19,6 +20,12 @@ bool compile_and_execute_source(ok::ArenaAllocator *arena,
     }
 
     connection->execute(&typed_query, results);
-    return results->ok;
+    if (results->error.has_value()) {
+        ErrorWithSourceLocation err = results->error.value;
+        *error = SQL::format_error(arena, err.location, err.message.view());
+        return false;
+    }
+
+    return true;
 }
 } // namespace xmdb

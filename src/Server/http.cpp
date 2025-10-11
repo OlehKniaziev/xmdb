@@ -1,8 +1,8 @@
 #include <cmath>
 
+#include <Core/Core.hpp>
 #include <Core/DBDescriptor.hpp>
 #include <Core/ok.hpp>
-#include <Core/Core.hpp>
 
 #include <http.h>
 
@@ -43,12 +43,10 @@ DECLARE_HANDLER(connect_handler) {
     //     return HTTP_STATUS_BAD_REQUEST;
     // }
 
-    ok::StringView db_name_sv{(const char *)db_name.Items, db_name.Count};
+    ok::StringView db_name_sv{(const char *) db_name.Items, db_name.Count};
     xmdb::DBDescriptor *requested_db = nullptr;
 
-    for (xmdb::DBDescriptor *db = shared_db_pool.db_descriptors;
-         db != nullptr;
-         db = db->next) {
+    for (xmdb::DBDescriptor *db = shared_db_pool.db_descriptors; db != nullptr; db = db->next) {
         if (db->name == db_name_sv) {
             requested_db = db;
             break;
@@ -59,34 +57,35 @@ DECLARE_HANDLER(connect_handler) {
         return HTTP_STATUS_NOT_FOUND;
     }
 
-    ok::StringView username_sv = {(const char *)username.Items, username.Count};
-    Optional<xmdb::DBUser> found_user = Optional<xmdb::DBUser>::empty();
+    ok::StringView username_sv = {(const char *) username.Items, username.Count};
 
-    for (UZ i = 0; i < requested_db->users.count; ++i) {
-        xmdb::DBUser user = requested_db->users[i];
+    DBUser *user = requested_db->users;
+    while (user != nullptr) {
         // FIXME(oleh): Replace this password hash check against the password by a check againts
         // a computed hash.
-        if (user.name == username_sv) {
-            for (UZ j = 0; j < user.sha256_password_digest.get_count(); ++j) {
-                if (user.sha256_password_digest[j] == 0) break;
+        if (user->name == username_sv) {
+            for (UZ j = 0; j < user->sha256_password_digest.get_count(); ++j) {
+                if (user->sha256_password_digest[j] == 0) break;
 
-                if (password.Items[j] != user.sha256_password_digest[j]) {
+                if (password.Items[j] != user->sha256_password_digest[j]) {
+                    user = nullptr;
                     goto loop_end;
                 }
             }
 
-            found_user = user;
             break;
         }
 
-    loop_end: ;
+        user = user->next;
+
+    loop_end:;
     }
 
-    if (!found_user.has_value()) {
+    if (user == nullptr) {
         return HTTP_STATUS_FORBIDDEN;
     }
 
-    ConnectionId connection_id = gen_connection(requested_db, found_user.value);
+    ConnectionId connection_id = gen_connection(requested_db, user);
     ctx->Content = WebArenaFormat(ctx->Arena, "%llu", connection_id);
 
     return HTTP_STATUS_OK;
@@ -123,7 +122,7 @@ DECLARE_HANDLER(run_query_handler) {
         return HTTP_STATUS_BAD_REQUEST;
     }
 
-    connection_id = (ConnectionId)connection_id_f64;
+    connection_id = (ConnectionId) connection_id_f64;
 
     Optional<ConnectionData> connection_data_opt = get_connection_data(connection_id);
     if (!connection_data_opt.has_value()) {
@@ -133,15 +132,12 @@ DECLARE_HANDLER(run_query_handler) {
     ConnectionData connection_data = connection_data_opt.value;
     connection_data.temp_arena.reset();
 
-    ok::StringView source_sv = {(const char *)query.Items, query.Count};
+    ok::StringView source_sv = {(const char *) query.Items, query.Count};
     xmdb::QueryResults query_results{};
     ok::String error{};
 
-    bool ok = xmdb::compile_and_execute_source(&connection_data.temp_arena,
-                                               connection_data.connection,
-                                               source_sv,
-                                               &query_results,
-                                               &error);
+    bool ok = xmdb::compile_and_execute_source(&connection_data.temp_arena, connection_data.connection, source_sv,
+                                               &query_results, &error);
 
     WebJsonBegin(ctx->Arena);
     WebJsonBeginObject();
@@ -162,8 +158,8 @@ DECLARE_HANDLER(run_query_handler) {
             for (UZ i = 0; i < results_table->columns_count; ++i) {
                 ok::StringView column_name_sv = results_table->columns_names[i];
                 web_string_view column_name = {
-                    .Items = (u8 *)column_name_sv.data,
-                    .Count = column_name_sv.count,
+                        .Items = (u8 *) column_name_sv.data,
+                        .Count = column_name_sv.count,
                 };
                 WebJsonPrepareArrayElement();
                 WebJsonPutString(column_name);
@@ -185,8 +181,8 @@ DECLARE_HANDLER(run_query_handler) {
                 for (UZ i = 0; i < results_table->columns_count; ++i) {
                     ok::StringView column_name_sv = results_table->columns_names[i];
                     web_string_view column_name = {
-                        .Items = (u8 *)column_name_sv.data,
-                        .Count = column_name_sv.count,
+                            .Items = (u8 *) column_name_sv.data,
+                            .Count = column_name_sv.count,
                     };
                     xmdb::DBValue *column_value = &table_outlet.values[i];
 
@@ -196,8 +192,7 @@ DECLARE_HANDLER(run_query_handler) {
                         Optional<S64> i = stream.next();
                         if (!i.has_value()) {
                             OK_PANIC_FMT("Expected to have %zu rows in table, but streams exhausted at %zu",
-                                         results_table->rows_count,
-                                         r);
+                                         results_table->rows_count, r);
                         }
 
                         WebJsonPutKey(column_name);
@@ -210,13 +205,12 @@ DECLARE_HANDLER(run_query_handler) {
                         Optional<ok::String> s = stream.next();
                         if (!s.has_value()) {
                             OK_PANIC_FMT("Expected to have %zu rows in table, but streams exhausted at %zu",
-                                         results_table->rows_count,
-                                         r);
+                                         results_table->rows_count, r);
                         }
 
                         web_string_view value = {
-                            .Items = (u8 *)s.value.cstr(),
-                            .Count = s.value.count(),
+                                .Items = (u8 *) s.value.cstr(),
+                                .Count = s.value.count(),
                         };
 
                         WebJsonPutKey(column_name);
@@ -229,8 +223,7 @@ DECLARE_HANDLER(run_query_handler) {
                         Optional<bool> b = stream.next();
                         if (!b.has_value()) {
                             OK_PANIC_FMT("Expected to have %zu rows in table, but streams exhausted at %zu",
-                                         results_table->rows_count,
-                                         r);
+                                         results_table->rows_count, r);
                         }
 
                         WebJsonPutKey(column_name);
@@ -248,8 +241,7 @@ DECLARE_HANDLER(run_query_handler) {
                         Optional<xmdb::Null> b = stream.next();
                         if (!b.has_value()) {
                             OK_PANIC_FMT("Expected to have %zu rows in table, but streams exhausted at %zu",
-                                         results_table->rows_count,
-                                         r);
+                                         results_table->rows_count, r);
                         }
 
                         WebJsonPutKey(column_name);
@@ -259,9 +251,9 @@ DECLARE_HANDLER(run_query_handler) {
                     }
                     case xmdb::SQL::TYPE_FLOAT:
                     case xmdb::SQL::TYPE_DOUBLE:
-                    case xmdb::SQL::TYPE_IMAGE: OK_TODO();
+                    case xmdb::SQL::TYPE_IMAGE:  OK_TODO();
                     case xmdb::SQL::TYPE_MAX:
-                    case xmdb::SQL::TYPE_TABLE: OK_UNREACHABLE();
+                    case xmdb::SQL::TYPE_TABLE:  OK_UNREACHABLE();
                     }
                 }
 
@@ -275,8 +267,8 @@ DECLARE_HANDLER(run_query_handler) {
         WebJsonPutFalse();
 
         web_string_view error_message = {
-            .Items = (u8 *)error.cstr(),
-            .Count = error.count(),
+                .Items = (u8 *) error.cstr(),
+                .Count = error.count(),
         };
         WebJsonPutKey(WEB_SV_LIT("error_message"));
         WebJsonPutString(error_message);

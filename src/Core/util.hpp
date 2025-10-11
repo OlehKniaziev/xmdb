@@ -1,6 +1,9 @@
 #ifndef XMDB_UTIL_HPP
 #define XMDB_UTIL_HPP
 
+#include "SourceLocation.hpp"
+#include "ok.hpp"
+
 #define TRY(x)                                                                                                          \
     do {                                                                                                                \
         if (!(x)) return {};                                                                                            \
@@ -9,6 +12,11 @@
 namespace xmdb {
 [[noreturn]]
 void dief(const char *fmt, ...);
+
+struct ErrorWithSourceLocation {
+    ok::String message;
+    SourceLocation location;
+};
 } // namespace xmdb
 
 #endif // XMDB_UTIL_HPP

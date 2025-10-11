@@ -245,6 +245,7 @@ struct CreateStmt : public Stmt {
     enum class Target : uint8_t {
         DATABASE,
         TABLE,
+        USER,
     };
 
     Target target;
@@ -277,6 +278,17 @@ struct CreateTableStmt : public CreateStmt {
 
     ok::Slice<ok::String> column_names;
     ok::Slice<ok::String> column_types;
+};
+
+struct CreateUserStmt : public CreateStmt {
+    static CreateUserStmt *alloc(ok::Allocator *allocator, Token token, ok::String name) {
+        auto *stmt = allocator->alloc<CreateUserStmt>();
+        stmt->type = CREATE;
+        stmt->target = Target::USER;
+        stmt->token = token;
+        stmt->name = name;
+        return stmt;
+    }
 };
 
 struct Query {

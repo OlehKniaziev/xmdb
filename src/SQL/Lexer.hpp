@@ -25,6 +25,7 @@ using ok::Table;
     X("TABLE", KW_TABLE)                                                                                               \
     X("DATABASE", KW_DATABASE)                                                                                         \
     X("CREATE", KW_CREATE)                                                                                             \
+    X("USER", KW_USER) \
     X("TRUE", KW_TRUE)                                                                                                 \
     X("FALSE", KW_FALSE)                                                                                               \
     X("NULL", KW_NULL)

@@ -6,8 +6,9 @@ namespace xmdb {
 DBPool::DBPool(ok::Allocator *allocator) : allocator{allocator}, execution_contexts{nullptr} {
     const StringView default_db_name = "default"_sv;
     DBDescriptor *db = create_db(default_db_name);
-    DBUser admin{"admin"_sv, "admin"_sv, PERM_READ | PERM_WRITE | PERM_ADMIN};
-    db->users.push(admin);
+    DBUser *admin = allocator->alloc<DBUser>();
+    *admin = DBUser::admin();
+    db->add_user(admin);
 }
 
 DBDescriptor *DBPool::get_db(StringView db_name) {
@@ -27,10 +28,11 @@ DBDescriptor *DBPool::create_db(StringView db_name) {
     return db;
 }
 
-QueryExecutionContext *DBPool::rent_empty_execution_context(DBDescriptor *db) {
+QueryExecutionContext *DBPool::rent_empty_execution_context(DBDescriptor *db, DBUser *user) {
     if (execution_contexts) {
         QueryExecutionContext *ctx = execution_contexts;
         ctx->current_db = db;
+        ctx->user = user;
         ctx->vars.clear();
         ctx->emitted_columns.count = 0;
         ctx->columns_to_insert.count = 0;
@@ -44,6 +46,7 @@ QueryExecutionContext *DBPool::rent_empty_execution_context(DBDescriptor *db) {
 
     QueryExecutionContext *ctx = allocator->alloc<QueryExecutionContext>();
     ctx->allocator = allocator;
+    ctx->user = user;
     ctx->next = nullptr;
     ctx->vars = ok::Table<U32, DBValue>::alloc(allocator);
     ctx->emitted_columns = ok::MultiList<StringView, DBValue, DBTable *>::alloc(allocator);

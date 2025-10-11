@@ -1,5 +1,7 @@
 #pragma once
 
+#include <csetjmp>
+#include "util.hpp"
 #include "DBDescriptor.hpp"
 #include "DBTable.hpp"
 #include "DBValue.hpp"
@@ -27,7 +29,10 @@ struct QueryExecutionContext {
 
     void delete_table(DBTable *);
 
+    void create_user(StringView);
+
     ok::Allocator *allocator;
+    DBUser *user;
     QueryExecutionContext *next;
     ok::Table<U32, DBValue> vars;
     ok::MultiList<StringView, DBValue, DBTable *> emitted_columns;
@@ -37,5 +42,7 @@ struct QueryExecutionContext {
     DBDescriptor *current_db;
     Optional<DBTable *> table_to_update;
     Optional<DBTable *> last_emitted_query;
+    jmp_buf jmpbuf;
+    Optional<ErrorWithSourceLocation> error;
 };
 } // namespace xmdb

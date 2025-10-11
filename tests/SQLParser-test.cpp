@@ -297,6 +297,18 @@ TEST(SQLParser, create_table_stmt) {
     EXPECT_EQ(create_table->column_types[1], "text"_sv);
 }
 
+TEST(SQLParser, create_user_stmt) {
+    ok::ArenaAllocator arena{};
+    auto source = "create user usr;"_sv;
+    Parser parser{&arena, source};
+
+    auto create_stmt = parser.create_stmt();
+    ASSERT_TRUE(create_stmt.has_value());
+
+    EXPECT_EQ(create_stmt.value->target, CreateStmt::Target::USER);
+    EXPECT_EQ(create_stmt.value->name, "usr"_sv);
+}
+
 TEST(SQLParser, query) {
     ok::ArenaAllocator arena{};
     auto source = R"sql(CREATE TABLE MyTable (

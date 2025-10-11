@@ -10,35 +10,35 @@ struct IRContractAdder {};
 
 template<>
 struct IRContractAdder<StringView> {
-    static U32 add(IREmitter* emitter, StringView sv) {
+    static U32 add(IREmitter *emitter, StringView sv) {
         return emitter->add_string(sv);
     }
 };
 
 template<>
 struct IRContractAdder<S64> {
-    static U32 add(IREmitter* emitter, S64 x) {
+    static U32 add(IREmitter *emitter, S64 x) {
         return emitter->add_int(x);
     }
 };
 
 template<>
-struct IRContractAdder<TableSchema*> {
-    static U32 add(IREmitter* emitter, TableSchema* schema) {
+struct IRContractAdder<TableSchema *> {
+    static U32 add(IREmitter *emitter, TableSchema *schema) {
         return emitter->add_schema(schema);
     }
 };
 
 template<>
 struct IRContractAdder<U32> {
-    static U32 add(IREmitter* emitter, U32 ip) {
+    static U32 add(IREmitter *emitter, U32 ip) {
         OK_UNUSED(emitter);
         return ip;
     }
 };
 
 #define INSTR_VAR_0(name)                                                                                              \
-    static U32 emit_##name(IREmitter* emitter, Token token) {                                                                 \
+    static U32 emit_##name(IREmitter *emitter, Token token) {                                                          \
         emitter->tokens.push(token);                                                                                   \
         U32 var_name = emitter->gen_temp();                                                                            \
         IRInstruction instr;                                                                                           \
@@ -48,30 +48,30 @@ struct IRContractAdder<U32> {
     }
 
 #define INSTR_VAR_1(name, t1)                                                                                          \
-    static U32 emit_##name(IREmitter* emitter, Token token, t1 o1) {                                                          \
+    static U32 emit_##name(IREmitter *emitter, Token token, t1 o1) {                                                   \
         emitter->tokens.push(token);                                                                                   \
         U32 var_name = emitter->gen_temp();                                                                            \
         IRInstruction instr;                                                                                           \
         instr.op = IRInstructionOperator_##name;                                                                       \
         instr.operand1 = var_name;                                                                                     \
-        instr.operand2 = IRContractAdder<t1>::add(emitter, o1);                                                         \
+        instr.operand2 = IRContractAdder<t1>::add(emitter, o1);                                                        \
         return emitter->add_instruction(instr);                                                                        \
     }
 
 #define INSTR_VAR_2(name, t1, t2)                                                                                      \
-    static U32 emit_##name(IREmitter* emitter, Token token, t1 o1, t2 o2) {                                                   \
+    static U32 emit_##name(IREmitter *emitter, Token token, t1 o1, t2 o2) {                                            \
         emitter->tokens.push(token);                                                                                   \
         U32 var_name = emitter->gen_temp();                                                                            \
         IRInstruction instr;                                                                                           \
         instr.op = IRInstructionOperator_##name;                                                                       \
         instr.operand1 = var_name;                                                                                     \
-        instr.operand2 = IRContractAdder<t1>::add(emitter, o1);                                                         \
-        instr.operand3 = IRContractAdder<t2>::add(emitter, o2);                                                         \
+        instr.operand2 = IRContractAdder<t1>::add(emitter, o1);                                                        \
+        instr.operand3 = IRContractAdder<t2>::add(emitter, o2);                                                        \
         return emitter->add_instruction(instr);                                                                        \
     }
 
-#define INSTR_0(name) \
-    static U32 emit_##name(IREmitter* emitter, Token token) {                                                          \
+#define INSTR_0(name)                                                                                                  \
+    static U32 emit_##name(IREmitter *emitter, Token token) {                                                          \
         emitter->tokens.push(token);                                                                                   \
         IRInstruction instr;                                                                                           \
         instr.op = IRInstructionOperator_##name;                                                                       \
@@ -79,32 +79,32 @@ struct IRContractAdder<U32> {
     }
 
 #define INSTR_1(name, t1)                                                                                              \
-    static U32 emit_##name(IREmitter* emitter, Token token, t1 o1) {                                                          \
+    static U32 emit_##name(IREmitter *emitter, Token token, t1 o1) {                                                   \
         emitter->tokens.push(token);                                                                                   \
         IRInstruction instr;                                                                                           \
         instr.op = IRInstructionOperator_##name;                                                                       \
-        instr.operand1 = IRContractAdder<t1>::add(emitter, o1);                                                         \
+        instr.operand1 = IRContractAdder<t1>::add(emitter, o1);                                                        \
         return emitter->add_instruction(instr);                                                                        \
     }
 
 #define INSTR_2(name, t1, t2)                                                                                          \
-    static U32 emit_##name(IREmitter* emitter, Token token, t1 o1, t2 o2) {                                                   \
+    static U32 emit_##name(IREmitter *emitter, Token token, t1 o1, t2 o2) {                                            \
         emitter->tokens.push(token);                                                                                   \
         IRInstruction instr;                                                                                           \
         instr.op = IRInstructionOperator_##name;                                                                       \
-        instr.operand1 = IRContractAdder<t1>::add(emitter, o1);                                                         \
-        instr.operand2 = IRContractAdder<t2>::add(emitter, o2);                                                         \
+        instr.operand1 = IRContractAdder<t1>::add(emitter, o1);                                                        \
+        instr.operand2 = IRContractAdder<t2>::add(emitter, o2);                                                        \
         return emitter->add_instruction(instr);                                                                        \
     }
 
-#define INSTR_3(name, t1, t2, t3)                                                                                          \
-    static U32 emit_##name(IREmitter* emitter, Token token, t1 o1, t2 o2, t3 o3) {                                                   \
+#define INSTR_3(name, t1, t2, t3)                                                                                      \
+    static U32 emit_##name(IREmitter *emitter, Token token, t1 o1, t2 o2, t3 o3) {                                     \
         emitter->tokens.push(token);                                                                                   \
         IRInstruction instr;                                                                                           \
         instr.op = IRInstructionOperator_##name;                                                                       \
-        instr.operand1 = IRContractAdder<t1>::add(emitter, o1);                                                         \
-        instr.operand2 = IRContractAdder<t2>::add(emitter, o2);                                                         \
-        instr.operand3 = IRContractAdder<t3>::add(emitter, o3);                                                         \
+        instr.operand1 = IRContractAdder<t1>::add(emitter, o1);                                                        \
+        instr.operand2 = IRContractAdder<t2>::add(emitter, o2);                                                        \
+        instr.operand3 = IRContractAdder<t3>::add(emitter, o3);                                                        \
         return emitter->add_instruction(instr);                                                                        \
     }
 
@@ -118,7 +118,7 @@ ENUM_IR_CONTRACTS
 #undef INSTR_VAR_1
 #undef INSTR_VAR_2
 
-static inline bool compile_use_stmt(UseStmt* stmt, IrContext* ctx) {
+static inline bool compile_use_stmt(UseStmt *stmt, IrContext *ctx) {
     auto db_name = stmt->database.view();
 
     for (UZ i = 0; i < ctx->database_schemas.count; ++i) {
@@ -134,15 +134,15 @@ static inline bool compile_use_stmt(UseStmt* stmt, IrContext* ctx) {
     return false;
 }
 
-static Optional<U32> compile_expr(Expr*, IrContext*);
+static Optional<U32> compile_expr(Expr *, IrContext *);
 
-static inline Optional<U32> compile_binop(BinaryOpExpr* binop, IrContext* ctx) {
+static inline Optional<U32> compile_binop(BinaryOpExpr *binop, IrContext *ctx) {
     auto lhs = compile_expr(binop->lhs, ctx);
     TRY(lhs);
     auto rhs = compile_expr(binop->rhs, ctx);
     TRY(rhs);
 
-    IREmitter* e = &ctx->ir_emitter;
+    IREmitter *e = &ctx->ir_emitter;
 
     switch (binop->kind) {
     case BinaryOpExpr::Kind::EQ: return emit_Eq(e, binop->token, lhs.value, rhs.value);
@@ -152,13 +152,13 @@ static inline Optional<U32> compile_binop(BinaryOpExpr* binop, IrContext* ctx) {
     }
 }
 
-static Optional<U32> compile_ident(IdentifierExpr* ident, IrContext* ctx) {
+static Optional<U32> compile_ident(IdentifierExpr *ident, IrContext *ctx) {
     switch (ctx->current_namespace()) {
     case IrContext::NS_TABLE: {
         U32 table_location = ctx->current_table_id();
         StringView column_name = ident->value.view();
 
-        Optional<TableSchema*> table_schema = ctx->get_table_schema_by_id(table_location);
+        Optional<TableSchema *> table_schema = ctx->get_table_schema_by_id(table_location);
         OK_ASSERT(table_schema.has_value());
 
         if (!table_schema.value->find_column(column_name)) {
@@ -171,7 +171,7 @@ static Optional<U32> compile_ident(IdentifierExpr* ident, IrContext* ctx) {
     }
     case IrContext::NS_GLOBAL: {
         StringView table_name = ident->value.view();
-        Optional<TableSchema*> table_schema = ctx->get_table_schema(ctx->active_db_id, table_name);
+        Optional<TableSchema *> table_schema = ctx->get_table_schema(ctx->active_db_id, table_name);
 
         if (!table_schema) {
             String error_message = String::format(ctx->allocator, "cannot find table '%s'", ident->value.cstr());
@@ -185,23 +185,23 @@ static Optional<U32> compile_ident(IdentifierExpr* ident, IrContext* ctx) {
     }
 }
 
-static Optional<U32> compile_expr(Expr* expr, IrContext* ctx) {
-    auto* e = &ctx->ir_emitter;
+static Optional<U32> compile_expr(Expr *expr, IrContext *ctx) {
+    auto *e = &ctx->ir_emitter;
 
     switch (expr->type) {
     case Expr::INTEGER_LIT: {
-        auto* integer_expr = static_cast<IntegerExpr*>(expr);
+        auto *integer_expr = static_cast<IntegerExpr *>(expr);
         return emit_ConstInt(e, expr->token, integer_expr->value);
     }
     case Expr::STRING_LIT: {
-        auto* string_expr = static_cast<StringExpr*>(expr);
+        auto *string_expr = static_cast<StringExpr *>(expr);
         return emit_ConstString(e, expr->token, string_expr->value.view());
     }
     case Expr::TRUE_LIT:  return emit_ConstTrue(e, expr->token);
     case Expr::FALSE_LIT: return emit_ConstFalse(e, expr->token);
     case Expr::NULL_LIT:  return emit_ConstNull(e, expr->token);
     case Expr::IDENT:     {
-        auto* ident = static_cast<IdentifierExpr*>(expr);
+        auto *ident = static_cast<IdentifierExpr *>(expr);
         return compile_ident(ident, ctx);
     }
     case Expr::BINARY_OP:
@@ -210,7 +210,7 @@ static Optional<U32> compile_expr(Expr* expr, IrContext* ctx) {
     }
 }
 
-static inline bool parse_type(StringView input, Token where, IrContext* ctx, ColumnType* out) {
+static inline bool parse_type(StringView input, Token where, IrContext *ctx, ColumnType *out) {
     if (input == "int"_sv) {
         *out = COLUMN_INTEGER;
         return true;
@@ -227,8 +227,9 @@ static inline bool parse_type(StringView input, Token where, IrContext* ctx, Col
     return false;
 }
 
-static inline bool compile_create_stmt(CreateStmt* stmt, IrContext* ctx) {
-    if (stmt->target == CreateStmt::Target::DATABASE) {
+static inline bool compile_create_stmt(CreateStmt *stmt, IrContext *ctx) {
+    switch (stmt->target) {
+    case CreateStmt::Target::DATABASE: {
         for (UZ i = 0; i < ctx->database_schemas.count; ++i) {
             if (ctx->database_schemas[i].name == stmt->name) {
                 String error_message =
@@ -244,36 +245,36 @@ static inline bool compile_create_stmt(CreateStmt* stmt, IrContext* ctx) {
         emit_CreateDatabase(&ctx->ir_emitter, stmt->token, stmt->name.view());
         return true;
     }
+    case CreateStmt::Target::TABLE: {
+        auto *create_table_stmt = static_cast<CreateTableStmt *>(stmt);
 
-    OK_ASSERT(stmt->target == CreateStmt::Target::TABLE);
+        TableSchema *table_schema = ctx->alloc_table_schema(ctx->active_db_id, stmt->name, true);
+        OK_ASSERT(table_schema->columns_types.has_value());
 
-    if (ctx->get_table_schema(ctx->active_db_id, stmt->name.view())) {
-        String error_message = String::format(ctx->allocator, "table '%s' already exists", stmt->name.cstr());
-        ctx->error_on(stmt->token, error_message);
-        return false;
+        for (UZ i = 0; i < create_table_stmt->column_names.count; ++i) {
+            String column_type_string = create_table_stmt->column_types[i];
+            ColumnType column_type;
+            TRY(parse_type(column_type_string.view(), stmt->token, ctx, &column_type));
+
+            String column_name = create_table_stmt->column_names[i];
+            table_schema->columns_names.push(column_name.copy(ctx->allocator));
+            table_schema->columns_types.value.push(column_type);
+        }
+
+        emit_CreateTable(&ctx->ir_emitter, stmt->token, create_table_stmt->name.view(), table_schema);
+
+        return true;
+    }
+    case CreateStmt::Target::USER: {
+        emit_CreateUser(&ctx->ir_emitter, stmt->token, stmt->name.view());
+        return true;
+    }
     }
 
-    auto* create_table_stmt = static_cast<CreateTableStmt*>(stmt);
-
-    TableSchema* table_schema = ctx->alloc_table_schema(ctx->active_db_id, stmt->name, true);
-    OK_ASSERT(table_schema->columns_types.has_value());
-
-    for (UZ i = 0; i < create_table_stmt->column_names.count; ++i) {
-        String column_type_string = create_table_stmt->column_types[i];
-        ColumnType column_type;
-        TRY(parse_type(column_type_string.view(), stmt->token, ctx, &column_type));
-
-        String column_name = create_table_stmt->column_names[i];
-        table_schema->columns_names.push(column_name.copy(ctx->allocator));
-        table_schema->columns_types.value.push(column_type);
-    }
-
-    emit_CreateTable(&ctx->ir_emitter, stmt->token, create_table_stmt->name.view(), table_schema);
-
-    return true;
+    OK_UNREACHABLE();
 }
 
-static inline bool compile_drop_stmt(DropStmt* stmt, IrContext* ctx) {
+static inline bool compile_drop_stmt(DropStmt *stmt, IrContext *ctx) {
     auto name = stmt->name.view();
 
     switch (stmt->target) {
@@ -303,18 +304,18 @@ static inline bool compile_drop_stmt(DropStmt* stmt, IrContext* ctx) {
     }
 }
 
-static inline bool compile_unoptimizable_stmt(Stmt* stmt, IrContext* ctx) {
+static inline bool compile_unoptimizable_stmt(Stmt *stmt, IrContext *ctx) {
     switch (stmt->type) {
     case Stmt::USE: {
-        auto* use = static_cast<UseStmt*>(stmt);
+        auto *use = static_cast<UseStmt *>(stmt);
         return compile_use_stmt(use, ctx);
     }
     case Stmt::CREATE: {
-        auto* create = static_cast<CreateStmt*>(stmt);
+        auto *create = static_cast<CreateStmt *>(stmt);
         return compile_create_stmt(create, ctx);
     }
     case Stmt::DROP: {
-        auto* drop = static_cast<DropStmt*>(stmt);
+        auto *drop = static_cast<DropStmt *>(stmt);
         return compile_drop_stmt(drop, ctx);
     }
     default: OK_UNREACHABLE();
@@ -377,19 +378,19 @@ struct StmtGraphNode {
     Slice<U32> edges;
 };
 
-static const char* stmt_graph_node_types_pretty[StmtGraphNode::Type::MAX] = {
+static const char *stmt_graph_node_types_pretty[StmtGraphNode::Type::MAX] = {
         [StmtGraphNode::EQ] = "=",          [StmtGraphNode::LT] = "<",          [StmtGraphNode::GT] = ">",
         [StmtGraphNode::SELECT] = "SELECT", [StmtGraphNode::UPDATE] = "UPDATE", [StmtGraphNode::INSERT] = "INSERT",
         [StmtGraphNode::DELETE] = "DELETE", [StmtGraphNode::LEAF] = "<leaf>",
 };
 
 struct StmtGraph {
-    explicit StmtGraph(Allocator* allocator) : allocator{allocator} {
+    explicit StmtGraph(Allocator *allocator) : allocator{allocator} {
         node_indices = Table<ok::HashPtr<Expr>, U32>::alloc(allocator);
         nodes = List<StmtGraphNode>::alloc(allocator);
     }
 
-    inline U32 add_expr_node(Expr* expr, StmtGraphNode node) {
+    inline U32 add_expr_node(Expr *expr, StmtGraphNode node) {
         nodes.push(node);
 
         U32 id = nodes.count - 1;
@@ -402,13 +403,13 @@ struct StmtGraph {
         return nodes.count - 1;
     }
 
-    Allocator* allocator;
+    Allocator *allocator;
     Table<ok::HashPtr<Expr>, U32> node_indices;
     List<StmtGraphNode> nodes;
     U32 root_node_index{};
 };
 
-static U32 expr_to_node(StmtGraph* g, Expr* expr) {
+static U32 expr_to_node(StmtGraph *g, Expr *expr) {
     auto existing_node = g->node_indices.get(ok::HashPtr{expr});
     if (existing_node.has_value()) return existing_node.value;
 
@@ -426,7 +427,7 @@ static U32 expr_to_node(StmtGraph* g, Expr* expr) {
         break;
     }
     case Expr::BINARY_OP: {
-        auto* binop = static_cast<BinaryOpExpr*>(expr);
+        auto *binop = static_cast<BinaryOpExpr *>(expr);
 
         switch (binop->kind) {
         case BinaryOpExpr::Kind::EQ: {
@@ -446,7 +447,7 @@ static U32 expr_to_node(StmtGraph* g, Expr* expr) {
         auto lhs_node = expr_to_node(g, binop->lhs);
         auto rhs_node = expr_to_node(g, binop->rhs);
 
-        auto* edges_ptr = g->allocator->alloc<U32>(2);
+        auto *edges_ptr = g->allocator->alloc<U32>(2);
         edges_ptr[0] = lhs_node;
         edges_ptr[1] = rhs_node;
 
@@ -457,11 +458,11 @@ static U32 expr_to_node(StmtGraph* g, Expr* expr) {
     case Expr::SELECT: {
         node_type = StmtGraphNode::SELECT;
 
-        auto* select = static_cast<SelectExpr*>(expr);
+        auto *select = static_cast<SelectExpr *>(expr);
 
         UZ edges_count = select->exprs.count + 1;
 
-        auto* edges_ptr = g->allocator->alloc<U32>(select->exprs.count + 1);
+        auto *edges_ptr = g->allocator->alloc<U32>(select->exprs.count + 1);
 
         UZ i;
         for (i = 0; i < select->exprs.count; ++i) {
@@ -487,7 +488,7 @@ static U32 expr_to_node(StmtGraph* g, Expr* expr) {
     return g->add_expr_node(expr, graph_node);
 }
 
-static StmtGraph build_expr_stmt_graph(Allocator* allocator, ExprStmt* stmt) {
+static StmtGraph build_expr_stmt_graph(Allocator *allocator, ExprStmt *stmt) {
     StmtGraph graph{allocator};
     graph.root_node_index = expr_to_node(&graph, stmt->expr);
     return graph;
@@ -554,22 +555,22 @@ static StmtGraph build_delete_stmt_graph(Allocator *allocator, DeleteStmt *stmt)
     return graph;
 }
 
-static StmtGraph build_statement_graph(Allocator* allocator, Stmt* stmt) {
+static StmtGraph build_statement_graph(Allocator *allocator, Stmt *stmt) {
     switch (stmt->type) {
     case Stmt::INSERT: {
-        auto *insert = static_cast<InsertStmt*>(stmt);
+        auto *insert = static_cast<InsertStmt *>(stmt);
         return build_insert_stmt_graph(allocator, insert);
     }
     case Stmt::UPDATE: {
-        auto *update = static_cast<UpdateStmt*>(stmt);
+        auto *update = static_cast<UpdateStmt *>(stmt);
         return build_update_stmt_graph(allocator, update);
     }
     case Stmt::DELETE: {
-        auto *del = static_cast<DeleteStmt*>(stmt);
+        auto *del = static_cast<DeleteStmt *>(stmt);
         return build_delete_stmt_graph(allocator, del);
     }
     case Stmt::EXPR: {
-        auto* expr = static_cast<ExprStmt*>(stmt);
+        auto *expr = static_cast<ExprStmt *>(stmt);
         return build_expr_stmt_graph(allocator, expr);
     }
 
@@ -577,7 +578,7 @@ static StmtGraph build_statement_graph(Allocator* allocator, Stmt* stmt) {
     }
 }
 
-static inline bool is_stmt_graph_optimizable(Stmt* stmt) {
+static inline bool is_stmt_graph_optimizable(Stmt *stmt) {
     switch (stmt->type) {
     case Stmt::USE:
     case Stmt::DROP:
@@ -590,16 +591,16 @@ static inline bool is_stmt_graph_optimizable(Stmt* stmt) {
     }
 }
 
-static void to_string(ok::String* string, StmtGraph* g, U32 node_idx, bool type_only = false) {
-    auto* node = &g->nodes[node_idx];
+static void to_string(ok::String *string, StmtGraph *g, U32 node_idx, bool type_only = false) {
+    auto *node = &g->nodes[node_idx];
 
-    if (node->type() == StmtGraphNode::LEAF) {
+    if (node->type() == StmtGraphNode::LEAF || node->type() == StmtGraphNode::STAR) {
         auto expr_string = node->up.expr->to_string(ok::temp_allocator);
         string->format_append("\"%s\";", expr_string.cstr());
         return;
     }
 
-    const char* node_type_str = stmt_graph_node_types_pretty[node->type()];
+    const char *node_type_str = stmt_graph_node_types_pretty[node->type()];
 
     string->format_append("\"%s\"", node_type_str);
 
@@ -617,7 +618,7 @@ static void to_string(ok::String* string, StmtGraph* g, U32 node_idx, bool type_
     }
 }
 
-Optional<Slice<U32>> compile_graph_node(StmtGraph* g, U32 node_id, IrContext* ctx);
+Optional<Slice<U32>> compile_graph_node(StmtGraph *g, U32 node_id, IrContext *ctx);
 
 Optional<U32> compile_graph_node_single(StmtGraph *g, U32 node_id, IrContext *ctx) {
     Optional<Slice<U32>> result = compile_graph_node(g, node_id, ctx);
@@ -633,8 +634,8 @@ Optional<U32> compile_graph_node_single(StmtGraph *g, U32 node_id, IrContext *ct
     return result.value[0];
 }
 
-Optional<Slice<U32>> compile_graph_node(StmtGraph* g, U32 node_id, IrContext* ctx) {
-    auto* node = &g->nodes[node_id];
+Optional<Slice<U32>> compile_graph_node(StmtGraph *g, U32 node_id, IrContext *ctx) {
+    auto *node = &g->nodes[node_id];
     if (node->is_visited()) {
         List<U32> result_nodes_ids = List<U32>::alloc(ctx->allocator, 5);
         result_nodes_ids.push(node->ir_id);
@@ -643,7 +644,7 @@ Optional<Slice<U32>> compile_graph_node(StmtGraph* g, U32 node_id, IrContext* ct
 
     node->make_visited();
 
-    IREmitter* e = &ctx->ir_emitter;
+    IREmitter *e = &ctx->ir_emitter;
 
     List<U32> result_nodes_ids = List<U32>::alloc(ctx->allocator, 5);
 
@@ -702,7 +703,7 @@ Optional<Slice<U32>> compile_graph_node(StmtGraph* g, U32 node_id, IrContext* ct
         Optional<U32> table_node_id = compile_graph_node_single(g, table_node_edge, ctx);
         TRY(table_node_id);
 
-        Optional<TableSchema*> table_schema = ctx->get_table_schema_by_id(table_node_id.value);
+        Optional<TableSchema *> table_schema = ctx->get_table_schema_by_id(table_node_id.value);
 
         if (!table_schema) {
             String error_message = String::alloc(ctx->allocator, "expression is not a table");
@@ -717,7 +718,7 @@ Optional<Slice<U32>> compile_graph_node(StmtGraph* g, U32 node_id, IrContext* ct
             for (UZ i = 0; i < node->edges.count - 1; ++i) {
                 U32 edge_id = node->edges[i];
 
-                StmtGraphNode* expr_node = &g->nodes[edge_id];
+                StmtGraphNode *expr_node = &g->nodes[edge_id];
                 Optional<Slice<U32>> expr_node_ids = compile_graph_node(g, edge_id, ctx);
                 TRY(expr_node_ids);
 
@@ -730,16 +731,12 @@ Optional<Slice<U32>> compile_graph_node(StmtGraph* g, U32 node_id, IrContext* ct
                 StringView column_name = ""_sv;
 
                 if (expr_node->up.expr->type == Expr::IDENT) {
-                    IdentifierExpr* ident = static_cast<IdentifierExpr*>(expr_node->up.expr);
+                    IdentifierExpr *ident = static_cast<IdentifierExpr *>(expr_node->up.expr);
                     column_name = ident->value.view();
                 }
 
                 U32 id = expr_node_ids.value[0];
-                emit_EmitColumn(&ctx->ir_emitter,
-                                expr_node->up.expr->token,
-                                table_node_id.value,
-                                id,
-                                column_name);
+                emit_EmitColumn(&ctx->ir_emitter, expr_node->up.expr->token, table_node_id.value, id, column_name);
             }
         }
         ctx->pop_namespace();
@@ -757,7 +754,7 @@ Optional<Slice<U32>> compile_graph_node(StmtGraph* g, U32 node_id, IrContext* ct
         Optional<U32> table_node_id = compile_graph_node_single(g, table_node_edge, ctx);
         TRY(table_node_id);
 
-        Optional<TableSchema*> table_schema = ctx->get_table_schema_by_id(table_node_id.value);
+        Optional<TableSchema *> table_schema = ctx->get_table_schema_by_id(table_node_id.value);
 
         if (!table_schema) {
             String error_message = String::alloc(ctx->allocator, "expression is not a table");
@@ -767,14 +764,13 @@ Optional<Slice<U32>> compile_graph_node(StmtGraph* g, U32 node_id, IrContext* ct
 
         OK_ASSERT(node->up.stmt->type == Stmt::INSERT);
 
-        auto *insert_stmt = static_cast<InsertStmt*>(node->up.stmt);
+        auto *insert_stmt = static_cast<InsertStmt *>(node->up.stmt);
 
         UZ mandatory_columns_count = table_schema.value->columns_names.count;
         if (insert_stmt->columns.count != mandatory_columns_count) {
-            String error_message = String::format(ctx->allocator,
-                                                  "the table has %zu mandatory columns, tried to insert %zu instead",
-                                                  mandatory_columns_count,
-                                                  insert_stmt->columns.count);
+            String error_message =
+                    String::format(ctx->allocator, "the table has %zu mandatory columns, tried to insert %zu instead",
+                                   mandatory_columns_count, insert_stmt->columns.count);
             ctx->error_on(insert_stmt->token, error_message);
             return {};
         }
@@ -782,9 +778,8 @@ Optional<Slice<U32>> compile_graph_node(StmtGraph* g, U32 node_id, IrContext* ct
         for (UZ i = 0; i < insert_stmt->columns.count; ++i) {
             StringView column = insert_stmt->columns[i].view();
             if (!table_schema.value->find_column(column)) {
-                String error_message = String::format(ctx->allocator,
-                                                      "table does not contain a column named '" OK_SV_FMT "'",
-                                                      OK_SV_ARG(column));
+                String error_message = String::format(
+                        ctx->allocator, "table does not contain a column named '" OK_SV_FMT "'", OK_SV_ARG(column));
                 ctx->error_on(insert_stmt->token, error_message);
                 return {};
             }
@@ -801,10 +796,8 @@ Optional<Slice<U32>> compile_graph_node(StmtGraph* g, U32 node_id, IrContext* ct
                 StmtGraphNode *first_expr_node = &g->nodes[first_expr_node_id];
 
                 if (values_count != insert_stmt->columns.count) {
-                    String error_message = String::format(ctx->allocator,
-                                                         "expected %zu values, but got %u instead",
-                                                         insert_stmt->columns.count,
-                                                         values_count);
+                    String error_message = String::format(ctx->allocator, "expected %zu values, but got %u instead",
+                                                          insert_stmt->columns.count, values_count);
                     ctx->error_on(first_expr_node->up.expr->token, error_message);
                     return {};
                 }
@@ -818,11 +811,8 @@ Optional<Slice<U32>> compile_graph_node(StmtGraph* g, U32 node_id, IrContext* ct
 
                     StringView column_name = insert_stmt->columns[j].view();
 
-                    emit_InsertColumn(&ctx->ir_emitter,
-                                      value_edge_node->up.expr->token,
-                                      table_node_id.value,
-                                      value_id.value,
-                                      column_name);
+                    emit_InsertColumn(&ctx->ir_emitter, value_edge_node->up.expr->token, table_node_id.value,
+                                      value_id.value, column_name);
                 }
 
                 emit_InsertRow(&ctx->ir_emitter, first_expr_node->up.expr->token, table_node_id.value);
@@ -845,7 +835,7 @@ Optional<Slice<U32>> compile_graph_node(StmtGraph* g, U32 node_id, IrContext* ct
         Optional<U32> table_node_id = compile_graph_node_single(g, table_node_edge, ctx);
         TRY(table_node_id);
 
-        Optional<TableSchema*> table_schema = ctx->get_table_schema_by_id(table_node_id.value);
+        Optional<TableSchema *> table_schema = ctx->get_table_schema_by_id(table_node_id.value);
 
         if (!table_schema) {
             String error_message = String::alloc(ctx->allocator, "expression is not a table");
@@ -855,7 +845,7 @@ Optional<Slice<U32>> compile_graph_node(StmtGraph* g, U32 node_id, IrContext* ct
 
         OK_ASSERT(node->up.stmt->type == Stmt::UPDATE);
 
-        auto *update_stmt = static_cast<UpdateStmt*>(node->up.stmt);
+        auto *update_stmt = static_cast<UpdateStmt *>(node->up.stmt);
 
         ctx->push_table(table_node_id.value);
         {
@@ -863,9 +853,8 @@ Optional<Slice<U32>> compile_graph_node(StmtGraph* g, U32 node_id, IrContext* ct
                 StringView column_name = update_stmt->columns[i - 1].view();
 
                 if (!table_schema.value->find_column(column_name)) {
-                    String error_message = String::format(ctx->allocator,
-                                                          "column '" OK_SV_FMT "' not found",
-                                                          OK_SV_ARG(column_name));
+                    String error_message =
+                            String::format(ctx->allocator, "column '" OK_SV_FMT "' not found", OK_SV_ARG(column_name));
                     ctx->error_on(update_stmt->token, error_message);
                     return {};
                 }
@@ -876,11 +865,8 @@ Optional<Slice<U32>> compile_graph_node(StmtGraph* g, U32 node_id, IrContext* ct
                 Optional<U32> value_edge_id = compile_graph_node_single(g, value_edge, ctx);
                 TRY(value_edge_id);
 
-                emit_UpdateColumn(&ctx->ir_emitter,
-                                  value_edge_node->up.expr->token,
-                                  table_node_id.value,
-                                  value_edge_id.value,
-                                  column_name);
+                emit_UpdateColumn(&ctx->ir_emitter, value_edge_node->up.expr->token, table_node_id.value,
+                                  value_edge_id.value, column_name);
             }
         }
         ctx->pop_namespace();
@@ -898,7 +884,7 @@ Optional<Slice<U32>> compile_graph_node(StmtGraph* g, U32 node_id, IrContext* ct
         Optional<U32> table_node_id = compile_graph_node_single(g, table_node_edge, ctx);
         TRY(table_node_id);
 
-        Optional<TableSchema*> table_schema = ctx->get_table_schema_by_id(table_node_id.value);
+        Optional<TableSchema *> table_schema = ctx->get_table_schema_by_id(table_node_id.value);
 
         if (!table_schema) {
             String error_message = String::alloc(ctx->allocator, "expression is not a table");
@@ -935,8 +921,7 @@ Optional<Slice<U32>> compile_graph_node(StmtGraph* g, U32 node_id, IrContext* ct
             StringView column_name = table->columns_names[i].or_else(String::alloc(ctx->allocator, "")).view();
             // FIXME(oleh): This probably should just output values with the 'FetchColumn' operator.
             U32 column_value = emit_FetchColumn(e, expr->token, table_id, column_name);
-            U32 column_id = emit_EmitColumn(e, expr->token, table_id, column_value, column_name);
-            result_nodes_ids.push(column_id);
+            result_nodes_ids.push(column_value);
         }
 
         break;
@@ -949,7 +934,7 @@ Optional<Slice<U32>> compile_graph_node(StmtGraph* g, U32 node_id, IrContext* ct
     return result_nodes_ids.slice();
 }
 
-static inline bool compile_graph(StmtGraph* graph, IrContext* ctx) {
+static inline bool compile_graph(StmtGraph *graph, IrContext *ctx) {
 #if 0
     auto dot_src = ok::String::alloc(ctx->allocator, "digraph { graph [dpi=200]; ");
 
@@ -986,7 +971,7 @@ const char *stringify_op(TableSchema *op) {
     return s.cstr();
 }
 
-String stringify_ir(Allocator* allocator, CompiledQuery* emitter) {
+String stringify_ir(Allocator *allocator, CompiledQuery *emitter) {
     String buffer = String::alloc(allocator);
 
     Slice<IRInstruction> instructions = emitter->instructions.slice();
@@ -1000,65 +985,65 @@ String stringify_ir(Allocator* allocator, CompiledQuery* emitter) {
 
         buffer.format_append("[%-*zu] ", ip_padding, i);
 
-#define INSTR_VAR_2(name, t1, t2) \
-        case IRInstructionOperator_##name: { \
-        Triple<String, t1, t2> operands = operands_of_##name(emitter, i); \
-        const char *op1 = stringify_op(operands.op2); \
-        const char *op2 = stringify_op(operands.op3); \
-        buffer.format_append("%s := %s %s %s", operands.op1.cstr(), #name,  op1, op2); \
-        break;\
-        }
+#define INSTR_VAR_2(name, t1, t2)                                                                                      \
+    case IRInstructionOperator_##name: {                                                                               \
+        Triple<String, t1, t2> operands = operands_of_##name(emitter, i);                                              \
+        const char *op1 = stringify_op(operands.op2);                                                                  \
+        const char *op2 = stringify_op(operands.op3);                                                                  \
+        buffer.format_append("%s := %s %s %s", operands.op1.cstr(), #name, op1, op2);                                  \
+        break;                                                                                                         \
+    }
 
-#define INSTR_VAR_1(name, t1) \
-        case IRInstructionOperator_##name: { \
-        Tuple<String, t1> operands = operands_of_##name(emitter, i); \
-        const char *op1 = stringify_op(operands.op2); \
-        buffer.format_append("%s := %s %s", operands.op1.cstr(), #name, op1); \
-        break;\
-        }
+#define INSTR_VAR_1(name, t1)                                                                                          \
+    case IRInstructionOperator_##name: {                                                                               \
+        Tuple<String, t1> operands = operands_of_##name(emitter, i);                                                   \
+        const char *op1 = stringify_op(operands.op2);                                                                  \
+        buffer.format_append("%s := %s %s", operands.op1.cstr(), #name, op1);                                          \
+        break;                                                                                                         \
+    }
 
-#define INSTR_VAR_0(name) \
-        case IRInstructionOperator_##name: { \
-        String var_name = operands_of_##name(emitter, i); \
-        buffer.format_append("%s := %s", var_name.cstr(), #name); \
-        break;\
-        }
+#define INSTR_VAR_0(name)                                                                                              \
+    case IRInstructionOperator_##name: {                                                                               \
+        String var_name = operands_of_##name(emitter, i);                                                              \
+        buffer.format_append("%s := %s", var_name.cstr(), #name);                                                      \
+        break;                                                                                                         \
+    }
 
-#define INSTR_0(name) \
-        case IRInstructionOperator_##name: { \
-        buffer.format_append("%s", #name); \
-        break;\
-        }
+#define INSTR_0(name)                                                                                                  \
+    case IRInstructionOperator_##name: {                                                                               \
+        buffer.format_append("%s", #name);                                                                             \
+        break;                                                                                                         \
+    }
 
-#define INSTR_1(name, t1) \
-        case IRInstructionOperator_##name: { \
-        t1 op = operands_of_##name(emitter, i); \
-        const char *op_str = stringify_op(op); \
-        buffer.format_append("%s %s", #name, op_str); \
-        break;\
-        }
+#define INSTR_1(name, t1)                                                                                              \
+    case IRInstructionOperator_##name: {                                                                               \
+        t1 op = operands_of_##name(emitter, i);                                                                        \
+        const char *op_str = stringify_op(op);                                                                         \
+        buffer.format_append("%s %s", #name, op_str);                                                                  \
+        break;                                                                                                         \
+    }
 
-#define INSTR_2(name, t1, t2) \
-        case IRInstructionOperator_##name: { \
-        Tuple<t1, t2> operands = operands_of_##name(emitter, i); \
-        const char *op1 = stringify_op(operands.op1); \
-        const char *op2 = stringify_op(operands.op2); \
-        buffer.format_append("%s %s %s", #name, op1, op2); \
-        break;\
-        }
+#define INSTR_2(name, t1, t2)                                                                                          \
+    case IRInstructionOperator_##name: {                                                                               \
+        Tuple<t1, t2> operands = operands_of_##name(emitter, i);                                                       \
+        const char *op1 = stringify_op(operands.op1);                                                                  \
+        const char *op2 = stringify_op(operands.op2);                                                                  \
+        buffer.format_append("%s %s %s", #name, op1, op2);                                                             \
+        break;                                                                                                         \
+    }
 
-#define INSTR_3(name, t1, t2, t3) \
-        case IRInstructionOperator_##name: { \
-        Triple<t1, t2, t3> operands = operands_of_##name(emitter, i); \
-        const char *op1 = stringify_op(operands.op1); \
-        const char *op2 = stringify_op(operands.op2); \
-        const char *op3 = stringify_op(operands.op3); \
-        buffer.format_append("%s %s %s %s", #name, op1, op2, op3); \
-        break;\
-        }
+#define INSTR_3(name, t1, t2, t3)                                                                                      \
+    case IRInstructionOperator_##name: {                                                                               \
+        Triple<t1, t2, t3> operands = operands_of_##name(emitter, i);                                                  \
+        const char *op1 = stringify_op(operands.op1);                                                                  \
+        const char *op2 = stringify_op(operands.op2);                                                                  \
+        const char *op3 = stringify_op(operands.op3);                                                                  \
+        buffer.format_append("%s %s %s %s", #name, op1, op2, op3);                                                     \
+        break;                                                                                                         \
+    }
 
-switch (instr.op) {
-    ENUM_IR_CONTRACTS
+        switch (instr.op) {
+            ENUM_IR_CONTRACTS
 #undef INSTR_0
 #undef INSTR_1
 #undef INSTR_2
@@ -1090,7 +1075,7 @@ bool ir_compile_query(Query *q, IrContext *ctx, CompiledQuery *out_query) {
     ctx->ir_emitter.temps_count = 0;
 
     for (UZ i = 0; i < q->stmts.count; ++i) {
-        auto* stmt = q->stmts[i];
+        auto *stmt = q->stmts[i];
 
         if (is_stmt_graph_optimizable(stmt)) {
             StmtGraph g = build_statement_graph(ctx->allocator, stmt);

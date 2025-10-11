@@ -1,9 +1,9 @@
-#include <gtest/gtest.h>
 #include <SQL/SQL.hpp>
+#include <gtest/gtest.h>
 
-#include <Core/DBPool.hpp>
-#include <Core/DBConnection.hpp>
 #include <Core/Core.hpp>
+#include <Core/DBConnection.hpp>
+#include <Core/DBPool.hpp>
 
 using namespace ok::literals;
 using namespace xmdb;
@@ -21,19 +21,16 @@ TEST(DBConnection, execute_create_and_select_on_empty_table) {
 
     QueryResults query_results{};
 
+    DBUser admin = DBUser::admin();
     DBPool db_pool{&arena};
     DBDescriptor *default_db = db_pool.get_db("default"_sv);
-    DBConnection db_conn{&db_pool, default_db};
+    DBConnection db_conn{&db_pool, default_db, &admin};
 
-    bool ok = compile_and_execute_source(&arena,
-                                         &db_conn,
-                                         source,
-                                         &query_results,
-                                         &error);
+    bool ok = compile_and_execute_source(&arena, &db_conn, source, &query_results, &error);
 
     ASSERT_TRUE(ok);
 
-    ASSERT_TRUE(query_results.ok);
+    ASSERT_FALSE(query_results.error.has_value());
     ASSERT_TRUE(query_results.value.has_value());
 
     DBTable *results_table = query_results.value.value;
@@ -60,19 +57,16 @@ TEST(DBConnection, execute_create_insert_and_select_on_table_with_one_row) {
 
     QueryResults query_results{};
 
+    DBUser admin = DBUser::admin();
     DBPool db_pool{&arena};
     DBDescriptor *default_db = db_pool.get_db("default"_sv);
-    DBConnection db_conn{&db_pool, default_db};
+    DBConnection db_conn{&db_pool, default_db, &admin};
 
-    bool ok = compile_and_execute_source(&arena,
-                                         &db_conn,
-                                         source,
-                                         &query_results,
-                                         &error);
+    bool ok = compile_and_execute_source(&arena, &db_conn, source, &query_results, &error);
 
     ASSERT_TRUE(ok);
 
-    ASSERT_TRUE(query_results.ok);
+    ASSERT_FALSE(query_results.error.has_value());
     ASSERT_TRUE(query_results.value.has_value());
 
     DBTable *results_table = query_results.value.value;
@@ -113,19 +107,16 @@ TEST(DBConnection, execute_create_insert_update_and_select_on_table_with_one_row
 
     QueryResults query_results{};
 
+    DBUser admin = DBUser::admin();
     DBPool db_pool{&arena};
     DBDescriptor *default_db = db_pool.get_db("default"_sv);
-    DBConnection db_conn{&db_pool, default_db};
+    DBConnection db_conn{&db_pool, default_db, &admin};
 
-    bool ok = compile_and_execute_source(&arena,
-                                         &db_conn,
-                                         source,
-                                         &query_results,
-                                         &error);
+    bool ok = compile_and_execute_source(&arena, &db_conn, source, &query_results, &error);
 
     ASSERT_TRUE(ok);
 
-    ASSERT_TRUE(query_results.ok);
+    ASSERT_FALSE(query_results.error.has_value());
     ASSERT_TRUE(query_results.value.has_value());
 
     DBTable *results_table = query_results.value.value;
@@ -165,19 +156,16 @@ TEST(DBConnection, execute_create_insert_delete_and_select_on_table_with_one_row
 
     QueryResults query_results{};
 
+    DBUser admin = DBUser::admin();
     DBPool db_pool{&arena};
     DBDescriptor *default_db = db_pool.get_db("default"_sv);
-    DBConnection db_conn{&db_pool, default_db};
+    DBConnection db_conn{&db_pool, default_db, &admin};
 
-    bool ok = compile_and_execute_source(&arena,
-                                         &db_conn,
-                                         source,
-                                         &query_results,
-                                         &error);
+    bool ok = compile_and_execute_source(&arena, &db_conn, source, &query_results, &error);
 
     ASSERT_TRUE(ok);
 
-    ASSERT_TRUE(query_results.ok);
+    ASSERT_FALSE(query_results.error.has_value());
     ASSERT_TRUE(query_results.value.has_value());
 
     DBTable *results_table = query_results.value.value;
@@ -218,21 +206,18 @@ TEST(DBConnection, create_new_db_and_execute_create_insert_and_select_on_table_w
 
     QueryResults query_results{};
 
+    DBUser admin = DBUser::admin();
     DBPool db_pool{&arena};
     DBDescriptor *default_db = db_pool.get_db("default"_sv);
-    DBConnection db_conn{&db_pool, default_db};
+    DBConnection db_conn{&db_pool, default_db, &admin};
 
-    bool ok = compile_and_execute_source(&arena,
-                                         &db_conn,
-                                         source,
-                                         &query_results,
-                                         &error);
+    bool ok = compile_and_execute_source(&arena, &db_conn, source, &query_results, &error);
 
     ASSERT_TRUE(ok);
 
     ASSERT_EQ(db_conn.db->name, "MyDb"_sv);
 
-    ASSERT_TRUE(query_results.ok);
+    ASSERT_FALSE(query_results.error.has_value());
     ASSERT_TRUE(query_results.value.has_value());
 
     DBTable *results_table = query_results.value.value;
@@ -271,19 +256,16 @@ TEST(DBConnection, create_and_drop_empty_table) {
 
     QueryResults query_results{};
 
+    DBUser admin = DBUser::admin();
     DBPool db_pool{&arena};
     DBDescriptor *default_db = db_pool.get_db("default"_sv);
-    DBConnection db_conn{&db_pool, default_db};
+    DBConnection db_conn{&db_pool, default_db, &admin};
 
-    bool ok = compile_and_execute_source(&arena,
-                                         &db_conn,
-                                         source,
-                                         &query_results,
-                                         &error);
+    bool ok = compile_and_execute_source(&arena, &db_conn, source, &query_results, &error);
 
     ASSERT_TRUE(ok);
 
-    ASSERT_TRUE(query_results.ok);
+    ASSERT_FALSE(query_results.error.has_value());
     ASSERT_TRUE(!query_results.value.has_value());
 
     ASSERT_EQ(default_db->tables.count, 0);
@@ -299,24 +281,19 @@ TEST(DBConnection, create_and_drop_empty_database) {
 
     QueryResults query_results{};
 
+    DBUser admin = DBUser::admin();
     DBPool db_pool{&arena};
     DBDescriptor *default_db = db_pool.get_db("default"_sv);
-    DBConnection db_conn{&db_pool, default_db};
+    DBConnection db_conn{&db_pool, default_db, &admin};
 
-    bool ok = compile_and_execute_source(&arena,
-                                         &db_conn,
-                                         source,
-                                         &query_results,
-                                         &error);
+    bool ok = compile_and_execute_source(&arena, &db_conn, source, &query_results, &error);
 
     ASSERT_TRUE(ok);
 
-    ASSERT_TRUE(query_results.ok);
+    ASSERT_FALSE(query_results.error.has_value());
     ASSERT_TRUE(!query_results.value.has_value());
 
-    for (DBDescriptor *db = db_pool.db_descriptors;
-         db != nullptr;
-         db = db->next) {
+    for (DBDescriptor *db = db_pool.db_descriptors; db != nullptr; db = db->next) {
         ASSERT_NE(db->name, "DB"_sv);
     }
 }
@@ -329,48 +306,33 @@ TEST(DBConnection, execute_multiple_queries_with_the_same_connection) {
 
     QueryResults query_results{};
 
+    DBUser admin = DBUser::admin();
     DBPool db_pool{&arena};
     DBDescriptor *default_db = db_pool.get_db("default"_sv);
-    DBConnection db_conn{&db_pool, default_db};
+    DBConnection db_conn{&db_pool, default_db, &admin};
 
-    bool ok = compile_and_execute_source(&arena,
-                                         &db_conn,
-                                         source,
-                                         &query_results,
-                                         &error);
+    bool ok = compile_and_execute_source(&arena, &db_conn, source, &query_results, &error);
 
     ASSERT_TRUE(ok) << error.cstr();
-    ASSERT_TRUE(query_results.ok);
+    ASSERT_FALSE(query_results.error.has_value());
 
     source = "USE DB;"_sv;
-    ok = compile_and_execute_source(&arena,
-                                    &db_conn,
-                                    source,
-                                    &query_results,
-                                    &error);
+    ok = compile_and_execute_source(&arena, &db_conn, source, &query_results, &error);
 
     ASSERT_TRUE(ok) << error.cstr();
-    ASSERT_TRUE(query_results.ok);
+    ASSERT_FALSE(query_results.error.has_value());
 
     source = "CREATE TABLE MyTable (column1 int);"_sv;
-    ok = compile_and_execute_source(&arena,
-                                    &db_conn,
-                                    source,
-                                    &query_results,
-                                    &error);
+    ok = compile_and_execute_source(&arena, &db_conn, source, &query_results, &error);
 
     ASSERT_TRUE(ok) << error.cstr();
-    ASSERT_TRUE(query_results.ok);
+    ASSERT_FALSE(query_results.error.has_value());
 
     source = "SELECT column1 FROM MyTable;"_sv;
-    ok = compile_and_execute_source(&arena,
-                                    &db_conn,
-                                    source,
-                                    &query_results,
-                                    &error);
+    ok = compile_and_execute_source(&arena, &db_conn, source, &query_results, &error);
 
     ASSERT_TRUE(ok) << error.cstr();
-    ASSERT_TRUE(query_results.ok);
+    ASSERT_FALSE(query_results.error.has_value());
 
     ASSERT_TRUE(query_results.value.has_value());
 
@@ -385,4 +347,69 @@ TEST(DBConnection, execute_multiple_queries_with_the_same_connection) {
 
     ASSERT_EQ(column1_value.type, SQL::TYPE_INT);
     ASSERT_EQ(column1_value.u.integer.next(), ok::Optional<S64>::NONE);
+}
+
+TEST(DBConnection, user_permissions) {
+    ok::ArenaAllocator arena{};
+    StringView source = "create table tab (x int);"_sv;
+
+    String error{};
+
+    QueryResults query_results{};
+
+    DBUser user = {"user"_sv, "user"_sv, 0};
+    DBPool db_pool{&arena};
+    DBDescriptor *default_db = db_pool.get_db("default"_sv);
+    DBConnection db_conn{&db_pool, default_db, &user};
+
+    bool ok = compile_and_execute_source(&arena, &db_conn, source, &query_results, &error);
+
+    ASSERT_FALSE(ok) << error.cstr();
+    ASSERT_TRUE(query_results.error.has_value());
+
+    ASSERT_EQ(error, "0:0: user user does not have WRITE permissions"_sv);
+
+    user.perm |= PERM_WRITE;
+
+    ok = compile_and_execute_source(&arena, &db_conn, source, &query_results, &error);
+
+    ASSERT_TRUE(ok) << error.cstr();
+
+    source = "select * from tab;"_sv;
+
+    ok = compile_and_execute_source(&arena, &db_conn, source, &query_results, &error);
+
+    ASSERT_FALSE(ok);
+    ASSERT_EQ(error, "0:0: user user does not have READ permissions"_sv);
+}
+
+TEST(DBConnection, create_new_user) {
+    ok::ArenaAllocator arena{};
+    StringView source = "create user some_user;"_sv;
+
+    String error{};
+
+    QueryResults query_results{};
+
+    DBUser user = DBUser::admin();
+    DBPool db_pool{&arena};
+    DBDescriptor *default_db = db_pool.get_db("default"_sv);
+    DBConnection db_conn{&db_pool, default_db, &user};
+
+    bool ok = compile_and_execute_source(&arena, &db_conn, source, &query_results, &error);
+
+    ASSERT_TRUE(ok) << error.cstr();
+
+    DBUser *usr = nullptr;
+
+    while (default_db->users != nullptr) {
+        if (default_db->users->name == "some_user"_sv) {
+            usr = default_db->users;
+            break;
+        }
+
+        default_db->users = default_db->users->next;
+    }
+
+    ASSERT_NE(usr, nullptr);
 }

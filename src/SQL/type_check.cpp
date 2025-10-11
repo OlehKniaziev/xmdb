@@ -30,7 +30,7 @@ static inline bool types_are_equal(Type lhs, Type rhs) {
 
 static void error_on(TypingContext *ctx, Token token, String message) {
     SourceLocation source_location = locate_token(ctx->source, token);
-    ctx->error = TypingContext::Error { .location = source_location, .message = message };
+    ctx->error = ErrorWithSourceLocation { .message = message, .location = source_location };
 }
 
 static Type column_type_to_type_table[COLUMN_MAX] = {
@@ -228,9 +228,11 @@ static inline bool type_check_ir_instruction(U32 ip, CompiledQuery *ir_emitter, 
     case IRInstructionOperator_CommitInsert:
     case IRInstructionOperator_CommitUpdate:
     case IRInstructionOperator_DeleteTable:
+    case IRInstructionOperator_CreateUser:
         return true;
-    default: OK_UNREACHABLE();
     }
+
+    OK_UNREACHABLE();
 }
 
 bool type_check_query(CompiledQuery *query, TypingContext *ctx, TypedCompiledQuery *typed_query) {

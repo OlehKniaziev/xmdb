@@ -7,9 +7,14 @@ namespace xmdb {
 struct DBDescriptor {
     static DBDescriptor *alloc(ok::Allocator *, ok::StringView);
 
+    inline void add_user(DBUser *user) {
+        user->next = users;
+        users = user;
+    }
+
     DBDescriptor *next;
     ok::StringView name;
-    ok::List<DBUser> users;
+    DBUser *users;
     ok::List<DBTable *> tables;
 };
 };

@@ -2,6 +2,7 @@
 #define XMDB_SQL_TYPE_CHECK_HPP
 
 #include <Core/SourceLocation.hpp>
+#include <Core/util.hpp>
 #include "ir.hpp"
 
 namespace xmdb::SQL {
@@ -31,11 +32,6 @@ struct TypedCompiledQuery {
 };
 
 struct TypingContext {
-    struct Error {
-        SourceLocation location;
-        String message;
-    };
-
     TypingContext(Allocator *allocator, StringView source);
 
     Allocator *allocator;
@@ -43,7 +39,7 @@ struct TypingContext {
     Table<U32, TypedTableSchema> table_types;
     List<U32> emitted_columns;
     StringView source; // used only for error reporting
-    Optional<Error> error{};
+    Optional<ErrorWithSourceLocation> error{};
 };
 
 bool type_check_query(CompiledQuery *query, TypingContext *ctx, TypedCompiledQuery *out);

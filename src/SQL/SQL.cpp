@@ -14,7 +14,7 @@ bool compile_and_type_check_source(ok::ArenaAllocator *arena,
 
     Optional<Query> query = parser.query();
     if (!query.has_value()) {
-        Parser::Error parser_error = parser.error.get();
+        ErrorWithSourceLocation parser_error = parser.error.get();
         StringView error_message = parser_error.message.view();
         *error = format_error(arena, parser_error.location, error_message);
         return false;
@@ -25,7 +25,7 @@ bool compile_and_type_check_source(ok::ArenaAllocator *arena,
     }
 
     if (!ir_compile_query(&query.value, ir_ctx, &typed_query->untyped)) {
-        IrContext::Error ir_error = ir_ctx->error.get();
+        ErrorWithSourceLocation ir_error = ir_ctx->error.get();
         StringView error_message = ir_error.message.view();
         *error = format_error(arena, ir_error.location, error_message);
         return false;
@@ -33,7 +33,7 @@ bool compile_and_type_check_source(ok::ArenaAllocator *arena,
 
     TypingContext t_ctx{arena, source};
     if (!type_check_query(&typed_query->untyped, &t_ctx, typed_query)) {
-        TypingContext::Error typing_error = t_ctx.error.get();
+        ErrorWithSourceLocation typing_error = t_ctx.error.get();
         StringView error_message = typing_error.message.view();
         *error = format_error(arena, typing_error.location, error_message);
         return false;

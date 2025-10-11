@@ -305,6 +305,11 @@ Optional<CreateStmt*> Parser::create_stmt() {
 
         stmt = CreateTableStmt::alloc(arena, create_token.value, name.value.data.to_string(arena), column_names.slice(),
                                       column_types.slice());
+    } else if (try_expect(Token::KW_USER)) {
+        auto name = expect(Token::IDENT);
+        TRY(name);
+
+        stmt = CreateUserStmt::alloc(arena, create_token.value, name.value.data.to_string(arena));
     } else {
         auto token = get_cur_token_or_signal_eof();
         TRY(token);
@@ -422,7 +427,7 @@ void Parser::set_token_mismatch(Token got, ok::Slice<Token::Type> expected) {
         message.format_append(", but got " OK_SV_FMT " instead", OK_SV_ARG(got_sv));
     }
 
-    error = Error{message, token_location};
+    error = ErrorWithSourceLocation{message, token_location};
 }
 
 void Parser::set_eof() {
@@ -435,6 +440,6 @@ void Parser::set_eof() {
     }
 
     auto message = String::alloc(arena, "unexpected EOF");
-    error = Error{message, location};
+    error = ErrorWithSourceLocation{message, location};
 }
 }; // namespace xmdb::SQL

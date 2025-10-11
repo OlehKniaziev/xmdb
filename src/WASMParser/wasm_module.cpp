@@ -43,7 +43,7 @@ extern "C" bool sql_parse_source(const char *source,
     Optional<xmdb::SQL::Query> q = parser.query();
 
     if (!q.has_value()) {
-        xmdb::SQL::Parser::Error error = parser.error.get();
+        xmdb::ErrorWithSourceLocation error = parser.error.get();
         *line = error.location.line;
         *col = error.location.column;
         UZ string_count = ok::min(err_buf_count, error.message.count());
