@@ -29,6 +29,8 @@ struct QueryExecutionContext {
 
     void delete_table(DBTable *);
 
+    void create_user(StringView);
+
     ok::Allocator *allocator;
     DBUser *user;
     QueryExecutionContext *next;

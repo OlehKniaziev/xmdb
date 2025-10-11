@@ -8,8 +8,7 @@ DBPool::DBPool(ok::Allocator *allocator) : allocator{allocator}, execution_conte
     DBDescriptor *db = create_db(default_db_name);
     DBUser *admin = allocator->alloc<DBUser>();
     *admin = DBUser::admin();
-    admin->next = db->users;
-    db->users = admin;
+    db->add_user(admin);
 }
 
 DBDescriptor *DBPool::get_db(StringView db_name) {

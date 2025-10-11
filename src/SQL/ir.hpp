@@ -64,6 +64,7 @@ struct TableSchema {
     INSTR_1(UseDatabase, StringView)                                                                                   \
     INSTR_2(CreateTable, StringView, TableSchema*)                                                                     \
     INSTR_1(CreateDatabase, StringView)                                                                                \
+    INSTR_1(CreateUser, StringView) \
     INSTR_1(DropTable, StringView)                                                                                     \
     INSTR_1(DropDatabase, StringView)                                                                                  \
     INSTR_3(InsertColumn, U32, U32, StringView) \

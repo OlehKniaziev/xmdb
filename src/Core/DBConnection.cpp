@@ -94,6 +94,11 @@ static void execute_instruction(TypedCompiledQuery *query, UZ i, QueryExecutionC
         ctx->create_table(operands.op1, operands.op2);
         break;
     }
+    case IRInstructionOperator_CreateUser: {
+        StringView user_name = operands_of_CreateUser(&query->untyped, i);
+        ctx->create_user(user_name);
+        break;
+    }
     case IRInstructionOperator_EmitColumn: {
         Triple<U32, U32, StringView> operands = operands_of_EmitColumn(&query->untyped, i);
 

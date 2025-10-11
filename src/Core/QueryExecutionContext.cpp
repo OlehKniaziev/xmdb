@@ -216,4 +216,10 @@ void QueryExecutionContext::delete_table(DBTable *table) {
 
     table->rows_count = 0;
 }
+
+void QueryExecutionContext::create_user(StringView name) {
+    DBUser *user = allocator->alloc<DBUser>();
+    *user = {name, ""_sv, PERM_READ | PERM_WRITE};
+    current_db->add_user(user);
+}
 } // namespace xmdb

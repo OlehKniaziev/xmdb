@@ -228,7 +228,8 @@ static inline bool parse_type(StringView input, Token where, IrContext *ctx, Col
 }
 
 static inline bool compile_create_stmt(CreateStmt *stmt, IrContext *ctx) {
-    if (stmt->target == CreateStmt::Target::DATABASE) {
+    switch (stmt->target) {
+    case CreateStmt::Target::DATABASE: {
         for (UZ i = 0; i < ctx->database_schemas.count; ++i) {
             if (ctx->database_schemas[i].name == stmt->name) {
                 String error_message =
@@ -244,27 +245,33 @@ static inline bool compile_create_stmt(CreateStmt *stmt, IrContext *ctx) {
         emit_CreateDatabase(&ctx->ir_emitter, stmt->token, stmt->name.view());
         return true;
     }
+    case CreateStmt::Target::TABLE: {
+        auto *create_table_stmt = static_cast<CreateTableStmt *>(stmt);
 
-    OK_ASSERT(stmt->target == CreateStmt::Target::TABLE);
+        TableSchema *table_schema = ctx->alloc_table_schema(ctx->active_db_id, stmt->name, true);
+        OK_ASSERT(table_schema->columns_types.has_value());
 
-    auto *create_table_stmt = static_cast<CreateTableStmt *>(stmt);
+        for (UZ i = 0; i < create_table_stmt->column_names.count; ++i) {
+            String column_type_string = create_table_stmt->column_types[i];
+            ColumnType column_type;
+            TRY(parse_type(column_type_string.view(), stmt->token, ctx, &column_type));
 
-    TableSchema *table_schema = ctx->alloc_table_schema(ctx->active_db_id, stmt->name, true);
-    OK_ASSERT(table_schema->columns_types.has_value());
+            String column_name = create_table_stmt->column_names[i];
+            table_schema->columns_names.push(column_name.copy(ctx->allocator));
+            table_schema->columns_types.value.push(column_type);
+        }
 
-    for (UZ i = 0; i < create_table_stmt->column_names.count; ++i) {
-        String column_type_string = create_table_stmt->column_types[i];
-        ColumnType column_type;
-        TRY(parse_type(column_type_string.view(), stmt->token, ctx, &column_type));
+        emit_CreateTable(&ctx->ir_emitter, stmt->token, create_table_stmt->name.view(), table_schema);
 
-        String column_name = create_table_stmt->column_names[i];
-        table_schema->columns_names.push(column_name.copy(ctx->allocator));
-        table_schema->columns_types.value.push(column_type);
+        return true;
+    }
+    case CreateStmt::Target::USER: {
+        emit_CreateUser(&ctx->ir_emitter, stmt->token, stmt->name.view());
+        return true;
+    }
     }
 
-    emit_CreateTable(&ctx->ir_emitter, stmt->token, create_table_stmt->name.view(), table_schema);
-
-    return true;
+    OK_UNREACHABLE();
 }
 
 static inline bool compile_drop_stmt(DropStmt *stmt, IrContext *ctx) {
@@ -928,7 +935,7 @@ Optional<Slice<U32>> compile_graph_node(StmtGraph *g, U32 node_id, IrContext *ct
 }
 
 static inline bool compile_graph(StmtGraph *graph, IrContext *ctx) {
-#if 1
+#if 0
     auto dot_src = ok::String::alloc(ctx->allocator, "digraph { graph [dpi=200]; ");
 
     for (UZ i = 0; i < graph->nodes.count; ++i) {
@@ -1083,8 +1090,6 @@ bool ir_compile_query(Query *q, IrContext *ctx, CompiledQuery *out_query) {
     out_query->strings = ctx->ir_emitter.strings.slice();
     out_query->integers = ctx->ir_emitter.integers.slice();
     out_query->schemas = ctx->ir_emitter.schemas.slice();
-
-    ok::println(stringify_ir(ctx->allocator, out_query));
 
     return true;
 }
