@@ -18,6 +18,9 @@ struct Parser {
     Optional<DeleteStmt*> delete_stmt();
     Optional<DropStmt*> drop_stmt();
     Optional<CreateStmt*> create_stmt();
+    Optional<AlterStmt*> alter_stmt();
+
+    Optional<SetClause> set_clause();
 
     Optional<Expr*> expression();
 

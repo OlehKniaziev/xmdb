@@ -1,3 +1,5 @@
+// TODO(oleh): Refactor the constructors in this file to accept strings as 'StringView'.
+
 #ifndef XMDB_AST_H_
 #define XMDB_AST_H_
 
@@ -6,7 +8,7 @@
 
 namespace xmdb::SQL {
 struct Stmt {
-    enum Type {
+    enum Type : U8 {
         SELECT,
         USE,
         INSERT,
@@ -15,6 +17,7 @@ struct Stmt {
         DROP,
         CREATE,
         EXPR,
+        ALTER,
     };
 
     Type type;
@@ -22,7 +25,7 @@ struct Stmt {
 };
 
 struct Expr {
-    enum Type : uint8_t {
+    enum Type : U8 {
         IDENT,
         INTEGER_LIT,
         STRING_LIT,
@@ -102,7 +105,7 @@ struct StringExpr : public Expr {
 };
 
 struct BinaryOpExpr : public Expr {
-    enum class Kind : uint8_t {
+    enum class Kind : U8 {
         EQ,
         GT,
         LT,
@@ -223,7 +226,7 @@ struct DeleteStmt : public Stmt {
 };
 
 struct DropStmt : public Stmt {
-    enum class Target : uint8_t {
+    enum class Target : U8 {
         TABLE,
         DATABASE,
     };
@@ -242,7 +245,7 @@ struct DropStmt : public Stmt {
 };
 
 struct CreateStmt : public Stmt {
-    enum class Target : uint8_t {
+    enum class Target : U8 {
         DATABASE,
         TABLE,
         USER,
@@ -289,6 +292,35 @@ struct CreateUserStmt : public CreateStmt {
         stmt->name = name;
         return stmt;
     }
+};
+
+struct SetClause {
+    ok::String name;
+    Expr *value;
+};
+
+struct AlterStmt : public Stmt {
+    enum class Target : U8 {
+        USER,
+    };
+
+    Target target;
+};
+
+struct AlterUserStmt : public AlterStmt {
+    static AlterUserStmt *alloc(ok::Allocator *allocator,
+        Token token, ok::StringView name, ok::Slice<SetClause> set_clauses) {
+        auto *stmt = allocator->alloc<AlterUserStmt>();
+        stmt->type = ALTER;
+        stmt->target = Target::USER;
+        stmt->token = token;
+        stmt->user_name = name.to_string(allocator);
+        stmt->set_clauses = set_clauses;
+        return stmt;
+    }
+
+    ok::String user_name;
+    ok::Slice<SetClause> set_clauses;
 };
 
 struct Query {
