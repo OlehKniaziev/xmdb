@@ -9,7 +9,6 @@
 namespace xmdb::SQL {
 struct Stmt {
     enum Type : U8 {
-        SELECT,
         USE,
         INSERT,
         UPDATE,

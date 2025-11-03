@@ -370,7 +370,7 @@ TEST(SQLParser, query) {
     ASSERT_EQ(query.value.stmts[1]->type, Stmt::EXPR);
 
     auto select_expr = static_cast<ExprStmt*>(query.value.stmts[1]);
-    ASSERT_EQ(select_expr->type, Expr::SELECT);
+    ASSERT_EQ(select_expr->expr->type, Expr::SELECT);
 }
 
 TEST(SQLParser, eof_error) {
