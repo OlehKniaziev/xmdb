@@ -28,7 +28,8 @@ using ok::Table;
     X("USER", KW_USER) \
     X("TRUE", KW_TRUE)                                                                                                 \
     X("FALSE", KW_FALSE)                                                                                               \
-    X("NULL", KW_NULL)
+    X("NULL", KW_NULL) \
+    X("ALTER", KW_ALTER)
 
 #define XMDB_ENUM_SQL_TOKENS                                                                                           \
     X("comma", COMMA)                                                                                                  \

@@ -309,6 +309,51 @@ TEST(SQLParser, create_user_stmt) {
     EXPECT_EQ(create_stmt.value->name, "usr"_sv);
 }
 
+TEST(SQLParser, set_clause) {
+    ok::ArenaAllocator arena{};
+    auto source = "foo = bar;"_sv;
+    Parser parser{&arena, source};
+
+    auto clause = parser.set_clause();
+    ASSERT_TRUE(clause.has_value());
+
+    EXPECT_EQ(clause.value.name, "foo"_sv);
+    EXPECT_EQ(clause.value.value->type, Expr::Type::IDENT);
+
+    auto ident = static_cast<IdentifierExpr *>(clause.value.value);
+
+    EXPECT_EQ(ident->value, "bar"_sv);
+}
+
+TEST(SQLParser, alter_user_stmt) {
+    ok::ArenaAllocator arena{};
+    auto source = "alter user foo set name = 'bar', password = '***';"_sv;
+    Parser parser{&arena, source};
+
+    auto alter_stmt = parser.stmt();
+    ASSERT_TRUE(alter_stmt.has_value());
+
+    auto alter = static_cast<AlterStmt *>(alter_stmt.value);
+
+    EXPECT_EQ(alter->target, AlterStmt::Target::USER);
+
+    auto alter_user = static_cast<AlterUserStmt *>(alter);
+
+    EXPECT_EQ(alter_user->user_name, "foo"_sv);
+    EXPECT_EQ(alter_user->set_clauses.count, 2);
+
+    auto first_clause = alter_user->set_clauses[0];
+    auto second_clause = alter_user->set_clauses[1];
+
+    EXPECT_EQ(first_clause.name, "name"_sv);
+    EXPECT_EQ(first_clause.value->type, Expr::STRING_LIT);
+    EXPECT_EQ(static_cast<StringExpr *>(first_clause.value)->value, "bar"_sv);
+
+    EXPECT_EQ(second_clause.name, "password"_sv);
+    EXPECT_EQ(second_clause.value->type, Expr::STRING_LIT);
+    EXPECT_EQ(static_cast<StringExpr *>(second_clause.value)->value, "***"_sv);
+}
+
 TEST(SQLParser, query) {
     ok::ArenaAllocator arena{};
     auto source = R"sql(CREATE TABLE MyTable (
@@ -325,7 +370,7 @@ TEST(SQLParser, query) {
     ASSERT_EQ(query.value.stmts[1]->type, Stmt::EXPR);
 
     auto select_expr = static_cast<ExprStmt*>(query.value.stmts[1]);
-    ASSERT_EQ(select_expr->type, Expr::SELECT);
+    ASSERT_EQ(select_expr->expr->type, Expr::SELECT);
 }
 
 TEST(SQLParser, eof_error) {

@@ -59,30 +59,26 @@ DECLARE_HANDLER(connect_handler) {
 
     ok::StringView username_sv = {(const char *) username.Items, username.Count};
 
-    DBUser *user = requested_db->users;
-    while (user != nullptr) {
-        // FIXME(oleh): Replace this password hash check against the password by a check againts
-        // a computed hash.
-        if (user->name == username_sv) {
-            for (UZ j = 0; j < user->sha256_password_digest.get_count(); ++j) {
-                if (user->sha256_password_digest[j] == 0) break;
+    Optional<DBUser *> user_opt = requested_db->find_user(username_sv);
 
-                if (password.Items[j] != user->sha256_password_digest[j]) {
-                    user = nullptr;
-                    goto loop_end;
-                }
-            }
-
-            break;
-        }
-
-        user = user->next;
-
-    loop_end:;
+    if (!user_opt.has_value()) {
+        return HTTP_STATUS_NOT_FOUND;
     }
 
-    if (user == nullptr) {
-        return HTTP_STATUS_FORBIDDEN;
+    DBUser *user = user_opt.value;
+
+    if (password.Count != user->sha256_password_digest.bytes.get_count()) {
+        return HTTP_STATUS_BAD_REQUEST;
+    }
+
+    // FIXME(oleh): Replace this password hash check against the password by a check againts
+    // a computed hash.
+    for (UZ j = 0; j < user->sha256_password_digest.bytes.get_count(); ++j) {
+        if (user->sha256_password_digest.bytes[j] == 0) break;
+
+        if (password.Items[j] != user->sha256_password_digest.bytes[j]) {
+            return HTTP_STATUS_BAD_REQUEST;
+        }
     }
 
     ConnectionId connection_id = gen_connection(requested_db, user);
@@ -252,7 +248,6 @@ DECLARE_HANDLER(run_query_handler) {
                     case xmdb::SQL::TYPE_FLOAT:
                     case xmdb::SQL::TYPE_DOUBLE:
                     case xmdb::SQL::TYPE_IMAGE:  OK_TODO();
-                    case xmdb::SQL::TYPE_MAX:
                     case xmdb::SQL::TYPE_TABLE:  OK_UNREACHABLE();
                     }
                 }

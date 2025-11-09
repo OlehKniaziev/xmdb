@@ -30,6 +30,8 @@ struct QueryExecutionContext {
     void delete_table(DBTable *);
 
     void create_user(StringView);
+    void alter_user_property(StringView, StringView, DBValue);
+    void commit_alter_user();
 
     ok::Allocator *allocator;
     DBUser *user;
@@ -39,6 +41,7 @@ struct QueryExecutionContext {
     ok::MultiList<StringView, DBValue> columns_to_insert;
     ok::Table<DBTable *, ok::MultiList<UZ, StringView *, DBValue *>> rows_to_insert;
     ok::MultiList<StringView, DBValue> columns_to_update;
+    Optional<DBUser *> user_to_alter;
     DBDescriptor *current_db;
     Optional<DBTable *> table_to_update;
     Optional<DBTable *> last_emitted_query;

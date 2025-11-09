@@ -9,7 +9,7 @@ bool compile_and_type_check_source(ok::ArenaAllocator *arena,
                                    StringView source,
                                    TypedCompiledQuery *typed_query,
                                    String *error,
-                                   IrContext *ir_ctx) {
+                                   IrContext *ir_ctx_arg) {
     Parser parser{arena, source};
 
     Optional<Query> query = parser.query();
@@ -20,8 +20,13 @@ bool compile_and_type_check_source(ok::ArenaAllocator *arena,
         return false;
     }
 
-    if (ir_ctx == nullptr) {
+    IrContext *ir_ctx = nullptr;
+
+    if (ir_ctx_arg == nullptr) {
+        ir_ctx = arena->alloc<IrContext>();
         *ir_ctx = IrContext{arena, source};
+    } else {
+        ir_ctx = ir_ctx_arg;
     }
 
     if (!ir_compile_query(&query.value, ir_ctx, &typed_query->untyped)) {

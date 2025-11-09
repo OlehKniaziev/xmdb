@@ -1,4 +1,5 @@
 #include "type_check.hpp"
+#include <SQL/ir.hpp>
 
 namespace xmdb::SQL {
 static inline bool type_is_comparable(Type type) {
@@ -30,30 +31,32 @@ static inline bool types_are_equal(Type lhs, Type rhs) {
 
 static void error_on(TypingContext *ctx, Token token, String message) {
     SourceLocation source_location = locate_token(ctx->source, token);
-    ctx->error = ErrorWithSourceLocation { .message = message, .location = source_location };
+    ctx->error = ErrorWithSourceLocation{.message = message, .location = source_location};
 }
 
 static Type column_type_to_type_table[COLUMN_MAX] = {
-    [COLUMN_INTEGER] = TYPE_INT,
-    [COLUMN_FLOAT] = TYPE_FLOAT,
-    [COLUMN_DOUBLE] = TYPE_DOUBLE,
-    [COLUMN_TEXT] = TYPE_STRING,
-    [COLUMN_IMAGE] = TYPE_IMAGE,
-    [COLUMN_BOOLEAN] = TYPE_BOOL,
+        [COLUMN_INTEGER] = TYPE_INT, [COLUMN_FLOAT] = TYPE_FLOAT, [COLUMN_DOUBLE] = TYPE_DOUBLE,
+        [COLUMN_TEXT] = TYPE_STRING, [COLUMN_IMAGE] = TYPE_IMAGE, [COLUMN_BOOLEAN] = TYPE_BOOL,
 };
 
 Type column_type_to_type(ColumnType column_type) {
     return column_type_to_type_table[column_type];
 }
 
-static const char *type_to_string_table[TYPE_MAX] = {
-    [TYPE_INT] = "integer",
-    [TYPE_STRING] = "string",
-    [TYPE_IMAGE] = "image",
-    [TYPE_BOOL] = "bool",
-    [TYPE_NULL] = "NULL",
-    [TYPE_TABLE] = "table",
-};
+const char *type_name(Type type) {
+    switch (type) {
+    case TYPE_BOOL:   return "bool";
+    case TYPE_STRING: return "string";
+    case TYPE_NULL:   return "null";
+    case TYPE_INT:    return "int";
+    case TYPE_TABLE:  return "table";
+    case TYPE_FLOAT:  return "float";
+    case TYPE_DOUBLE: return "double";
+    case TYPE_IMAGE:  return "image";
+    }
+
+    OK_UNREACHABLE();
+}
 
 static inline bool type_check_ir_instruction(U32 ip, CompiledQuery *ir_emitter, TypingContext *ctx) {
     IRInstruction instr = ir_emitter->instructions[ip];
@@ -67,7 +70,8 @@ static inline bool type_check_ir_instruction(U32 ip, CompiledQuery *ir_emitter, 
         Type lhs_type = ctx->ir_instruction_types.get(operands.op2).get();
         if (!type_is_comparable(lhs_type)) {
             Token token = ir_emitter->tokens[ip];
-            String message = String::format(ctx->allocator, "type '%s' is not comparable", type_to_string_table[lhs_type]);
+            String message =
+                    String::format(ctx->allocator, "type '%s' is not comparable", type_name(lhs_type));
             error_on(ctx, token, message);
             return false;
         }
@@ -75,7 +79,8 @@ static inline bool type_check_ir_instruction(U32 ip, CompiledQuery *ir_emitter, 
 
         if (!types_are_equal(lhs_type, rhs_type)) {
             Token token = ir_emitter->tokens[ip];
-            String message = String::format(ctx->allocator, "cannot compare lhs of type '%s' to rhs of type '%s'", type_to_string_table[lhs_type], type_to_string_table[rhs_type]);
+            String message = String::format(ctx->allocator, "cannot compare lhs of type '%s' to rhs of type '%s'",
+                                            type_name(lhs_type), type_name(rhs_type));
             error_on(ctx, token, message);
             return false;
         }
@@ -104,7 +109,7 @@ static inline bool type_check_ir_instruction(U32 ip, CompiledQuery *ir_emitter, 
         return true;
     }
     case IRInstructionOperator_FetchTable: {
-        Triple<String, StringView, TableSchema*> operands = operands_of_FetchTable(ir_emitter, ip);
+        Triple<String, StringView, TableSchema *> operands = operands_of_FetchTable(ir_emitter, ip);
         TableSchema *table_schema = operands.op3;
 
         OK_ASSERT(table_schema->columns_types.has_value());
@@ -118,8 +123,8 @@ static inline bool type_check_ir_instruction(U32 ip, CompiledQuery *ir_emitter, 
         }
 
         TypedTableSchema typed_table_schema = {
-            .column_names = table_schema->columns_names.slice(),
-            .column_types = column_types.slice(),
+                .column_names = table_schema->columns_names.slice(),
+                .column_types = column_types.slice(),
         };
 
         ctx->table_types.put(ip, typed_table_schema);
@@ -158,16 +163,15 @@ static inline bool type_check_ir_instruction(U32 ip, CompiledQuery *ir_emitter, 
             Type column_type = ctx->ir_instruction_types.get(emit_column_ops.op2).get();
 
             Optional<String> column_name{};
-            if (emit_column_ops.op3.count != 0)
-                column_name = emit_column_ops.op3.to_string(ctx->allocator);
+            if (emit_column_ops.op3.count != 0) column_name = emit_column_ops.op3.to_string(ctx->allocator);
 
             column_names.push(column_name);
             column_types.push(column_type);
         }
 
         TypedTableSchema typed_schema = {
-            .column_names = column_names.slice(),
-            .column_types = column_types.slice(),
+                .column_names = column_names.slice(),
+                .column_types = column_types.slice(),
         };
 
         ctx->emitted_columns.count -= columns_to_emit_count;
@@ -187,10 +191,9 @@ static inline bool type_check_ir_instruction(U32 ip, CompiledQuery *ir_emitter, 
 
         if (!types_are_equal(column_type, expected_column_type)) {
             Token token = ir_emitter->tokens[ip];
-            String message = String::format(ctx->allocator,
-                                            "expected a value of type '%s', but got '%s' instead",
-                                            type_to_string_table[expected_column_type],
-                                            type_to_string_table[column_type]);
+            String message =
+                    String::format(ctx->allocator, "expected a value of type '%s', but got '%s' instead",
+                                   type_name(expected_column_type), type_name(column_type));
             error_on(ctx, token, message);
             return false;
         }
@@ -209,10 +212,9 @@ static inline bool type_check_ir_instruction(U32 ip, CompiledQuery *ir_emitter, 
 
         if (!types_are_equal(column_type, expected_column_type)) {
             Token token = ir_emitter->tokens[ip];
-            String message = String::format(ctx->allocator,
-                                            "expected a value of type '%s', but got '%s' instead",
-                                            type_to_string_table[expected_column_type],
-                                            type_to_string_table[column_type]);
+            String message =
+                    String::format(ctx->allocator, "expected a value of type '%s', but got '%s' instead",
+                                   type_name(expected_column_type), type_name(column_type));
             error_on(ctx, token, message);
             return false;
         }
@@ -229,7 +231,8 @@ static inline bool type_check_ir_instruction(U32 ip, CompiledQuery *ir_emitter, 
     case IRInstructionOperator_CommitUpdate:
     case IRInstructionOperator_DeleteTable:
     case IRInstructionOperator_CreateUser:
-        return true;
+    case IRInstructionOperator_AlterUserProperty:
+    case IRInstructionOperator_CommitAlterUser:   return true;
     }
 
     OK_UNREACHABLE();

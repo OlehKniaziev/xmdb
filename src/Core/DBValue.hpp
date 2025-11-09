@@ -86,7 +86,6 @@ struct DBValue {
         case SQL::TYPE_DOUBLE:
         case SQL::TYPE_IMAGE: OK_TODO();
         case SQL::TYPE_TABLE: OK_PANIC("Cannot concatenate table values");
-        case SQL::TYPE_MAX:
         case SQL::TYPE_NULL: OK_UNREACHABLE();
         }
 

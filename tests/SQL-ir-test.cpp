@@ -1,7 +1,8 @@
-#include <gtest/gtest.h>
 #include <SQL/Parser.hpp>
+#include <SQL/SQL.hpp>
 #include <SQL/ir.hpp>
 #include <SQL/type_check.hpp>
+#include <gtest/gtest.h>
 
 using namespace ok::literals;
 using namespace xmdb::SQL;
@@ -244,4 +245,14 @@ TEST(ir, delete_) {
     TypedCompiledQuery typed_query{};
     TypingContext t_ctx{&arena, source};
     ASSERT_TRUE(type_check_query(&compiled_query, &t_ctx, &typed_query));
+}
+
+TEST(ir, alter_user) {
+    ok::ArenaAllocator arena{};
+    auto source = "CREATE USER foo; ALTER USER foo SET PASSWORD = 'strong_pass';"_sv;
+
+    TypedCompiledQuery typed_query{};
+    String error{};
+
+    ASSERT_TRUE(compile_and_type_check_source(&arena, source, &typed_query, &error)) << error.cstr();
 }
