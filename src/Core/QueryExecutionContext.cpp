@@ -3,16 +3,19 @@
 using namespace ok::literals;
 
 namespace xmdb {
+#define FAIL_FMT(ctx, fmt, ...)                                                                                        \
+    do {                                                                                                               \
+        /* TODO(oleh): Retrieve location from the query executed. */                                                   \
+        ctx->error =                                                                                                   \
+                ErrorWithSourceLocation{.message = String::format(ctx->allocator, fmt, __VA_ARGS__), .location = {}};  \
+        longjmp(ctx->jmpbuf, 1);                                                                                       \
+                                                                                                                       \
+    } while (false)
 
-#define X(p)                                                                                                           \
+#define X(p, _unused)                                                                                                  \
     void CHECK_##p(QueryExecutionContext *ctx) {                                                                       \
         if ((ctx->user->perm & PERM_##p) == 0) {                                                                       \
-            /* TODO(oleh): Retrieve location from the query executed. */                                               \
-            ctx->error = ErrorWithSourceLocation{                                                                      \
-                    .message = String::format(ctx->allocator, "user " OK_SV_FMT " does not have " #p " permissions",   \
-                                              OK_SV_ARG(ctx->user->name)),                                             \
-                    .location = {}};                                                                                   \
-            longjmp(ctx->jmpbuf, 1);                                                                                   \
+            FAIL_FMT(ctx, "user " OK_SV_FMT " does not have " #p " permissions", OK_SV_ARG(ctx->user->name));          \
         }                                                                                                              \
     }
 
@@ -221,5 +224,44 @@ void QueryExecutionContext::create_user(StringView name) {
     DBUser *user = allocator->alloc<DBUser>();
     *user = {name, ""_sv, PERM_READ | PERM_WRITE};
     current_db->add_user(user);
+}
+
+void QueryExecutionContext::alter_user_property(StringView user_name, StringView property_name, DBValue value) {
+    CHECK_ADMIN(this);
+
+    Optional<DBUser *> target_user = current_db->find_user(user_name);
+
+    if (!target_user.has_value()) FAIL_FMT(this, "could not find user named '" OK_SV_FMT "'", OK_SV_ARG(user_name));
+
+    if (user_to_alter.has_value()) {
+        OK_ASSERT(user_to_alter.value->name == user_name);
+    } else {
+        DBUser *copied_user = allocator->alloc<DBUser>();
+        memcpy(copied_user, target_user.value, sizeof(*copied_user));
+        user_to_alter = copied_user;
+    }
+
+    if (property_name == "PASSWORD"_sv) {
+        if (value.type != SQL::TYPE_STRING)
+            FAIL_FMT(this, "expected user password to be of type string, got type '%s' instead",
+                     SQL::type_name(value.type));
+
+        TableStream<String> string_value = value.u.string;
+        Optional<String> password = string_value.next();
+
+        user_to_alter.value->sha256_password_digest = sha256_digest(password.get().view());
+    } else {
+        FAIL_FMT(this, "user '" OK_SV_FMT "' does not have property '" OK_SV_FMT "'", OK_SV_ARG(user_name),
+                 OK_SV_ARG(property_name));
+    }
+}
+
+void QueryExecutionContext::commit_alter_user() {
+    OK_ASSERT(user_to_alter.has_value());
+
+    Optional<DBUser *> target_user = current_db->find_user(user_to_alter.value->name);
+    memcpy(target_user.value, user_to_alter.value, sizeof(*target_user.value));
+
+    user_to_alter = {};
 }
 } // namespace xmdb

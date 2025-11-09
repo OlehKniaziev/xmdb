@@ -23,7 +23,7 @@ DBValue DBValue::cmp(ok::Allocator *allocator, DBValue other) {
                 return 1;
             }
 
-            return (S64)lhs.value - (S64)rhs.value;
+            return (S64) lhs.value - (S64) rhs.value;
         };
 
         auto reset = [](void *data) -> void {
@@ -59,10 +59,9 @@ void DBValue::reset() {
     }
     case SQL::TYPE_FLOAT:
     case SQL::TYPE_DOUBLE:
-    case SQL::TYPE_IMAGE: OK_TODO();
+    case SQL::TYPE_IMAGE:  OK_TODO();
 
-    case SQL::TYPE_TABLE:
-    case SQL::TYPE_MAX: OK_UNREACHABLE();
+    case SQL::TYPE_TABLE:  OK_UNREACHABLE();
     }
 }
 } // namespace xmdb

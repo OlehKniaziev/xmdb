@@ -1,5 +1,6 @@
 #pragma once
 
+#include "hash.hpp"
 #include "ok.hpp"
 
 using namespace ok::literals;
@@ -7,15 +8,15 @@ using namespace ok::literals;
 namespace xmdb {
 
 #define XMDB_ENUM_USER_PERMISSIONS                                                                                     \
-    X(READ)                                                                                                            \
-    X(WRITE)                                                                                                           \
-    X(ADMIN)
+    X(READ, 1 << 0)                                                                                                    \
+    X(WRITE, 1 << 1)                                                                                                   \
+    X(ADMIN, PERM_READ | PERM_WRITE)
 
-enum DBUserPermissions : U8 {
-    PERM_READ = 1 << 0,
-    PERM_WRITE = 1 << 1,
-    PERM_ADMIN = PERM_READ | PERM_WRITE,
-};
+#define X(name, value) PERM_##name = value,
+
+enum DBUserPermissions : U8 { XMDB_ENUM_USER_PERMISSIONS };
+
+#undef X
 
 struct DBUser {
     DBUser(ok::StringView name, ok::StringView password, U8 perm);
@@ -26,7 +27,7 @@ struct DBUser {
 
     DBUser *next;
     ok::StringView name;
-    ok::Array<U8, 32> sha256_password_digest;
+    SHA256Digest sha256_password_digest;
     U8 perm;
 };
 }; // namespace xmdb

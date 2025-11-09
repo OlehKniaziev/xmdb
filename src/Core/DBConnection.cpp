@@ -1,4 +1,5 @@
 #include "DBConnection.hpp"
+#include <SQL/ir.hpp>
 #include <csetjmp>
 
 namespace xmdb {
@@ -19,7 +20,6 @@ static inline ColumnType type_to_column_type(Type type) {
     case TYPE_DOUBLE: return COLUMN_DOUBLE;
     case TYPE_NULL:
     case TYPE_TABLE:  OK_PANIC("Unsupported type to column type conversion");
-    case TYPE_MAX:    OK_UNREACHABLE();
     }
 
     OK_UNREACHABLE();
@@ -97,6 +97,16 @@ static void execute_instruction(TypedCompiledQuery *query, UZ i, QueryExecutionC
     case IRInstructionOperator_CreateUser: {
         StringView user_name = operands_of_CreateUser(&query->untyped, i);
         ctx->create_user(user_name);
+        break;
+    }
+    case IRInstructionOperator_AlterUserProperty: {
+        Triple<StringView, StringView, U32> operands = operands_of_AlterUserProperty(&query->untyped, i);
+        DBValue property_value = ctx->fetch_var(operands.op3);
+        ctx->alter_user_property(operands.op1, operands.op2, property_value);
+        break;
+    }
+    case IRInstructionOperator_CommitAlterUser: {
+        ctx->commit_alter_user();
         break;
     }
     case IRInstructionOperator_EmitColumn: {

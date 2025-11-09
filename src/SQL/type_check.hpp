@@ -15,11 +15,11 @@ enum Type {
     TYPE_TABLE,
     TYPE_FLOAT,
     TYPE_DOUBLE,
-
-    TYPE_MAX,
 };
 
 Type column_type_to_type(ColumnType);
+
+const char *type_name(Type);
 
 struct TypedTableSchema {
     Slice<Optional<String>> column_names;

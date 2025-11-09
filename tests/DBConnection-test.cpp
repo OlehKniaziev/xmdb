@@ -413,3 +413,26 @@ TEST(DBConnection, create_new_user) {
 
     ASSERT_NE(usr, nullptr);
 }
+
+TEST(DBConnection, alter_new_user) {
+    ok::ArenaAllocator arena{};
+    StringView source = "create user some_user; alter user some_user set PASSWORD = 'pass';"_sv;
+
+    String error{};
+
+    QueryResults query_results{};
+
+    DBUser user = DBUser::admin();
+    DBPool db_pool{&arena};
+    DBDescriptor *default_db = db_pool.get_db("default"_sv);
+    DBConnection db_conn{&db_pool, default_db, &user};
+
+    bool ok = compile_and_execute_source(&arena, &db_conn, source, &query_results, &error);
+
+    ASSERT_TRUE(ok) << error.cstr();
+
+    Optional<DBUser *> some_user = default_db->find_user("some_user"_sv);
+    ASSERT_TRUE(some_user.has_value());
+
+    ASSERT_EQ(some_user.value->sha256_password_digest, sha256_digest("pass"_sv));
+}

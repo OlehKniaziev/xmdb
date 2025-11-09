@@ -10,6 +10,7 @@ add_library(LibCore
   QueryExecutionContext.cpp
   Core.cpp
   util.cpp
+  hash.cpp
 )
 
 set_property(TARGET LibCore PROPERTY POSITION_INDEPENDENT_CODE 1)

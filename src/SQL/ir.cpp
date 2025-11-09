@@ -1,3 +1,4 @@
+#include <Core/ok.hpp>
 #include <Core/util.hpp>
 
 #include "ir.hpp"
@@ -135,22 +136,6 @@ static inline bool compile_use_stmt(UseStmt *stmt, IrContext *ctx) {
 }
 
 static Optional<U32> compile_expr(Expr *, IrContext *);
-
-static inline Optional<U32> compile_binop(BinaryOpExpr *binop, IrContext *ctx) {
-    auto lhs = compile_expr(binop->lhs, ctx);
-    TRY(lhs);
-    auto rhs = compile_expr(binop->rhs, ctx);
-    TRY(rhs);
-
-    IREmitter *e = &ctx->ir_emitter;
-
-    switch (binop->kind) {
-    case BinaryOpExpr::Kind::EQ: return emit_Eq(e, binop->token, lhs.value, rhs.value);
-    case BinaryOpExpr::Kind::GT: return emit_Gt(e, binop->token, lhs.value, rhs.value);
-    case BinaryOpExpr::Kind::LT: return emit_Lt(e, binop->token, lhs.value, rhs.value);
-    default:                     OK_UNREACHABLE();
-    }
-}
 
 static Optional<U32> compile_ident(IdentifierExpr *ident, IrContext *ctx) {
     switch (ctx->current_namespace()) {
@@ -304,6 +289,30 @@ static inline bool compile_drop_stmt(DropStmt *stmt, IrContext *ctx) {
     }
 }
 
+static bool compile_alter_stmt(AlterStmt *alter, IrContext *ctx) {
+    switch (alter->target) {
+    case AlterStmt::Target::USER: {
+        auto *user = static_cast<AlterUserStmt *>(alter);
+        Slice<SetClause> clauses = user->set_clauses;
+
+        for (UZ i = 0; i < clauses.count; ++i) {
+            SetClause clause = clauses[i];
+            Optional<U32> clause_value = compile_expr(clause.value, ctx);
+            TRY(clause_value);
+
+            emit_AlterUserProperty(&ctx->ir_emitter, alter->token, user->user_name.view(), clause.name.view(),
+                           clause_value.value);
+        }
+
+        emit_CommitAlterUser(&ctx->ir_emitter, alter->token);
+
+        return true;
+    }
+    }
+
+    OK_UNREACHABLE();
+}
+
 static inline bool compile_unoptimizable_stmt(Stmt *stmt, IrContext *ctx) {
     switch (stmt->type) {
     case Stmt::USE: {
@@ -317,6 +326,10 @@ static inline bool compile_unoptimizable_stmt(Stmt *stmt, IrContext *ctx) {
     case Stmt::DROP: {
         auto *drop = static_cast<DropStmt *>(stmt);
         return compile_drop_stmt(drop, ctx);
+    }
+    case Stmt::ALTER: {
+        auto *alter = static_cast<AlterStmt *>(stmt);
+        return compile_alter_stmt(alter, ctx);
     }
     default: OK_UNREACHABLE();
     }
@@ -336,8 +349,6 @@ struct StmtGraphNode {
         LEAF,
 
         STAR,
-
-        MAX,
     };
 
     static StmtGraphNode expr(Type type, Expr *value, Slice<U32> edges) {
@@ -368,6 +379,22 @@ struct StmtGraphNode {
         flags |= (1 << (sizeof(flags) * 8 - 1));
     }
 
+    const char *type_pretty() const {
+        switch (type()) {
+        case Type::EQ:     return "Equal";
+        case Type::GT:     return "Greater";
+        case Type::LT:     return "Less";
+        case Type::DELETE: return "Delete";
+        case Type::INSERT: return "Insert";
+        case Type::LEAF:   return "Leaf";
+        case Type::STAR:   return "*";
+        case Type::UPDATE: return "Update";
+        case Type::SELECT: return "Select";
+        }
+
+        OK_UNREACHABLE();
+    }
+
     U32 ir_id = 0;
     U32 flags;
     // Check the node type to find out which one is active.
@@ -376,12 +403,6 @@ struct StmtGraphNode {
         Stmt *stmt;
     } up;
     Slice<U32> edges;
-};
-
-static const char *stmt_graph_node_types_pretty[StmtGraphNode::Type::MAX] = {
-        [StmtGraphNode::EQ] = "=",          [StmtGraphNode::LT] = "<",          [StmtGraphNode::GT] = ">",
-        [StmtGraphNode::SELECT] = "SELECT", [StmtGraphNode::UPDATE] = "UPDATE", [StmtGraphNode::INSERT] = "INSERT",
-        [StmtGraphNode::DELETE] = "DELETE", [StmtGraphNode::LEAF] = "<leaf>",
 };
 
 struct StmtGraph {
@@ -582,13 +603,15 @@ static inline bool is_stmt_graph_optimizable(Stmt *stmt) {
     switch (stmt->type) {
     case Stmt::USE:
     case Stmt::DROP:
+    case Stmt::ALTER:
     case Stmt::CREATE: return false;
     case Stmt::EXPR:
     case Stmt::UPDATE:
     case Stmt::DELETE:
     case Stmt::INSERT: return true;
-    default:           OK_UNREACHABLE();
     }
+
+    OK_UNREACHABLE();
 }
 
 static void to_string(ok::String *string, StmtGraph *g, U32 node_idx, bool type_only = false) {
@@ -600,7 +623,7 @@ static void to_string(ok::String *string, StmtGraph *g, U32 node_idx, bool type_
         return;
     }
 
-    const char *node_type_str = stmt_graph_node_types_pretty[node->type()];
+    const char *node_type_str = node->type_pretty();
 
     string->format_append("\"%s\"", node_type_str);
 
@@ -896,7 +919,7 @@ Optional<Slice<U32>> compile_graph_node(StmtGraph *g, U32 node_id, IrContext *ct
 
         ctx->push_table(table_node_id.value);
         {
-            // TODO: apply filter
+            // TODO(oleh): apply filter
         }
         ctx->pop_namespace();
 
@@ -925,9 +948,6 @@ Optional<Slice<U32>> compile_graph_node(StmtGraph *g, U32 node_id, IrContext *ct
         }
 
         break;
-    }
-    case StmtGraphNode::MAX: {
-        OK_UNREACHABLE();
     }
     }
 
