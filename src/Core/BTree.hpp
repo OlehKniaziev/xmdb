@@ -12,6 +12,8 @@ struct BTreeIndex {
 
     bool contains(U64);
 
+    bool first_constructed();
+
     void *pImpl;
 };
 }; // namespace xmdb

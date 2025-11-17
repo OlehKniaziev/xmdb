@@ -5,7 +5,7 @@ constexpr U64 BTREE_PAGE_SIZE = 4096;
 
 constexpr U16 BTREE_HEADER_VERSION = 1;
 constexpr U64 BTREE_HEADER_MAGIC = ((U64) 'x' << 56) | ((U64) 'm' << 48) | ((U64) 'd' << 40) | ((U64) 'b' << 32);
-constexpr U64 BTREE_INDEX_HEADER_LENGTH = BTREE_PAGE_SIZE;
+constexpr U64 BTREE_HEADER_LENGTH = BTREE_PAGE_SIZE;
 
 constexpr U64 BTREE_ORDER = 128;
 
@@ -45,7 +45,12 @@ struct DiskNode {
 static_assert(sizeof(DiskNode) == BTREE_PAGE_SIZE);
 
 struct Node {
-    static Node *alloc(ok::Allocator *allocator) {
+    static Node *alloc_with_disk(ok::Allocator *allocator) {
+        auto *node = allocator->alloc<Node>();
+        return node;
+    }
+
+    static Node *alloc_without_disk(ok::Allocator *allocator) {
         auto *node = allocator->alloc<Node>();
         node->disk = allocator->alloc<DiskNode>();
         node->disk->keys_count = 0;
@@ -99,31 +104,40 @@ struct Node {
     U64 id;
 };
 
+using BTreeStateFlags = U16;
+
+enum {
+    FLAG_FIRST_CONSTRUCTION = 1 << 0,
+};
+
 struct BTreeState {
     static ok::Optional<ok::String> create(ok::Allocator *allocator, ok::File state_file, BTreeState **out_state) {
         BTreeState *state = nullptr;
 
+        state_file.seek_start();
+
         if (state_file.size() == 0) {
             state = allocator->alloc<BTreeState>();
+            state->flags = FLAG_FIRST_CONSTRUCTION;
             state->header = DiskHeader::alloc(allocator);
             state->allocator = allocator;
             state->state_file = state_file;
-            state->root = Node::alloc(allocator);
+            state->root = Node::alloc_without_disk(allocator);
             state->root->set_leaf(true);
             state->root->set_root(true);
             state->root->id = 0;
 
-            UZ temp_buf_count = BTREE_INDEX_HEADER_LENGTH + BTREE_PAGE_SIZE;
+            UZ temp_buf_count = BTREE_HEADER_LENGTH + BTREE_PAGE_SIZE;
             U8 *temp_buf = ok::temp_allocator->alloc<U8>(temp_buf_count);
 
             memcpy(temp_buf, state->header, sizeof(*state->header));
-            memcpy(temp_buf + BTREE_INDEX_HEADER_LENGTH, state->root->disk, BTREE_PAGE_SIZE);
+            memcpy(temp_buf + BTREE_HEADER_LENGTH, state->root->disk, BTREE_PAGE_SIZE);
 
             auto write_err = state_file.write(temp_buf, temp_buf_count);
             if (write_err) return ok::File::error_string(allocator, write_err.value);
         } else {
             // NOTE(oleh): Read in the header and root.
-            constexpr auto buffer_count = BTREE_INDEX_HEADER_LENGTH + BTREE_PAGE_SIZE;
+            constexpr auto buffer_count = BTREE_HEADER_LENGTH + BTREE_PAGE_SIZE;
             auto *buffer = allocator->alloc<U8>(buffer_count);
 
             UZ read_count = 0;
@@ -132,10 +146,12 @@ struct BTreeState {
 
             OK_VERIFY(read_count == buffer_count);
 
-            auto *state = allocator->alloc<BTreeState>();
+            state = allocator->alloc<BTreeState>();
+            state->flags = 0;
             state->allocator = allocator;
             state->header = (DiskHeader *) buffer;
-            state->root->disk = (DiskNode *) (buffer + BTREE_INDEX_HEADER_LENGTH);
+            state->root = Node::alloc_with_disk(allocator);
+            state->root->disk = (DiskNode *) (buffer + BTREE_HEADER_LENGTH);
             state->root->id = 0;
         }
 
@@ -177,14 +193,26 @@ struct BTreeState {
     }
 
     Node *load_node_from_disk(Node *parent, U64 child_index) {
-        OK_UNUSED(parent);
-        OK_UNUSED(child_index);
-        OK_TODO();
+        U64 node_id = parent->children()[child_index];
+
+        state_file.seek_to(BTREE_HEADER_LENGTH + node_id * BTREE_PAGE_SIZE);
+
+        UZ num_read = 0;
+        Node *node = Node::alloc_without_disk(allocator);
+
+        auto read_err = state_file.read(reinterpret_cast<U8 *>(node->disk), BTREE_PAGE_SIZE, &num_read);
+        if (read_err) OK_TODO();
+
+        OK_VERIFY(num_read == BTREE_PAGE_SIZE);
+
+        return node;
     }
 
     void save_node_to_disk(Node *node) {
-        OK_UNUSED(node);
-        OK_TODO();
+        state_file.seek_to(BTREE_HEADER_LENGTH + node->id * BTREE_PAGE_SIZE);
+
+        auto write_err = state_file.write(reinterpret_cast<U8 *>(node->disk), BTREE_PAGE_SIZE);
+        if (write_err) OK_TODO();
     }
 
     void split_child(Node *parent, Node *full_child) {
@@ -193,7 +221,7 @@ struct BTreeState {
 
         U64 full_child_index = full_child->id;
 
-        Node *new_child = Node::alloc(allocator);
+        Node *new_child = Node::alloc_without_disk(allocator);
         new_child->set_leaf(full_child->is_leaf());
         new_child->set_keys_count(BTREE_ORDER - 1);
 
@@ -240,7 +268,7 @@ struct BTreeState {
         auto *node = root;
 
         if (node->is_full()) {
-            Node *new_root = Node::alloc(allocator);
+            Node *new_root = Node::alloc_without_disk(allocator);
 
             new_root->set_leaf(false);
             new_root->set_keys_count(0);
@@ -296,6 +324,7 @@ struct BTreeState {
     DiskHeader *header;
     Node *root;
     ok::Slice<U8> write_buffer;
+    BTreeStateFlags flags;
 };
 
 ok::Optional<ok::File::OpenError> BTreeIndex::create(ok::Allocator *allocator, ok::StringView state_filename,
@@ -312,6 +341,7 @@ BTreeIndex BTreeIndex::create(ok::Allocator *allocator, ok::File state_file) {
     BTreeIndex tree{};
     auto error_string = BTreeState::create(allocator, state_file, (BTreeState **)&tree.pImpl);
     OK_VERIFY(!error_string.has_value());
+    OK_VERIFY(tree.pImpl != nullptr);
     return tree;
 }
 
@@ -325,5 +355,10 @@ bool BTreeIndex::contains(U64 key) {
     Node *out_node;
     S64 index = impl->search(key, &out_node);
     return index != -1;
+}
+
+bool BTreeIndex::first_constructed() {
+    auto *impl = static_cast<BTreeState *>(pImpl);
+    return impl->flags & FLAG_FIRST_CONSTRUCTION;
 }
 }; // namespace xmdb
