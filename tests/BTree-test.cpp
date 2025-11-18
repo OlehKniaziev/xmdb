@@ -4,12 +4,12 @@
 using namespace xmdb;
 
 static BTreeIndex default_index() {
-    ok::ArenaAllocator arena{};
+    auto *arena = new ok::ArenaAllocator{};
     ok::File state_file{};
 
     OK_VERIFY(!ok::create_temp_file(&state_file).has_value());
 
-    return BTreeIndex::create(&arena, state_file);
+    return BTreeIndex::create(arena, state_file);
 }
 
 // NOTE(oleh): Just to ensure that the constructor will not crash.
@@ -20,7 +20,10 @@ TEST(BTreeIndexTest, create_with_temp_state_file) {
     ASSERT_FALSE(ok::create_temp_file(&state_file).has_value());
 
     auto tree = BTreeIndex::create(&arena, state_file);
-    OK_UNUSED(tree);
+
+    ASSERT_TRUE(tree.first_constructed());
+    ASSERT_EQ(tree.height(), 1);
+    ASSERT_EQ(tree.node_count(), 1);
 }
 
 TEST(BTreeIndexTest, create_then_reload) {
@@ -56,4 +59,21 @@ TEST(BTreeIndexTest, contains_after_insert) {
     ASSERT_TRUE(index.contains(0));
     ASSERT_TRUE(index.contains(1));
     ASSERT_TRUE(index.contains(2));
+}
+
+TEST(BTreeIndexTest, grows) {
+    BTreeIndex index = default_index();
+
+    UZ i;
+    for (i = 0; i < BTREE_MAX_KEYS; ++i) {
+        index.insert(i);
+    }
+
+    ASSERT_EQ(index.node_count(), 1);
+    ASSERT_EQ(index.height(), 1);
+
+    index.insert(i);
+
+    ASSERT_EQ(index.height(), 2);
+    ASSERT_EQ(index.node_count(), 3);
 }

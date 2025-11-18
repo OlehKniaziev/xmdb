@@ -1,21 +1,6 @@
 #include "BTree.hpp"
 
 namespace xmdb {
-constexpr U64 BTREE_PAGE_SIZE = 4096;
-
-constexpr U16 BTREE_HEADER_VERSION = 1;
-constexpr U64 BTREE_HEADER_MAGIC = ((U64) 'x' << 56) | ((U64) 'm' << 48) | ((U64) 'd' << 40) | ((U64) 'b' << 32);
-constexpr U64 BTREE_HEADER_LENGTH = BTREE_PAGE_SIZE;
-
-constexpr U64 BTREE_ORDER = 128;
-
-static_assert(BTREE_ORDER >= 2, "Order of the B-Tree is not allowed to be less than 2");
-
-struct BTreeState;
-
-constexpr auto BTREE_MAX_KEYS = BTREE_ORDER * 2 - 1;
-constexpr auto BTREE_MAX_CHILDREN = BTREE_ORDER * 2;
-
 struct DiskHeader {
     static DiskHeader *alloc(ok::Allocator *allocator) {
         auto *header = allocator->alloc<DiskHeader>();
@@ -30,6 +15,7 @@ struct DiskHeader {
     U16 version;
     U64 index_nodes_count;
     U64 payload_length;
+    U64 height;
 };
 
 struct DiskNode {
@@ -45,12 +31,12 @@ struct DiskNode {
 static_assert(sizeof(DiskNode) == BTREE_PAGE_SIZE);
 
 struct Node {
-    static Node *alloc_with_disk(ok::Allocator *allocator) {
+    static Node *alloc_without_backing_disk_buffer(ok::Allocator *allocator) {
         auto *node = allocator->alloc<Node>();
         return node;
     }
 
-    static Node *alloc_without_disk(ok::Allocator *allocator) {
+    static Node *alloc_with_backing_disk_buffer(ok::Allocator *allocator) {
         auto *node = allocator->alloc<Node>();
         node->disk = allocator->alloc<DiskNode>();
         node->disk->keys_count = 0;
@@ -85,11 +71,15 @@ struct Node {
 
     inline ok::Slice<U64> children() {
         if (is_leaf()) return {};
-        return {disk->children, disk->keys_count + 1};
+        return {disk->children, children_count()};
     }
 
     inline U64 keys_count() {
         return disk->keys_count;
+    }
+
+    inline U64 children_count() {
+        return keys_count() + 1;
     }
 
     inline void add_keys_count(U64 n) {
@@ -120,9 +110,11 @@ struct BTreeState {
             state = allocator->alloc<BTreeState>();
             state->flags = FLAG_FIRST_CONSTRUCTION;
             state->header = DiskHeader::alloc(allocator);
+            state->header->height = 1;
+            state->header->index_nodes_count = 1;
             state->allocator = allocator;
             state->state_file = state_file;
-            state->root = Node::alloc_without_disk(allocator);
+            state->root = Node::alloc_with_backing_disk_buffer(allocator);
             state->root->set_leaf(true);
             state->root->set_root(true);
             state->root->id = 0;
@@ -150,7 +142,7 @@ struct BTreeState {
             state->flags = 0;
             state->allocator = allocator;
             state->header = (DiskHeader *) buffer;
-            state->root = Node::alloc_with_disk(allocator);
+            state->root = Node::alloc_with_backing_disk_buffer(allocator);
             state->root->disk = (DiskNode *) (buffer + BTREE_HEADER_LENGTH);
             state->root->id = 0;
         }
@@ -198,7 +190,7 @@ struct BTreeState {
         state_file.seek_to(BTREE_HEADER_LENGTH + node_id * BTREE_PAGE_SIZE);
 
         UZ num_read = 0;
-        Node *node = Node::alloc_without_disk(allocator);
+        Node *node = Node::alloc_with_backing_disk_buffer(allocator);
 
         auto read_err = state_file.read(reinterpret_cast<U8 *>(node->disk), BTREE_PAGE_SIZE, &num_read);
         if (read_err) OK_TODO();
@@ -215,13 +207,15 @@ struct BTreeState {
         if (write_err) OK_TODO();
     }
 
-    void split_child(Node *parent, Node *full_child) {
+    void split_child(Node *parent, Node *full_child, U64 full_child_index) {
         OK_ASSERT(!parent->is_full());
         OK_ASSERT(full_child->is_full());
 
-        U64 full_child_index = full_child->id;
+        U64 full_child_id = full_child->id;
 
-        Node *new_child = Node::alloc_without_disk(allocator);
+        U64 median_key = full_child->keys()[BTREE_ORDER];
+
+        Node *new_child = alloc_node_with_backing_disk_buffer();
         new_child->set_leaf(full_child->is_leaf());
         new_child->set_keys_count(BTREE_ORDER - 1);
 
@@ -239,18 +233,17 @@ struct BTreeState {
 
         // NOTE(oleh): Access of children here cannot be out-of-bounds, since the parent node
         // is not full.
-        for (S64 i = (S64) parent->keys_count(); i > (S64) full_child_index; --i) {
+        for (S64 i = (S64) parent->keys_count(); i > (S64) full_child_id; --i) {
             parent->children()[i + 1] = parent->children()[i];
         }
 
-        parent->children()[full_child_index + 1] = new_child->id;
-
-        for (S64 i = (S64) parent->keys_count() - 1; i > (S64) full_child_index - 1; --i) {
+        for (S64 i = (S64) parent->keys_count() - 1; i > (S64) full_child_id - 1; --i) {
             parent->keys()[i + 1] = parent->keys()[i];
         }
 
-        U64 median_key = full_child->keys()[BTREE_ORDER];
         parent->add_keys_count(1);
+        parent->children()[full_child_index + 1] = new_child->id;
+
         parent->keys()[full_child_index] = median_key;
 
         save_node_to_disk(parent);
@@ -258,29 +251,26 @@ struct BTreeState {
         save_node_to_disk(new_child);
     }
 
-    void split_child(Node *parent, U64 child_index) {
-        Node *full_child = load_node_from_disk(parent, child_index);
-
-        split_child(parent, full_child);
-    }
-
     void insert(U64 key) {
-        auto *node = root;
-
-        if (node->is_full()) {
-            Node *new_root = Node::alloc_without_disk(allocator);
+        if (root->is_full()) {
+            Node *new_root = alloc_node_with_backing_disk_buffer();
 
             new_root->set_leaf(false);
             new_root->set_keys_count(0);
 
-            new_root->children()[0] = node->id;
-            split_child(new_root, (U64) 0);
+            root->id = new_root->id;
+            new_root->id = 0;
+
+            new_root->children()[0] = root->id;
+            split_child(new_root, root, 0);
 
             this->root = new_root;
 
+            ++header->height;
+
             insert_non_full(new_root, key);
         } else {
-            insert_non_full(node, key);
+            insert_non_full(root, key);
         }
     }
 
@@ -308,7 +298,7 @@ struct BTreeState {
             Node *child = load_node_from_disk(node, i);
 
             if (child->is_full()) {
-                split_child(node, child);
+                split_child(node, child, i);
 
                 if (key > node->keys()[i]) {
                     ++i;
@@ -319,12 +309,27 @@ struct BTreeState {
         }
     }
 
+    Node *alloc_node_without_backing_disk_buffer() {
+        ++header->index_nodes_count;
+        auto *node = Node::alloc_with_backing_disk_buffer(allocator);
+        node->id = ++current_node_id;
+        return node;
+    }
+
+    Node *alloc_node_with_backing_disk_buffer() {
+        ++header->index_nodes_count;
+        auto *node = Node::alloc_with_backing_disk_buffer(allocator);
+        node->id = ++current_node_id;
+        return node;
+    }
+
     ok::Allocator *allocator;
     ok::File state_file;
     DiskHeader *header;
     Node *root;
     ok::Slice<U8> write_buffer;
     BTreeStateFlags flags;
+    U64 current_node_id;
 };
 
 ok::Optional<ok::File::OpenError> BTreeIndex::create(ok::Allocator *allocator, ok::StringView state_filename,
@@ -360,5 +365,19 @@ bool BTreeIndex::contains(U64 key) {
 bool BTreeIndex::first_constructed() {
     auto *impl = static_cast<BTreeState *>(pImpl);
     return impl->flags & FLAG_FIRST_CONSTRUCTION;
+}
+
+UZ BTreeIndex::order() {
+    return BTREE_ORDER;
+}
+
+U64 BTreeIndex::height() {
+    auto *impl = static_cast<BTreeState *>(pImpl);
+    return impl->header->height;
+}
+
+U64 BTreeIndex::node_count() {
+    auto *impl = static_cast<BTreeState *>(pImpl);
+    return impl->header->index_nodes_count;
 }
 }; // namespace xmdb
