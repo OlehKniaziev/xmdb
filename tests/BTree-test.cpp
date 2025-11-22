@@ -61,7 +61,7 @@ TEST(BTreeIndexTest, contains_after_insert) {
     ASSERT_TRUE(index.contains(2));
 }
 
-TEST(BTreeIndexTest, grows) {
+TEST(BTreeIndexTest, growing) {
     BTreeIndex index = default_index();
 
     UZ i;
@@ -76,4 +76,9 @@ TEST(BTreeIndexTest, grows) {
 
     ASSERT_EQ(index.height(), 2);
     ASSERT_EQ(index.node_count(), 3);
+
+    for (i = 0; i <= BTREE_MAX_KEYS; ++i) {
+        // OK_ASSERT(index.contains(i));
+        ASSERT_TRUE(index.contains(i)) << "does not contain " << i;;
+    }
 }

@@ -197,6 +197,8 @@ struct BTreeState {
 
         OK_VERIFY(num_read == BTREE_PAGE_SIZE);
 
+        node->id = node_id;
+
         return node;
     }
 
@@ -213,7 +215,7 @@ struct BTreeState {
 
         U64 full_child_id = full_child->id;
 
-        U64 median_key = full_child->keys()[BTREE_ORDER];
+        U64 median_key = full_child->keys()[BTREE_ORDER - 1];
 
         Node *new_child = alloc_node_with_backing_disk_buffer();
         new_child->set_leaf(full_child->is_leaf());
@@ -344,7 +346,7 @@ ok::Optional<ok::File::OpenError> BTreeIndex::create(ok::Allocator *allocator, o
 
 BTreeIndex BTreeIndex::create(ok::Allocator *allocator, ok::File state_file) {
     BTreeIndex tree{};
-    auto error_string = BTreeState::create(allocator, state_file, (BTreeState **)&tree.pImpl);
+    auto error_string = BTreeState::create(allocator, state_file, (BTreeState **) &tree.pImpl);
     OK_VERIFY(!error_string.has_value());
     OK_VERIFY(tree.pImpl != nullptr);
     return tree;
