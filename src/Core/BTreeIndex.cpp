@@ -1,4 +1,6 @@
-#include "BTree.hpp"
+// TODO(oleh): Make this load nodes only if they aren't in memory already.
+// This would require an in-memory index of live nodes, or something like that.
+#include "BTreeIndex.hpp"
 
 namespace xmdb {
 struct DiskHeader {
@@ -184,6 +186,40 @@ struct BTreeState {
         return node_search(root, key, out_node);
     }
 
+    inline bool remove_node(Node *node, U64 key) {
+#if 0
+        S64 i = 0;
+
+        for (; i < (S64)node->keys_count() && key < node->keys()[i]; ++i) {
+        }
+
+        if (i == (S64)node->keys_count()) {
+            if (node->is_leaf()) return false;
+            Node *child = load_node_from_disk(node, i);
+            return remove_node(child, key);
+        }
+
+        if (node->keys()[i] == key) {
+            if (node->is_leaf()) {
+                for (; i < (S64)node->keys_count() - 1; ++i) {
+                    node->keys()[i] = node->keys()[i - 1];
+                }
+
+                return true;
+            }
+        }
+#else
+        OK_UNUSED(node);
+        OK_UNUSED(key);
+
+        OK_TODO();
+#endif // 0
+    }
+
+    bool remove(U64 key) {
+        return remove_node(root, key);
+    }
+
     Node *load_node_from_disk(Node *parent, U64 child_index) {
         U64 node_id = parent->children()[child_index];
 
@@ -362,6 +398,11 @@ bool BTreeIndex::contains(U64 key) {
     Node *out_node;
     S64 index = impl->search(key, &out_node);
     return index != -1;
+}
+
+bool BTreeIndex::remove(U64 key) {
+    auto *impl = static_cast<BTreeState *>(pImpl);
+    return impl->remove(key);
 }
 
 bool BTreeIndex::first_constructed() {

@@ -25,6 +25,8 @@ struct BTreeIndex {
 
     bool contains(U64);
 
+    bool remove(U64);
+
     bool first_constructed();
 
     UZ order();

@@ -1,4 +1,4 @@
-#include <Core/BTree.hpp>
+#include <Core/BTreeIndex.hpp>
 #include <gtest/gtest.h>
 
 using namespace xmdb;
@@ -79,6 +79,25 @@ TEST(BTreeIndexTest, growing) {
 
     for (i = 0; i <= BTREE_MAX_KEYS; ++i) {
         // OK_ASSERT(index.contains(i));
-        ASSERT_TRUE(index.contains(i)) << "does not contain " << i;;
+        ASSERT_TRUE(index.contains(i)) << "does not contain " << i;
+        ;
     }
 }
+
+#if 0
+
+TEST(BTreeIndexTest, remove) {
+    BTreeIndex index = default_index();
+
+    constexpr U64 value = 1;
+
+    index.insert(value);
+
+    ASSERT_TRUE(index.contains(value));
+
+    index.remove(value);
+
+    ASSERT_FALSE(index.contains(value));
+}
+
+#endif // 0
