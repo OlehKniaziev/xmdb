@@ -1,5 +1,7 @@
 #pragma once
 
+#include "ok.hpp"
+
 #include "DBRecord.hpp"
 
 namespace xmdb {

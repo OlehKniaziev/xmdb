@@ -23,6 +23,11 @@ struct InMemoryTableStream {
     Slice<T> values;
 };
 
+template <typename T, UZ A = alignof(T)>
+struct DiskTableStream {
+    PageList *page_list;
+};
+
 template <typename T>
 struct TableStream {
     enum Type {
@@ -116,6 +121,7 @@ struct TableStream {
     union {
         ComputedTableStream<T> computed;
         InMemoryTableStream<T> in_memory;
+        DiskTableStream<T> on_disk;
         T constant;
         Once once;
     } u;

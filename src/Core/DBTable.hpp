@@ -1,7 +1,7 @@
 #pragma once
 
-#include "DBValue.hpp"
 #include "DBIndex.hpp"
+#include "DBValue.hpp"
 #include "ok.hpp"
 
 namespace xmdb {
@@ -16,26 +16,23 @@ struct DBTableOutlet {
     ok::Slice<DBValue> values;
 };
 
-struct DBTable {
+class DBTable {
     enum : U16 {
         F_ANON,
     };
 
-    static DBTable *alloc(ok::Allocator *allocator,
-                          ok::StringView name,
-                          UZ column_count,
-                          ok::StringView *column_names,
-                          SQL::ColumnType *column_types,
-                          DBValue *column_values,
-                          UZ rows_count);
+public:
+    static DBTable *alloc(ok::Allocator *allocator, ok::StringView name, UZ column_count, ok::StringView *column_names,
+                          SQL::ColumnType *column_types, DBValue *column_values, UZ rows_count);
 
     inline DBTableOutlet use() {
-        return DBTableOutlet {
-            .rows_count = rows_count,
-            .values = {columns_values, columns_count},
+        return DBTableOutlet{
+                .rows_count = rows_count,
+                .values = {columns_values, columns_count},
         };
     }
 
+private:
     U16 flags;
     ok::StringView name;
     UZ columns_count;
@@ -45,4 +42,4 @@ struct DBTable {
     DBValue *columns_values;
     ok::Table<UZ, DBIndex> indices;
 };
-};
+}; // namespace xmdb

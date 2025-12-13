@@ -5,7 +5,7 @@
 #include "TableStream.hpp"
 
 namespace xmdb {
-struct DBTable;
+class DBTable;
 
 struct Null {
 };
