@@ -25,7 +25,7 @@ struct InMemoryTableStream {
 
 template <typename T, UZ A = alignof(T)>
 struct DiskTableStream {
-    PageList *page_list;
+    PagedSeekList *page_list;
 };
 
 template <typename T>
