@@ -249,7 +249,7 @@ static void execute_instruction(TypedCompiledQuery *query, UZ i, QueryExecutionC
         bool deleted = false;
 
         for (UZ i = 0; i < conn->db->tables.count; ++i) {
-            if (conn->db->tables[i]->name == table_name) {
+            if (conn->db->tables[i]->name() == table_name) {
                 deleted = true;
                 conn->db->tables.remove_at(i);
                 break;

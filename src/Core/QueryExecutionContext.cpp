@@ -36,9 +36,9 @@ void QueryExecutionContext::put_var(U32 ip, StringView name, DBValue value) {
 DBValue QueryExecutionContext::fetch_column(DBTable *table, StringView column_name) {
     CHECK_READ(this);
 
-    for (UZ i = 0; i < table->columns_count; ++i) {
-        if (table->columns_names[i] == column_name) {
-            return table->columns_values[i];
+    for (UZ i = 0; i < table->columns_count(); ++i) {
+        if (table->columns_names()[i] == column_name) {
+            return table->columns_values()[i];
         }
     }
 
@@ -50,7 +50,7 @@ DBTable *QueryExecutionContext::fetch_table(StringView table_name) {
 
     for (UZ i = 0; i < current_db->tables.count; ++i) {
         DBTable *table = current_db->tables[i];
-        if (table->name == table_name) {
+        if (table->name() == table_name) {
             return table;
         }
     }
@@ -100,8 +100,8 @@ DBTable *QueryExecutionContext::emit_query(U32 columns_count, SQL::ColumnType *c
 
     for (UZ i = 0; i < emitted_columns.count; ++i) {
         DBTable *table = tables[i];
-        if (table->rows_count > rows_count) {
-            rows_count = table->rows_count;
+        if (table->rows_count() > rows_count) {
+            rows_count = table->rows_count();
         }
     }
 
@@ -157,20 +157,20 @@ void QueryExecutionContext::commit_insert() {
 
             for (UZ j = 0; j < columns_to_insert_count; ++j) {
                 StringView column_name = columns_to_insert_names[j];
-                for (UZ c = 0; c < table->columns_count; ++c) {
-                    if (table->columns_names[c] != column_name) continue;
+                for (UZ c = 0; c < table->columns_count(); ++c) {
+                    if (table->columns_names()[c] != column_name) continue;
 
                     DBValue column_value = columns_to_insert_values[j];
-                    DBValue old_value = table->columns_values[c];
+                    DBValue old_value = table->columns_values()[c];
                     DBValue new_value = DBValue::concat(allocator, old_value, column_value);
 
-                    table->columns_values[c] = new_value;
+                    table->columns_values()[c] = new_value;
                     break;
                 }
             }
         }
 
-        table->rows_count += rows.count;
+        table->set_rows_count(table->rows_count() + rows.count);
     });
 
     rows_to_insert.clear();
@@ -195,10 +195,10 @@ void QueryExecutionContext::commit_update() {
 
     for (UZ i = 0; i < columns_to_update.count; ++i) {
         StringView column_name = columns_to_update_names[i];
-        for (UZ c = 0; c < table->columns_count; ++c) {
-            if (table->columns_names[c] != column_name) continue;
+        for (UZ c = 0; c < table->columns_count(); ++c) {
+            if (table->columns_names()[c] != column_name) continue;
             DBValue new_value = columns_to_update_values[i];
-            table->columns_values[c] = new_value;
+            table->columns_values()[c] = new_value;
             break;
         }
     }
@@ -210,14 +210,14 @@ void QueryExecutionContext::commit_update() {
 void QueryExecutionContext::delete_table(DBTable *table) {
     CHECK_WRITE(this);
 
-    for (UZ i = 0; i < table->columns_count; ++i) {
-        SQL::ColumnType column_type = table->columns_types[i];
+    for (UZ i = 0; i < table->columns_count(); ++i) {
+        SQL::ColumnType column_type = table->columns_types()[i];
         SQL::Type value_type = column_type_to_type(column_type);
         DBValue new_value = DBValue::empty(value_type);
-        table->columns_values[i] = new_value;
+        table->columns_values()[i] = new_value;
     }
 
-    table->rows_count = 0;
+    table->set_rows_count(0);
 }
 
 void QueryExecutionContext::create_user(StringView name) {

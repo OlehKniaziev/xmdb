@@ -1,12 +1,13 @@
 #pragma once
 
 #include "ok.hpp"
+#include "PagedSeekList.hpp"
 
 namespace xmdb {
 
 template <typename T>
 struct ComputedTableStream {
-    using Computation = Optional<T> (*)(void *);
+    using Computation = ok::Optional<T> (*)(void *);
     using Reset = void (*)(void *);
 
     ComputedTableStream(Computation computation, Reset reset, void *data) : computation{computation}, reset{reset}, data{data} {}
@@ -20,7 +21,7 @@ template <typename T>
 struct InMemoryTableStream {
     explicit InMemoryTableStream(ok::Slice<T> values) : offset{0}, values{values} {}
     UZ offset;
-    Slice<T> values;
+    ok::Slice<T> values;
 };
 
 template <typename T, UZ A = alignof(T)>
@@ -49,7 +50,7 @@ struct TableStream {
         };
     }
 
-    static TableStream<T> in_memory(Slice<T> values) {
+    static TableStream<T> in_memory(ok::Slice<T> values) {
         return TableStream<T> {
             .type = IN_MEMORY,
             .u = {
@@ -91,10 +92,10 @@ struct TableStream {
         streams->a = lhs;
         streams->b = rhs;
 
-        auto computation = [](void *streams_ptr) -> Optional<T> {
+        auto computation = [](void *streams_ptr) -> ok::Optional<T> {
             ok::Pair<TableStream<T>, TableStream<T>> *streams = static_cast<ok::Pair<TableStream<T>, TableStream<T>> *>(streams_ptr);
 
-            Optional<T> lhs_value = streams->a.next();
+            ok::Optional<T> lhs_value = streams->a.next();
             if (lhs_value) return lhs_value;
             return streams->b.next();
         };

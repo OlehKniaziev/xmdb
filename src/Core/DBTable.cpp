@@ -9,18 +9,18 @@ DBTable *DBTable::alloc(ok::Allocator *allocator,
                         DBValue *columns_values,
                         UZ rows_count) {
     DBTable *table = allocator->alloc<DBTable>();
-    table->name = name;
-    table->columns_count = columns_count;
-    table->columns_names = columns_names;
+    table->m_name = name;
+    table->m_columns_count = columns_count;
+    table->m_columns_names = columns_names;
     if (columns_values != nullptr) {
-        table->columns_values = columns_values;
-        table->rows_count = rows_count;
+        table->m_columns_values = columns_values;
+        table->m_rows_count = rows_count;
     } else {
-        table->columns_values = allocator->alloc<DBValue>(columns_count);
+        table->m_columns_values = allocator->alloc<DBValue>(columns_count);
 
         for (UZ i = 0; i < columns_count; ++i) {
             SQL::ColumnType column_type = columns_types[i];
-            DBValue *column_value = &table->columns_values[i];
+            DBValue *column_value = &table->m_columns_values[i];
 
             switch (column_type) {
             case SQL::COLUMN_INTEGER: {
@@ -39,10 +39,10 @@ DBTable *DBTable::alloc(ok::Allocator *allocator,
             }
         }
 
-        table->rows_count = 0;
+        table->m_rows_count = 0;
     }
-    table->columns_types = columns_types;
-    table->indices = ok::Table<UZ, DBIndex>::alloc(allocator);
+    table->m_columns_types = columns_types;
+    table->m_indices = ok::Table<UZ, DBIndex>::alloc(allocator);
     return table;
 }
 } // namespace xmdb

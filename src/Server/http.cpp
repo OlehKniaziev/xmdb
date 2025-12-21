@@ -82,7 +82,7 @@ DECLARE_HANDLER(connect_handler) {
     }
 
     ConnectionId connection_id = gen_connection(requested_db, user);
-    ctx->Content = WebArenaFormat(ctx->Arena, "%llu", connection_id);
+    ctx->Content = WebArenaFormat(&ctx->Arena, "%llu", connection_id);
 
     return HTTP_STATUS_OK;
 }
@@ -135,7 +135,7 @@ DECLARE_HANDLER(run_query_handler) {
     bool ok = xmdb::compile_and_execute_source(&connection_data.temp_arena, connection_data.connection, source_sv,
                                                &query_results, &error);
 
-    WebJsonBegin(ctx->Arena);
+    WebJsonBegin(&ctx->Arena);
     WebJsonBeginObject();
 
     if (ok) {
@@ -151,8 +151,8 @@ DECLARE_HANDLER(run_query_handler) {
 
             WebJsonBeginArray();
 
-            for (UZ i = 0; i < results_table->columns_count; ++i) {
-                ok::StringView column_name_sv = results_table->columns_names[i];
+            for (UZ i = 0; i < results_table->columns_count(); ++i) {
+                ok::StringView column_name_sv = results_table->columns_names()[i];
                 web_string_view column_name = {
                         .Items = (u8 *) column_name_sv.data,
                         .Count = column_name_sv.count,
@@ -169,13 +169,13 @@ DECLARE_HANDLER(run_query_handler) {
 
             xmdb::DBTableOutlet table_outlet = results_table->use();
 
-            for (UZ r = 0; r < results_table->rows_count; ++r) {
+            for (UZ r = 0; r < results_table->rows_count(); ++r) {
                 WebJsonPrepareArrayElement();
 
                 WebJsonBeginObject();
 
-                for (UZ i = 0; i < results_table->columns_count; ++i) {
-                    ok::StringView column_name_sv = results_table->columns_names[i];
+                for (UZ i = 0; i < results_table->columns_count(); ++i) {
+                    ok::StringView column_name_sv = results_table->columns_names()[i];
                     web_string_view column_name = {
                             .Items = (u8 *) column_name_sv.data,
                             .Count = column_name_sv.count,
@@ -188,7 +188,7 @@ DECLARE_HANDLER(run_query_handler) {
                         Optional<S64> i = stream.next();
                         if (!i.has_value()) {
                             OK_PANIC_FMT("Expected to have %zu rows in table, but streams exhausted at %zu",
-                                         results_table->rows_count, r);
+                                         results_table->rows_count(), r);
                         }
 
                         WebJsonPutKey(column_name);
@@ -201,7 +201,7 @@ DECLARE_HANDLER(run_query_handler) {
                         Optional<ok::String> s = stream.next();
                         if (!s.has_value()) {
                             OK_PANIC_FMT("Expected to have %zu rows in table, but streams exhausted at %zu",
-                                         results_table->rows_count, r);
+                                         results_table->rows_count(), r);
                         }
 
                         web_string_view value = {
@@ -219,7 +219,7 @@ DECLARE_HANDLER(run_query_handler) {
                         Optional<bool> b = stream.next();
                         if (!b.has_value()) {
                             OK_PANIC_FMT("Expected to have %zu rows in table, but streams exhausted at %zu",
-                                         results_table->rows_count, r);
+                                         results_table->rows_count(), r);
                         }
 
                         WebJsonPutKey(column_name);
@@ -237,7 +237,7 @@ DECLARE_HANDLER(run_query_handler) {
                         Optional<xmdb::Null> b = stream.next();
                         if (!b.has_value()) {
                             OK_PANIC_FMT("Expected to have %zu rows in table, but streams exhausted at %zu",
-                                         results_table->rows_count, r);
+                                         results_table->rows_count(), r);
                         }
 
                         WebJsonPutKey(column_name);
@@ -279,12 +279,13 @@ DECLARE_HANDLER(run_query_handler) {
 }
 
 void run_http_server(U16 port) {
-    web_http_server http_server{};
-    WebHttpServerInit(&http_server);
+    web_http_server server{};
+    web_http_server_config config{.NumThreads = 1};
+    WebHttpServerInit(&server, &config);
 
-    WebHttpServerAttachHandler(&http_server, "/connect", connect_handler);
-    WebHttpServerAttachHandler(&http_server, "/run-query", run_query_handler);
+    WebHttpServerAttachHandler(&server, "/connect", connect_handler);
+    WebHttpServerAttachHandler(&server, "/run-query", run_query_handler);
 
-    WebHttpServerStart(&http_server, port);
+    WebHttpServerStart(&server, port);
 }
 } // namespace xmdb::server
