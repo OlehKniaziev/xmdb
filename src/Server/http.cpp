@@ -82,7 +82,7 @@ DECLARE_HANDLER(connect_handler) {
     }
 
     ConnectionId connection_id = gen_connection(requested_db, user);
-    ctx->Content = WebArenaFormat(ctx->Arena, "%llu", connection_id);
+    ctx->Content = WebArenaFormat(&ctx->Arena, "%llu", connection_id);
 
     return HTTP_STATUS_OK;
 }
@@ -135,7 +135,7 @@ DECLARE_HANDLER(run_query_handler) {
     bool ok = xmdb::compile_and_execute_source(&connection_data.temp_arena, connection_data.connection, source_sv,
                                                &query_results, &error);
 
-    WebJsonBegin(ctx->Arena);
+    WebJsonBegin(&ctx->Arena);
     WebJsonBeginObject();
 
     if (ok) {
@@ -279,12 +279,16 @@ DECLARE_HANDLER(run_query_handler) {
 }
 
 void run_http_server(U16 port) {
-    web_http_server http_server{};
-    WebHttpServerInit(&http_server);
+    web_http_server server{};
+    web_http_server_config config{
+        // TODO(oleh): Make this configurable for user.
+        .NumThreads = 1,
+    };
+    WebHttpServerInit(&server, &config);
 
-    WebHttpServerAttachHandler(&http_server, "/connect", connect_handler);
-    WebHttpServerAttachHandler(&http_server, "/run-query", run_query_handler);
+    WebHttpServerAttachHandler(&server, "/connect", connect_handler);
+    WebHttpServerAttachHandler(&server, "/run-query", run_query_handler);
 
-    WebHttpServerStart(&http_server, port);
+    WebHttpServerStart(&server, port);
 }
 } // namespace xmdb::server
