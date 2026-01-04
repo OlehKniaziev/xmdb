@@ -2,72 +2,118 @@
 
 #include "DBIndex.hpp"
 #include "DBValue.hpp"
+#include "ColumnLayout.hpp"
 #include "ok.hpp"
 
 namespace xmdb {
-struct DBTableOutlet {
-    ~DBTableOutlet() {
-        for (UZ i = 0; i < values.count; ++i) {
-            values[i].reset();
-        }
-    }
-
-    UZ rows_count;
-    ok::Slice<DBValue> values;
-};
-
-class DBTable {
-    enum : U16 {
-        F_ANON,
-    };
-
+class Value {
 public:
-    static DBTable *alloc(ok::Allocator *allocator, ok::StringView name, UZ column_count, ok::StringView *column_names,
-                          SQL::ColumnType *column_types, DBValue *column_values, UZ rows_count);
+    Value() = delete;
 
-    inline DBTableOutlet use() {
-        return DBTableOutlet{
-                .rows_count = m_rows_count,
-                .values = {m_columns_values, m_columns_count},
-        };
+    static Value integer(S64 value) {
+        return Value{SQL::TYPE_INT, reinterpret_cast<void *>(static_cast<U64>(value))};
     }
 
-    inline ok::StringView name() const {
-        return m_name;
-    }
+    template <typename T>
+    T cast() = delete;
 
-    inline UZ columns_count() const {
-        return m_columns_count;
-    }
-
-    inline ok::Slice<ok::StringView> columns_names() {
-        return {m_columns_names, m_columns_count};
-    }
-
-    inline ok::Slice<DBValue> columns_values() {
-        return {m_columns_values, m_columns_count};
-    }
-
-    inline ok::Slice<SQL::ColumnType> columns_types() {
-        return {m_columns_types, m_columns_count};
-    }
-
-    inline UZ rows_count() const {
-        return m_rows_count;
-    }
-
-    inline void set_rows_count(UZ x) {
-        m_rows_count = x;
+    SQL::Type type() const {
+        return m_type;
     }
 
 private:
-    U16 m_flags;
+    Value(SQL::Type type, void *data) : m_type{type}, m_data{data} {}
+
+    SQL::Type m_type;
+    void *m_data;
+};
+
+template <>
+S64 Value::cast<S64>();
+
+template <>
+ok::String Value::cast<ok::String>();
+
+template <>
+bool Value::cast<bool>();
+
+class DBTableStream {
+public:
+    ok::Optional<Value> next() {
+        OK_TODO();
+    }
+
+private:
+};
+
+class DBTable {
+public:
+    using Flags = U16;
+    enum : Flags {
+        F_ANON    = 1 << 0,
+        F_PERSIST = 1 << 1,
+        F_PROXY   = 1 << 2,
+    };
+
+    DBTable(ok::Allocator *allocator,
+            Flags flags,
+            ok::StringView name,
+            UZ column_count,
+            ok::StringView *column_names,
+            SQL::ColumnType *column_types);
+
+    Flags flags() const {
+        return m_flags;
+    }
+
+    ok::StringView name() const {
+        return m_name;
+    }
+
+    UZ columns_count() const {
+        return m_columns_count;
+    }
+
+    ok::Slice<ok::StringView> columns_names() {
+        return {m_columns_names, m_columns_count};
+    }
+
+    ok::Slice<SQL::ColumnType> columns_types() {
+        return {m_columns_types, m_columns_count};
+    }
+
+    ok::Slice<ColumnLayout> columns_layout() {
+        return {m_columns_layout, m_columns_count};
+    }
+
+    UZ rows_count() const {
+        return m_rows_count;
+    }
+
+    void set_rows_count(UZ x) {
+        m_rows_count = x;
+    }
+
+protected:
     ok::StringView m_name;
+    U16 m_flags;
     UZ m_columns_count;
     UZ m_rows_count;
     ok::StringView *m_columns_names;
     SQL::ColumnType *m_columns_types;
-    DBValue *m_columns_values;
     ok::Table<UZ, DBIndex> m_indices;
+    ColumnLayout *m_columns_layout;
+};
+
+class DBTableOutlet {
+public:
+    explicit DBTableOutlet(DBTable &table) : m_table{table} {}
+
+    DBTableStream column_stream(UZ) {
+        OK_TODO();
+    }
+
+private:
+    DBTable &m_table;
 };
 }; // namespace xmdb

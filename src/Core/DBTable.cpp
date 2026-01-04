@@ -1,48 +1,85 @@
 #include "DBTable.hpp"
+#include "FixedString.hpp"
 
 namespace xmdb {
-DBTable *DBTable::alloc(ok::Allocator *allocator,
-                        ok::StringView name,
-                        UZ columns_count,
-                        ok::StringView *columns_names,
-                        SQL::ColumnType *columns_types,
-                        DBValue *columns_values,
-                        UZ rows_count) {
-    DBTable *table = allocator->alloc<DBTable>();
-    table->m_name = name;
-    table->m_columns_count = columns_count;
-    table->m_columns_names = columns_names;
-    if (columns_values != nullptr) {
-        table->m_columns_values = columns_values;
-        table->m_rows_count = rows_count;
-    } else {
-        table->m_columns_values = allocator->alloc<DBValue>(columns_count);
+template <>
+S64 Value::cast<S64>() {
+    OK_ASSERT(m_type == SQL::TYPE_INT);
+    return static_cast<S64>(reinterpret_cast<U64>(m_data));
+}
 
-        for (UZ i = 0; i < columns_count; ++i) {
-            SQL::ColumnType column_type = columns_types[i];
-            DBValue *column_value = &table->m_columns_values[i];
+template <>
+ok::String Value::cast<ok::String>() {
+    OK_ASSERT(m_type == SQL::TYPE_STRING);
+    return *reinterpret_cast<ok::String *>(m_data);
+}
 
-            switch (column_type) {
-            case SQL::COLUMN_INTEGER: {
-                TableStream<S64> ints = TableStream<S64>::empty();
-                DBValue value = DBValue::integer(ints);
-                *column_value = value;
-                break;
-            }
-            case SQL::COLUMN_TEXT: {
-                TableStream<String> strings = TableStream<String>::empty();
-                DBValue value = DBValue::string(strings);
-                *column_value = value;
-                break;
-            }
-            default: OK_TODO();
-            }
+template <>
+bool Value::cast<bool>() {
+    OK_ASSERT(m_type == SQL::TYPE_BOOL);
+    return static_cast<bool>(reinterpret_cast<U64>(m_data));
+}
+
+struct TypeLayout {
+    static constexpr UZ MAX_ALIGNMENT = sizeof(UZ);
+
+    UZ size;
+    UZ alignment;
+};
+
+static TypeLayout type_layout(SQL::ColumnType type) {
+    static_assert(FixedString::SIZE % 8 == 0);
+
+    switch (type) {
+    case SQL::ColumnType::INTEGER: return {.size = 8, .alignment = 8};
+    case SQL::ColumnType::FLOAT:   return {.size = 4, .alignment = 4};
+    case SQL::ColumnType::DOUBLE:  return {.size = 8, .alignment = 8};
+    case SQL::ColumnType::BOOLEAN: return {.size = 1, .alignment = 1};
+    case SQL::ColumnType::TEXT:    return {.size = FixedString::SIZE, .alignment = 8};
+    case SQL::ColumnType::IMAGE:   OK_TODO();
+    }
+
+    OK_UNREACHABLE();
+}
+
+// TODO(oleh): Reorder columns so that disk layout is optimized. Usually this would involve sorting the columns by type
+// sizes in ascending order.
+static ColumnLayout *compute_columns_layout(ok::Allocator *allocator,
+                                            UZ columns_count,
+                                            SQL::ColumnType *columns_types) {
+    ColumnLayout *columns_layout = allocator->alloc<ColumnLayout>(columns_count);
+    UZ offset = 0;
+
+    for (UZ i = 0; i < columns_count; ++i) {
+        SQL::ColumnType column_type = columns_types[i];
+        TypeLayout t_layout = type_layout(column_type);
+
+        if (t_layout.alignment != 1) {
+            OK_ASSERT((t_layout.alignment & 1) == 0);
+
+            offset = ok::align_up(offset, t_layout.alignment);
         }
 
-        table->m_rows_count = 0;
+        ColumnLayout column_layout = {
+            .offset = offset,
+            .size = t_layout.size,
+        };
+
+        columns_layout[i] = column_layout;
+
+        offset += t_layout.size;
     }
-    table->m_columns_types = columns_types;
-    table->m_indices = ok::Table<UZ, DBIndex>::alloc(allocator);
-    return table;
+
+    return columns_layout;
+}
+
+DBTable::DBTable(ok::Allocator *allocator,
+                 DBTable::Flags flags,
+                 ok::StringView name,
+                 UZ columns_count,
+                 ok::StringView *columns_names,
+                 SQL::ColumnType *columns_types) : m_name{name}, m_flags{flags}, m_columns_count{columns_count}, m_columns_names{columns_names}, m_columns_types{columns_types} {
+    m_indices = ok::Table<UZ, DBIndex>::alloc(allocator);
+    m_columns_layout = compute_columns_layout(allocator, columns_count, columns_types);
 }
 } // namespace xmdb

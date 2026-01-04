@@ -197,12 +197,12 @@ static Optional<U32> compile_expr(Expr *expr, IrContext *ctx) {
 
 static inline bool parse_type(StringView input, Token where, IrContext *ctx, ColumnType *out) {
     if (input == "int"_sv) {
-        *out = COLUMN_INTEGER;
+        *out = ColumnType::INTEGER;
         return true;
     }
 
     if (input == "text"_sv) {
-        *out = COLUMN_TEXT;
+        *out = ColumnType::TEXT;
         return true;
     }
 

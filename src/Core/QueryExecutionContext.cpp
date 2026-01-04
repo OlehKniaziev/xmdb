@@ -1,4 +1,5 @@
 #include "QueryExecutionContext.hpp"
+#include "new.hpp"
 
 using namespace ok::literals;
 
@@ -38,7 +39,11 @@ DBValue QueryExecutionContext::fetch_column(DBTable *table, StringView column_na
 
     for (UZ i = 0; i < table->columns_count(); ++i) {
         if (table->columns_names()[i] == column_name) {
-            return table->columns_values()[i];
+            ColumnLayout layout = table->columns_layout()[i];
+            QueryGraph::ReadNode *read_node = query_graph.read(layout.offset, layout.size);
+            SQL::ColumnType column_type = table->columns_types()[i];
+            SQL::Type value_type = column_type_to_type(column_type);
+            return DBValue{value_type, read_node};
         }
     }
 
@@ -75,9 +80,7 @@ void QueryExecutionContext::create_table(StringView table_name, SQL::TableSchema
         }
     }
 
-    DBValue *column_values = nullptr;
-    DBTable *new_table = DBTable::alloc(allocator, table_name, column_types.count, column_names, column_types.items,
-                                        column_values, 0);
+    DBTable *new_table = new /* (this->allocator) */ DBTable(allocator, DBTable::F_PERSIST, table_name, column_types.count, column_names, column_types.items);
     current_db->tables.push(new_table);
 }
 
@@ -107,8 +110,7 @@ DBTable *QueryExecutionContext::emit_query(U32 columns_count, SQL::ColumnType *c
 
     emitted_columns.count = 0;
 
-    DBTable *table =
-            DBTable::alloc(allocator, ""_sv, columns_count, columns_names, columns_types, columns_values, rows_count);
+    DBTable *table = new (allocator) DBTable{allocator, DBTable::F_ANON | DBTable::F_PROXY, ""_sv, columns_count, columns_names, columns_types};
     last_emitted_query = table;
     return table;
 }
@@ -119,6 +121,7 @@ void QueryExecutionContext::insert_column(DBTable *table, StringView column_name
 }
 
 void QueryExecutionContext::insert_row(DBTable *table) {
+#if 0
     StringView *columns_names_ptr = columns_to_insert.get_items<StringView>();
     DBValue *columns_values_ptr = columns_to_insert.get_items<DBValue>();
 
@@ -140,9 +143,14 @@ void QueryExecutionContext::insert_row(DBTable *table) {
     }
 
     columns_to_insert.count = 0;
+#else
+    OK_UNUSED(table);
+    OK_TODO();
+#endif // 0
 }
 
 void QueryExecutionContext::commit_insert() {
+#if 0
     CHECK_WRITE(this);
 
     OK_TABLE_FOREACH(rows_to_insert, table, rows, {
@@ -174,6 +182,9 @@ void QueryExecutionContext::commit_insert() {
     });
 
     rows_to_insert.clear();
+#else
+    OK_TODO();
+#endif // 0
 }
 
 void QueryExecutionContext::update_column(DBTable *table, StringView column_name, DBValue column_value) {
@@ -187,6 +198,7 @@ void QueryExecutionContext::update_column(DBTable *table, StringView column_name
 }
 
 void QueryExecutionContext::commit_update() {
+#if 0
     CHECK_WRITE(this);
 
     DBTable *table = table_to_update.get();
@@ -205,9 +217,13 @@ void QueryExecutionContext::commit_update() {
 
     columns_to_update.count = 0;
     table_to_update = {};
+#else
+    OK_TODO();
+#endif // 0
 }
 
 void QueryExecutionContext::delete_table(DBTable *table) {
+#if 0
     CHECK_WRITE(this);
 
     for (UZ i = 0; i < table->columns_count(); ++i) {
@@ -218,6 +234,10 @@ void QueryExecutionContext::delete_table(DBTable *table) {
     }
 
     table->set_rows_count(0);
+#else
+    OK_UNUSED(table);
+    OK_TODO();
+#endif // 0
 }
 
 void QueryExecutionContext::create_user(StringView name) {
@@ -229,27 +249,20 @@ void QueryExecutionContext::create_user(StringView name) {
 void QueryExecutionContext::alter_user_property(StringView user_name, StringView property_name, DBValue value) {
     CHECK_ADMIN(this);
 
-    Optional<DBUser *> target_user = current_db->find_user(user_name);
-
-    if (!target_user.has_value()) FAIL_FMT(this, "could not find user named '" OK_SV_FMT "'", OK_SV_ARG(user_name));
-
-    if (user_to_alter.has_value()) {
-        OK_ASSERT(user_to_alter.value->name == user_name);
-    } else {
-        DBUser *copied_user = allocator->alloc<DBUser>();
-        memcpy(copied_user, target_user.value, sizeof(*copied_user));
-        user_to_alter = copied_user;
+    if (!alter_user_atomic_node) {
+        alter_user_atomic_node = query_graph.atomic();
     }
 
+    QueryGraph::AtomicNode *atomic_node = alter_user_atomic_node.get();
+
     if (property_name == "PASSWORD"_sv) {
-        if (value.type != SQL::TYPE_STRING)
+        if (value.type() != SQL::TYPE_STRING)
             FAIL_FMT(this, "expected user password to be of type string, got type '%s' instead",
-                     SQL::type_name(value.type));
+                     SQL::type_name(value.type()));
 
-        TableStream<String> string_value = value.u.string;
-        Optional<String> password = string_value.next();
-
-        user_to_alter.value->sha256_password_digest = sha256_digest(password.get().view());
+        const QueryGraph::Node *value_node = value.node_repr();
+        auto *alter_node = new (allocator) QueryGraph::AlterUserNode{user_name, QueryGraph::AlterUserNode::Property::PASSWORD, value_node};
+        atomic_node->add(alter_node);
     } else {
         FAIL_FMT(this, "user '" OK_SV_FMT "' does not have property '" OK_SV_FMT "'", OK_SV_ARG(user_name),
                  OK_SV_ARG(property_name));
@@ -257,11 +270,18 @@ void QueryExecutionContext::alter_user_property(StringView user_name, StringView
 }
 
 void QueryExecutionContext::commit_alter_user() {
-    OK_ASSERT(user_to_alter.has_value());
+    alter_user_atomic_node = {};
+}
 
-    Optional<DBUser *> target_user = current_db->find_user(user_to_alter.value->name);
-    memcpy(target_user.value, user_to_alter.value, sizeof(*target_user.value));
+DBValue QueryExecutionContext::compare(DBValue &, DBValue &) {
+    OK_TODO();
+}
 
-    user_to_alter = {};
+DBTable *QueryExecutionContext::fetch_table(U32 ip) {
+    return tables.get(ip).get();
+}
+
+void QueryExecutionContext::put_table(U32 ip, DBTable *table) {
+    tables.put(ip, table);
 }
 } // namespace xmdb

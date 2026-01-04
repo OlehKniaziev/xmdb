@@ -16,15 +16,13 @@ using ok::Table;
 
 namespace xmdb::SQL {
 
-enum ColumnType {
-    COLUMN_INTEGER,
-    COLUMN_FLOAT,
-    COLUMN_DOUBLE,
-    COLUMN_TEXT,
-    COLUMN_IMAGE,
-    COLUMN_BOOLEAN,
-
-    COLUMN_MAX,
+enum class ColumnType {
+    INTEGER,
+    FLOAT,
+    DOUBLE,
+    TEXT,
+    IMAGE,
+    BOOLEAN,
 };
 
 struct TableSchema {

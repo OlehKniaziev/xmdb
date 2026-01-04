@@ -1,4 +1,5 @@
 #include <Core/BTreeIndex.hpp>
+#include <Core/constants.hpp>
 #include <gtest/gtest.h>
 
 using namespace xmdb;

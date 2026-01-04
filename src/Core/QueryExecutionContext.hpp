@@ -1,6 +1,7 @@
 #pragma once
 
 #include <csetjmp>
+
 #include "util.hpp"
 #include "DBDescriptor.hpp"
 #include "DBTable.hpp"
@@ -15,6 +16,10 @@ struct QueryExecutionContext {
     void emit_column(DBTable *, DBValue, StringView);
 
     DBTable *fetch_table(StringView);
+    DBTable *fetch_table(U32);
+
+    void put_table(U32, DBTable *);
+
     void create_table(StringView, SQL::TableSchema *);
 
     DBTable *emit_query(U32, SQL::ColumnType *);
@@ -33,19 +38,24 @@ struct QueryExecutionContext {
     void alter_user_property(StringView, StringView, DBValue);
     void commit_alter_user();
 
+    DBValue compare(DBValue &, DBValue &);
+
+    QueryExecutionContext *next;
+    QueryGraph query_graph;
     ok::Allocator *allocator;
     DBUser *user;
-    QueryExecutionContext *next;
     ok::Table<U32, DBValue> vars;
+    ok::Table<U32, DBTable *> tables;
     ok::MultiList<StringView, DBValue, DBTable *> emitted_columns;
     ok::MultiList<StringView, DBValue> columns_to_insert;
     ok::Table<DBTable *, ok::MultiList<UZ, StringView *, DBValue *>> rows_to_insert;
     ok::MultiList<StringView, DBValue> columns_to_update;
-    Optional<DBUser *> user_to_alter;
+    Optional<QueryGraph::AtomicNode *> alter_user_atomic_node;
     DBDescriptor *current_db;
     Optional<DBTable *> table_to_update;
     Optional<DBTable *> last_emitted_query;
-    jmp_buf jmpbuf;
     Optional<ErrorWithSourceLocation> error;
+    // TODO(oleh): Abstract this probably so it's easier to port later on.
+    jmp_buf jmpbuf;
 };
 } // namespace xmdb

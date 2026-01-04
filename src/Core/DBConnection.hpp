@@ -23,4 +23,4 @@ struct DBConnection {
     DBDescriptor *db;
     SQL::IrContext ir_ctx;
 };
-};
+}

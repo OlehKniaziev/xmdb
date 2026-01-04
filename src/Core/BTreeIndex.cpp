@@ -2,6 +2,8 @@
 // This would require an in-memory index of live nodes, or something like that.
 #include "BTreeIndex.hpp"
 
+#include "constants.hpp"
+
 namespace xmdb {
 struct DiskHeader {
     static DiskHeader *alloc(ok::Allocator *allocator) {

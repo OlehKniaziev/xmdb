@@ -916,6 +916,12 @@ struct String : public StringBase<String, char> {
 
 template <template <typename> class Self, typename T>
 struct OptionalBase {
+    static Self<T> empty() {
+        U8 buf[sizeof(Self<T>)] = {};
+        Self<T> *opt = reinterpret_cast<Self<T> *>(buf);
+        return *opt;
+    }
+
     const T& or_else(const T& other) const {
         auto* self = self_cast();
 
@@ -960,13 +966,6 @@ struct Optional : public OptionalBase<Optional, T> {
 
     Optional(ValueType value) : _has_value{true}, value{value} {}
 
-    static Optional<T> empty() {
-        U8 buf[sizeof(Optional<T>)];
-        Optional<T> *opt = reinterpret_cast<Optional<T> *>(buf);
-        opt->_has_value = false;
-        return *opt;
-    }
-
     inline bool has_value() const {
         return _has_value;
     }
@@ -991,8 +990,6 @@ struct Optional : public OptionalBase<Optional, T> {
 
     bool _has_value;
     ValueType value;
-
-    static const Optional<T> NONE;
 };
 
 template <typename T>
@@ -1036,8 +1033,6 @@ struct Optional<T*> : public OptionalBase<Optional, T*> {
     }
 
     ValueType value;
-
-    static const Optional<T> NONE;
 };
 
 static_assert(sizeof(Optional<int*>) == sizeof(int*));
@@ -1297,13 +1292,6 @@ template <typename T>
 bool operator ==(const HashPtr<T>& lhs, const HashPtr<T>& rhs) {
     return *lhs.value == *rhs.value;
 }
-
-// OPTIONAL IMPLEMENTATION
-template <typename T>
-const Optional<T> Optional<T>::NONE = Optional<T>{};
-
-template <typename T>
-const Optional<T> Optional<T*>::NONE = Optional<T*>{};
 
 // ARRAY BASE IMPLEMENTATION
 template <typename Self, typename T>

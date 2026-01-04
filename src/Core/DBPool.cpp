@@ -31,24 +31,29 @@ DBDescriptor *DBPool::create_db(StringView db_name) {
 QueryExecutionContext *DBPool::rent_empty_execution_context(DBDescriptor *db, DBUser *user) {
     if (execution_contexts) {
         QueryExecutionContext *ctx = execution_contexts;
+        ctx->query_graph.reset();
         ctx->current_db = db;
         ctx->user = user;
         ctx->vars.clear();
+        ctx->tables.clear();
         ctx->emitted_columns.count = 0;
         ctx->columns_to_insert.count = 0;
         ctx->rows_to_insert.clear();
         ctx->columns_to_update.count = 0;
         ctx->table_to_update = {};
         ctx->last_emitted_query = {};
+        ctx->alter_user_atomic_node = {};
         execution_contexts = execution_contexts->next;
         return ctx;
     }
 
     QueryExecutionContext *ctx = allocator->alloc<QueryExecutionContext>();
+    ctx->next = nullptr;
+    ctx->query_graph = QueryGraph{allocator};
     ctx->allocator = allocator;
     ctx->user = user;
-    ctx->next = nullptr;
     ctx->vars = ok::Table<U32, DBValue>::alloc(allocator);
+    ctx->tables = ok::Table<U32, DBTable *>::alloc(allocator);
     ctx->emitted_columns = ok::MultiList<StringView, DBValue, DBTable *>::alloc(allocator);
     ctx->columns_to_insert = ok::MultiList<StringView, DBValue>::alloc(allocator);
     ctx->rows_to_insert = ok::Table<DBTable *, ok::MultiList<UZ, StringView *, DBValue *>>::alloc(allocator);
@@ -56,6 +61,7 @@ QueryExecutionContext *DBPool::rent_empty_execution_context(DBDescriptor *db, DB
     ctx->current_db = db;
     ctx->table_to_update = {};
     ctx->last_emitted_query = {};
+    ctx->alter_user_atomic_node = {};
     return ctx;
 }
 
