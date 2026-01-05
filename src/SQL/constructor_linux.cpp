@@ -9,6 +9,8 @@ __attribute__((constructor)) void init_global_state() {
     SQL::token_table = Table<StringView, SQL::Token::Type>::alloc(&state_arena);
 #define X(str, kw) SQL::token_table.put(StringView{str}, SQL::Token::kw);
     XMDB_ENUM_SQL_KEYWORDS
-    #undef X
+#undef X
+
+    log::info("Initialized global state");
 }
 };

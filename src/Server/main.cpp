@@ -9,6 +9,7 @@
 #include "Config.hpp"
 
 using namespace xmdb::server;
+using log = xmdb::log;
 
 int main(int argc, char **argv) {
     xmdb::init_global_state();
@@ -19,7 +20,7 @@ int main(int argc, char **argv) {
 
     switch (config.protocol) {
     case Protocol::HTTP: {
-        printf("Starting the server on port %u\n", config.port);
+        log::info("Starting the server on port %u\n", config.port);
         run_http_server(config.port);
         break;
     }
