@@ -11,6 +11,7 @@ add_library(LibCore
   Core.cpp
   util.cpp
   hash.cpp
+  Logger.cpp
 )
 
 set_property(TARGET LibCore PROPERTY POSITION_INDEPENDENT_CODE 1)
