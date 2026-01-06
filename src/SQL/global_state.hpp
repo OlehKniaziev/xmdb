@@ -1,8 +1,5 @@
-#ifndef XMDB_GLOBAL_STATE_HPP
-#define XMDB_GLOBAL_STATE_HPP
+#pragma once
 
-namespace xmdb {
+namespace xmdb::SQL {
 void init_global_state();
 };
-
-#endif // XMDB_GLOBAL_STATE_HPP

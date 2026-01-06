@@ -257,7 +257,10 @@ DECLARE_HANDLER(run_query_handler) {
 
 void run_http_server(U16 port) {
     web_http_server server{};
-    web_http_server_config config{.NumThreads = 1};
+    web_http_server_config config{
+        // TODO(oleh): Make this configurable for user.
+        .NumThreads = 1,
+    };
     WebHttpServerInit(&server, &config);
 
     WebHttpServerAttachHandler(&server, "/connect", connect_handler);

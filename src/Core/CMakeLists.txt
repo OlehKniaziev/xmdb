@@ -13,6 +13,7 @@ add_library(LibCore
   hash.cpp
   BTreeIndex.cpp
   QueryGraph.cpp
+  Logger.cpp
 )
 
 set_property(TARGET LibCore PROPERTY POSITION_INDEPENDENT_CODE 1)
