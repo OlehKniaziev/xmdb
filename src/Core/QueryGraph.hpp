@@ -58,7 +58,7 @@ public:
             return m_offset;
         }
 
-        ok::Slice<const U8> buffer() const {
+        ok::Slice<U8> buffer() const {
             return m_buffer;
         }
 

@@ -3,37 +3,27 @@
 #include <SQL/type_check.hpp>
 
 #include "QueryGraph.hpp"
+#include "ColumnLayout.hpp"
 
 namespace xmdb {
 class DBValue {
 public:
+    enum class Kind {
+        COLUMN,
+        // WRITE,
+        COMPARE,
+        CONSTANT,
+        // ALTER_USER,
+        // ATOMIC,
+    };
+
     DBValue() = delete;
-
-    // DBValue(const DBValue &) = delete;
-    // DBValue(DBValue &&) = delete;
-
-    DBValue(SQL::Type type, const QueryGraph::Node *node) : m_type{type}, m_node_repr{node} {}
 
     static DBValue concat(ok::Allocator *, DBValue, DBValue) {
         OK_TODO();
     }
 
-    static DBValue const_bool(QueryGraph &graph, bool b) {
-        QueryGraph::ConstantNode *node = graph.const_bool(b);
-        return DBValue{SQL::TYPE_BOOL, node};
-    }
-
-    static DBValue const_int(QueryGraph &graph, S64 i) {
-        QueryGraph::ConstantNode *node = graph.const_int(i);
-        return DBValue{SQL::TYPE_INT, node};
-    }
-
-    static DBValue const_string(QueryGraph &graph, ok::StringView s) {
-        QueryGraph::ConstantNode *node = graph.const_string(s);
-        return DBValue{SQL::TYPE_STRING, node};
-    }
-
-    static DBValue null() {
+    static DBValue *null() {
         OK_TODO();
     }
 
@@ -41,14 +31,60 @@ public:
         return m_type;
     }
 
-    const QueryGraph::Node *node_repr() const {
-        return m_node_repr;
+    Kind kind() const {
+        return m_kind;
     }
 
-    DBValue cmp(QueryGraph &, DBValue);
+protected:
+    explicit DBValue(SQL::Type type, Kind kind) : m_type{type}, m_kind{kind} {}
+
+    SQL::Type m_type;
+    Kind m_kind;
+};
+
+class ColumnDBValue : public DBValue {
+public:
+    ColumnDBValue(SQL::Type type, ColumnLayout layout) : DBValue{type, Kind::COLUMN}, m_layout{layout} {}
 
 private:
-    SQL::Type m_type;
-    const QueryGraph::Node *m_node_repr;
+    ColumnLayout m_layout;
+};
+
+class ConstDBValue : public DBValue {
+public:
+    enum class ConstKind {
+        INT,
+        STRING,
+        BOOL,
+    };
+
+    explicit ConstDBValue(S64 i) : ConstDBValue{SQL::TYPE_INT, ConstKind::INT, reinterpret_cast<void *>(i)} {}
+    explicit ConstDBValue(ok::String *s) : ConstDBValue{SQL::TYPE_STRING, ConstKind::STRING, static_cast<void *>(s)} {}
+    explicit ConstDBValue(bool b) : ConstDBValue{SQL::TYPE_BOOL, ConstKind::BOOL, reinterpret_cast<void *>(static_cast<U64>(b))} {}
+
+private:
+    explicit ConstDBValue(SQL::Type type, ConstKind kind, void *data) : DBValue{type, Kind::CONSTANT}, m_const_kind{kind}, m_data{data} {}
+
+    ConstKind m_const_kind;
+    void *m_data;
+};
+
+class CompareDBValue : public DBValue {
+public:
+    CompareDBValue(DBValue *lhs, DBValue *rhs) : DBValue{lhs->type(), Kind::COMPARE}, m_lhs{lhs}, m_rhs{rhs} {
+        OK_ASSERT(lhs->type() == rhs->type());
+    }
+
+    DBValue *lhs() {
+        return m_lhs;
+    }
+
+    DBValue *rhs() {
+        return m_rhs;
+    }
+
+private:
+    DBValue *m_lhs;
+    DBValue *m_rhs;
 };
 } // namespace xmdb

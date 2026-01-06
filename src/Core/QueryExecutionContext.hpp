@@ -9,11 +9,11 @@
 
 namespace xmdb {
 struct QueryExecutionContext {
-    DBValue fetch_var(U32);
-    void put_var(U32, StringView, DBValue);
+    DBValue * fetch_var(U32);
+    void put_var(U32, StringView, DBValue *);
 
-    DBValue fetch_column(DBTable *, StringView);
-    void emit_column(DBTable *, DBValue, StringView);
+    DBValue * fetch_column(DBTable *, StringView);
+    void emit_column(DBTable *, DBValue *, StringView);
 
     DBTable *fetch_table(StringView);
     DBTable *fetch_table(U32);
@@ -24,32 +24,32 @@ struct QueryExecutionContext {
 
     DBTable *emit_query(U32, SQL::ColumnType *);
 
-    void insert_column(DBTable *, StringView, DBValue);
+    void insert_column(DBTable *, StringView, DBValue *);
     void insert_row(DBTable *);
 
     void commit_insert();
 
-    void update_column(DBTable *, StringView, DBValue);
+    void update_column(DBTable *, StringView, DBValue *);
     void commit_update();
 
     void delete_table(DBTable *);
 
     void create_user(StringView);
-    void alter_user_property(StringView, StringView, DBValue);
+    void alter_user_property(StringView, StringView, DBValue *);
     void commit_alter_user();
 
-    DBValue compare(DBValue &, DBValue &);
+    DBValue * compare(DBValue *, DBValue *);
 
     QueryExecutionContext *next;
     QueryGraph query_graph;
     ok::Allocator *allocator;
     DBUser *user;
-    ok::Table<U32, DBValue> vars;
+    ok::Table<U32, DBValue *> vars;
     ok::Table<U32, DBTable *> tables;
-    ok::MultiList<StringView, DBValue, DBTable *> emitted_columns;
-    ok::MultiList<StringView, DBValue> columns_to_insert;
+    ok::MultiList<StringView, DBValue *, DBTable *> emitted_columns;
+    ok::MultiList<StringView, DBValue *> columns_to_insert;
     ok::Table<DBTable *, ok::MultiList<UZ, StringView *, DBValue *>> rows_to_insert;
-    ok::MultiList<StringView, DBValue> columns_to_update;
+    ok::MultiList<StringView, DBValue *> columns_to_update;
     Optional<QueryGraph::AtomicNode *> alter_user_atomic_node;
     DBDescriptor *current_db;
     Optional<DBTable *> table_to_update;

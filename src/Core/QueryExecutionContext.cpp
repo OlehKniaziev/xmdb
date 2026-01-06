@@ -22,28 +22,27 @@ namespace xmdb {
 
 XMDB_ENUM_USER_PERMISSIONS
 
-DBValue QueryExecutionContext::fetch_var(U32 ip) {
+DBValue *QueryExecutionContext::fetch_var(U32 ip) {
     CHECK_READ(this);
-    Optional<DBValue> value = vars.get(ip);
+    Optional<DBValue *> value = vars.get(ip);
     return value.get();
 }
 
-void QueryExecutionContext::put_var(U32 ip, StringView name, DBValue value) {
+void QueryExecutionContext::put_var(U32 ip, StringView name, DBValue *value) {
     OK_UNUSED(name);
     CHECK_WRITE(this);
     vars.put(ip, value);
 }
 
-DBValue QueryExecutionContext::fetch_column(DBTable *table, StringView column_name) {
+DBValue *QueryExecutionContext::fetch_column(DBTable *table, StringView column_name) {
     CHECK_READ(this);
 
     for (UZ i = 0; i < table->columns_count(); ++i) {
         if (table->columns_names()[i] == column_name) {
             ColumnLayout layout = table->columns_layout()[i];
-            QueryGraph::ReadNode *read_node = query_graph.read(layout.offset, layout.size);
             SQL::ColumnType column_type = table->columns_types()[i];
             SQL::Type value_type = column_type_to_type(column_type);
-            return DBValue{value_type, read_node};
+            return new (allocator) ColumnDBValue{value_type, layout};
         }
     }
 
@@ -84,17 +83,17 @@ void QueryExecutionContext::create_table(StringView table_name, SQL::TableSchema
     current_db->tables.push(new_table);
 }
 
-void QueryExecutionContext::emit_column(DBTable *table, DBValue column_value, StringView column_name) {
+void QueryExecutionContext::emit_column(DBTable *table, DBValue *column_value, StringView column_name) {
     emitted_columns.push(column_name, column_value, table);
 }
 
 DBTable *QueryExecutionContext::emit_query(U32 columns_count, SQL::ColumnType *columns_types) {
     const StringView *columns_names_ptr = emitted_columns.get_items<StringView>();
-    const DBValue *columns_values_ptr = emitted_columns.get_items<DBValue>();
+    DBValue ** const columns_values_ptr = emitted_columns.get_items<DBValue *>();
     DBTable **tables = emitted_columns.get_items<DBTable *>();
 
     StringView *columns_names = allocator->alloc<StringView>(columns_count);
-    DBValue *columns_values = allocator->alloc<DBValue>(columns_count);
+    DBValue **columns_values = allocator->alloc<DBValue *>(columns_count);
     memcpy(columns_names, columns_names_ptr, columns_count * sizeof(*columns_names));
     memcpy(columns_values, columns_values_ptr, columns_count * sizeof(*columns_values));
 
@@ -115,7 +114,7 @@ DBTable *QueryExecutionContext::emit_query(U32 columns_count, SQL::ColumnType *c
     return table;
 }
 
-void QueryExecutionContext::insert_column(DBTable *table, StringView column_name, DBValue column_value) {
+void QueryExecutionContext::insert_column(DBTable *table, StringView column_name, DBValue *column_value) {
     OK_UNUSED(table);
     columns_to_insert.push(column_name, column_value);
 }
@@ -187,7 +186,7 @@ void QueryExecutionContext::commit_insert() {
 #endif // 0
 }
 
-void QueryExecutionContext::update_column(DBTable *table, StringView column_name, DBValue column_value) {
+void QueryExecutionContext::update_column(DBTable *table, StringView column_name, DBValue *column_value) {
     if (!table_to_update.has_value()) {
         table_to_update = table;
     } else if (table_to_update.value != table) {
@@ -246,7 +245,8 @@ void QueryExecutionContext::create_user(StringView name) {
     current_db->add_user(user);
 }
 
-void QueryExecutionContext::alter_user_property(StringView user_name, StringView property_name, DBValue value) {
+void QueryExecutionContext::alter_user_property(StringView user_name, StringView property_name, DBValue *value) {
+#if 0
     CHECK_ADMIN(this);
 
     if (!alter_user_atomic_node) {
@@ -256,25 +256,30 @@ void QueryExecutionContext::alter_user_property(StringView user_name, StringView
     QueryGraph::AtomicNode *atomic_node = alter_user_atomic_node.get();
 
     if (property_name == "PASSWORD"_sv) {
-        if (value.type() != SQL::TYPE_STRING)
+        if (value->type() != SQL::TYPE_STRING)
             FAIL_FMT(this, "expected user password to be of type string, got type '%s' instead",
-                     SQL::type_name(value.type()));
+                     SQL::type_name(value->type()));
 
-        const QueryGraph::Node *value_node = value.node_repr();
+        const QueryGraph::Node *value_node = value->node_repr();
         auto *alter_node = new (allocator) QueryGraph::AlterUserNode{user_name, QueryGraph::AlterUserNode::Property::PASSWORD, value_node};
         atomic_node->add(alter_node);
     } else {
         FAIL_FMT(this, "user '" OK_SV_FMT "' does not have property '" OK_SV_FMT "'", OK_SV_ARG(user_name),
                  OK_SV_ARG(property_name));
     }
+#else
+    OK_UNUSED(user_name);
+    OK_UNUSED(property_name);
+    OK_UNUSED(value);
+#endif // 0
 }
 
 void QueryExecutionContext::commit_alter_user() {
     alter_user_atomic_node = {};
 }
 
-DBValue QueryExecutionContext::compare(DBValue &, DBValue &) {
-    OK_TODO();
+DBValue *QueryExecutionContext::compare(DBValue *lhs, DBValue *rhs) {
+    return new (allocator) CompareDBValue{lhs, rhs};
 }
 
 DBTable *QueryExecutionContext::fetch_table(U32 ip) {
