@@ -41,6 +41,6 @@ void error(const char *fmt, ...) OK_ATTRIBUTE_PRINTF(1, 2);
 
 #define XMDB_FIXME(msg)                                                                                                \
     do {                                                                                                               \
-        log::warn("%s:%d: [%s] FIXME: %s", __FILE__, __LINE__, __FUNCTION__, (msg));                                        \
+        ::xmdb::log::warn("%s:%d: [%s] FIXME: %s", __FILE__, __LINE__, __FUNCTION__, (msg));                           \
     } while (false)
 } // namespace xmdb
