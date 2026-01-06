@@ -16,7 +16,8 @@ struct Logger {
 };
 
 struct FileLogger : public Logger {
-    FileLogger(LogLevel lvl, FILE *file) : log_level{lvl}, file{file} {}
+    FileLogger(LogLevel lvl, FILE *file) : log_level{lvl}, file{file} {
+    }
 
     void set_log_level(LogLevel lvl) override {
         log_level = lvl;
@@ -36,5 +37,10 @@ void log(LogLevel, const char *, ...) OK_ATTRIBUTE_PRINTF(2, 3);
 void info(const char *fmt, ...) OK_ATTRIBUTE_PRINTF(1, 2);
 void warn(const char *fmt, ...) OK_ATTRIBUTE_PRINTF(1, 2);
 void error(const char *fmt, ...) OK_ATTRIBUTE_PRINTF(1, 2);
-}
-}
+} // namespace log
+
+#define XMDB_FIXME(msg)                                                                                                \
+    do {                                                                                                               \
+        log::warn("%s:%d: [%s] FIXME: %s", __FILE__, __LINE__, __FUNCTION__, (msg));                                        \
+    } while (false)
+} // namespace xmdb
