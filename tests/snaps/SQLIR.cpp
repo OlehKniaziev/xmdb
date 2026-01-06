@@ -1,5 +1,6 @@
 #include <SQL/Parser.hpp>
 #include <SQL/ir.hpp>
+#include <Core/Logger.hpp>
 
 using namespace ok::literals;
 using namespace xmdb::SQL;

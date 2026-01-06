@@ -2,6 +2,7 @@
 #include <Core/DBPool.hpp>
 #include <Core/DBConnection.hpp>
 #include <Core/Core.hpp>
+#include <Core/Logger.hpp>
 
 #include <SQL/global_state.hpp>
 
@@ -9,10 +10,10 @@
 #include "Config.hpp"
 
 using namespace xmdb::server;
-using log = xmdb::log;
+namespace log = xmdb::log;
 
 int main(int argc, char **argv) {
-    xmdb::init_global_state();
+    xmdb::SQL::init_global_state();
 
     ok::Slice<char *> args = {argv, (UZ)argc};
 

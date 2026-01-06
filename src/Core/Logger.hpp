@@ -30,6 +30,7 @@ struct FileLogger : public Logger {
 };
 
 void set_log_level(LogLevel);
+void set_logger(Logger *);
 
 namespace log {
 void log(LogLevel, const char *, ...) OK_ATTRIBUTE_PRINTF(2, 3);
