@@ -1,7 +1,5 @@
 #include "Lexer.hpp"
 
-#include <Core/Logger.hpp>
-
 using namespace ok::literals;
 
 namespace xmdb::SQL {
