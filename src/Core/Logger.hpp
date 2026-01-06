@@ -12,7 +12,7 @@ enum class LogLevel {
 
 struct Logger {
     virtual void set_log_level(LogLevel) = 0;
-    virtual void log(LogLevel, const char *fmt, va_list) = 0;
+    virtual void log(LogLevel, const char *, va_list) = 0;
 };
 
 struct FileLogger : public Logger {
@@ -31,7 +31,7 @@ struct FileLogger : public Logger {
 void set_log_level(LogLevel);
 
 namespace log {
-void log(LogLevel, const char *fmt, ...) OK_ATTRIBUTE_PRINTF(2, 3);
+void log(LogLevel, const char *, ...) OK_ATTRIBUTE_PRINTF(2, 3);
 
 void info(const char *fmt, ...) OK_ATTRIBUTE_PRINTF(1, 2);
 void warn(const char *fmt, ...) OK_ATTRIBUTE_PRINTF(1, 2);
