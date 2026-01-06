@@ -1,5 +1,5 @@
 #include "hash.hpp"
-#include "log.hpp"
+#include "Logger.hpp"
 
 namespace xmdb {
 SHA256Digest sha256_digest(ok::StringView sv) {

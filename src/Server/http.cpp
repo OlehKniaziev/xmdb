@@ -167,7 +167,7 @@ DECLARE_HANDLER(run_query_handler) {
 
             WebJsonBeginArray();
 
-            xmdb::DBTableOutlet table_outlet{*results_table};
+            xmdb::DBTableOutlet table_outlet{results_table};
 
             for (UZ r = 0; r < results_table->rows_count(); ++r) {
                 WebJsonPrepareArrayElement();
@@ -181,7 +181,7 @@ DECLARE_HANDLER(run_query_handler) {
                             .Count = column_name_sv.count,
                     };
 
-                    xmdb::DBTableStream column_stream = table_outlet.column_stream(i);
+                    xmdb::DBTableStream column_stream = table_outlet.column_stream(&connection_data.temp_arena, i);
                     xmdb::Value value = column_stream.next().get();
 
                     switch (value.type()) {

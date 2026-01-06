@@ -82,4 +82,58 @@ DBTable::DBTable(ok::Allocator *allocator,
     m_indices = ok::Table<UZ, DBIndex>::alloc(allocator);
     m_columns_layout = compute_columns_layout(allocator, columns_count, columns_types);
 }
+
+DBTableStream DBTableStream::from_value(ok::Allocator *allocator, DBValue *value) {
+    switch (value->kind()) {
+    case DBValue::Kind::CONSTANT: {
+        auto *const_val = static_cast<ConstDBValue *>(value);
+        return DBTableStream{const_val};
+    }
+    case DBValue::Kind::COMPARE: {
+        struct CompareState {
+            DBTableStream lhs;
+            DBTableStream rhs;
+        };
+
+        auto *cmp_val = static_cast<CompareDBValue *>(value);
+        auto *cmp_state = allocator->alloc<CompareState>();
+        cmp_state->lhs = from_value(allocator, cmp_val->lhs());
+        cmp_state->rhs = from_value(allocator, cmp_val->rhs());
+
+        return DBTableStream{
+            [](void *arg) -> ok::Optional<Value> {
+                auto *state = static_cast<CompareState *>(arg);
+                ok::Optional<Value> lhs_opt = state->lhs.next();
+                ok::Optional<Value> rhs_opt = state->rhs.next();
+
+                if (lhs_opt && rhs_opt) {
+                    Value lhs = lhs_opt.get();
+                    Value rhs = rhs_opt.get();
+                    return lhs.compare(rhs);
+                }
+
+                if (lhs_opt) {
+                    return Value::greater();
+                }
+
+                if (rhs_opt) {
+                    return Value::less();
+                }
+
+                return ok::Optional<Value>::empty();
+            },
+            static_cast<void *>(cmp_state),
+        };
+    }
+    case DBValue::Kind::COLUMN: {
+        OK_TODO_MSG("disk DBTableStream");
+    }
+    }
+
+    OK_UNREACHABLE();
+}
+
+Value Value::compare(Value) {
+    OK_TODO();
+}
 } // namespace xmdb

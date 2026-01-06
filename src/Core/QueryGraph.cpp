@@ -1,5 +1,5 @@
 #include "QueryGraph.hpp"
-#include "log.hpp"
+#include "Logger.hpp"
 #include "new.hpp"
 
 namespace xmdb {
