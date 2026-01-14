@@ -146,9 +146,7 @@ public:
 
     static DBTableStream from_value(ok::Allocator *, DBValue *);
 
-    ok::Optional<Value> next() {
-        OK_TODO();
-    }
+    ok::Optional<Value> next();
 
 private:
     struct ComputationStream {

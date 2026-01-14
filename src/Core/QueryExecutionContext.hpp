@@ -6,6 +6,27 @@
 #include "DBDescriptor.hpp"
 #include "DBTable.hpp"
 #include "DBValue.hpp"
+#include "QueryGraph.hpp"
+
+#define XMDB_FAIL(ctx, msg)                                                                                        \
+    do {                                                                                                               \
+        /* TODO(oleh): Retrieve location from the query executed. */                                                   \
+(ctx)->error =                                                                                                   \
+    ErrorWithSourceLocation{.message = String::alloc((ctx)->allocator, msg), .location = {}};  \
+longjmp((ctx)->jmpbuf, 1);                                                                                       \
+                                                                                                                       \
+    } while (false)
+
+#define XMDB_FAIL_FMT(ctx, fmt, ...)                                                                                        \
+    do {                                                                                                               \
+        /* TODO(oleh): Retrieve location from the query executed. */                                                   \
+(ctx)->error =                                                                                                   \
+    ErrorWithSourceLocation{.message = String::format((ctx)->allocator, fmt, __VA_ARGS__), .location = {}};  \
+longjmp((ctx)->jmpbuf, 1);                                                                                       \
+                                                                                                                       \
+    } while (false)
+
+
 
 namespace xmdb {
 struct QueryExecutionContext {
@@ -25,7 +46,7 @@ struct QueryExecutionContext {
     DBTable *emit_query(U32, SQL::ColumnType *);
 
     void insert_column(DBTable *, StringView, DBValue *);
-    void insert_row(DBTable *);
+    void insert_row();
 
     void commit_insert();
 
@@ -48,10 +69,11 @@ struct QueryExecutionContext {
     ok::Table<U32, DBTable *> tables;
     ok::MultiList<StringView, DBValue *, DBTable *> emitted_columns;
     ok::MultiList<StringView, DBValue *> columns_to_insert;
-    ok::Table<DBTable *, ok::MultiList<UZ, StringView *, DBValue *>> rows_to_insert;
+    ok::MultiList<UZ, StringView *, DBValue **> rows_to_insert;
     ok::MultiList<StringView, DBValue *> columns_to_update;
     Optional<QueryGraph::AtomicNode *> alter_user_atomic_node;
     DBDescriptor *current_db;
+    Optional<DBTable *> table_to_insert;
     Optional<DBTable *> table_to_update;
     Optional<DBTable *> last_emitted_query;
     Optional<ErrorWithSourceLocation> error;

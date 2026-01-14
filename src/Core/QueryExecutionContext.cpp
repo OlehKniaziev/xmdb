@@ -1,26 +1,20 @@
 #include "QueryExecutionContext.hpp"
 #include "new.hpp"
+#include "Logger.hpp"
 
 using namespace ok::literals;
 
 namespace xmdb {
-#define FAIL_FMT(ctx, fmt, ...)                                                                                        \
-    do {                                                                                                               \
-        /* TODO(oleh): Retrieve location from the query executed. */                                                   \
-        ctx->error =                                                                                                   \
-                ErrorWithSourceLocation{.message = String::format(ctx->allocator, fmt, __VA_ARGS__), .location = {}};  \
-        longjmp(ctx->jmpbuf, 1);                                                                                       \
-                                                                                                                       \
-    } while (false)
-
 #define X(p, _unused)                                                                                                  \
     void CHECK_##p(QueryExecutionContext *ctx) {                                                                       \
         if ((ctx->user->perm & PERM_##p) == 0) {                                                                       \
-            FAIL_FMT(ctx, "user " OK_SV_FMT " does not have " #p " permissions", OK_SV_ARG(ctx->user->name));          \
+            XMDB_FAIL_FMT(ctx, "user " OK_SV_FMT " does not have " #p " permissions", OK_SV_ARG(ctx->user->name));          \
         }                                                                                                              \
     }
 
 XMDB_ENUM_USER_PERMISSIONS
+
+#undef X
 
 DBValue *QueryExecutionContext::fetch_var(U32 ip) {
     CHECK_READ(this);
@@ -88,6 +82,8 @@ void QueryExecutionContext::emit_column(DBTable *table, DBValue *column_value, S
 }
 
 DBTable *QueryExecutionContext::emit_query(U32 columns_count, SQL::ColumnType *columns_types) {
+    XMDB_FIXME("This *should* also be added to the query graph, since we want every operation to preserve it's order as in the source code");
+
     const StringView *columns_names_ptr = emitted_columns.get_items<StringView>();
     DBValue ** const columns_values_ptr = emitted_columns.get_items<DBValue *>();
     DBTable **tables = emitted_columns.get_items<DBTable *>();
@@ -97,7 +93,7 @@ DBTable *QueryExecutionContext::emit_query(U32 columns_count, SQL::ColumnType *c
     memcpy(columns_names, columns_names_ptr, columns_count * sizeof(*columns_names));
     memcpy(columns_values, columns_values_ptr, columns_count * sizeof(*columns_values));
 
-    // FIXME(oleh): This is gonna be wrong once the row filtering is added.
+    // NOTE(oleh): This is gonna be wrong once the row filtering is added.
     UZ rows_count = 0;
 
     for (UZ i = 0; i < emitted_columns.count; ++i) {
@@ -115,75 +111,75 @@ DBTable *QueryExecutionContext::emit_query(U32 columns_count, SQL::ColumnType *c
 }
 
 void QueryExecutionContext::insert_column(DBTable *table, StringView column_name, DBValue *column_value) {
-    OK_UNUSED(table);
+    if (!table_to_insert) {
+        table_to_insert = table;
+    } else {
+        OK_ASSERT(table == table_to_insert.get());
+    }
+
     columns_to_insert.push(column_name, column_value);
 }
 
-void QueryExecutionContext::insert_row(DBTable *table) {
-#if 0
+void QueryExecutionContext::insert_row() {
+    OK_ASSERT(table_to_insert);
+
     StringView *columns_names_ptr = columns_to_insert.get_items<StringView>();
-    DBValue *columns_values_ptr = columns_to_insert.get_items<DBValue>();
+    DBValue **columns_values_ptr = columns_to_insert.get_items<DBValue *>();
 
     StringView *columns_names = allocator->alloc<StringView>(columns_to_insert.count);
-    DBValue *columns_values = allocator->alloc<DBValue>(columns_to_insert.count);
+    DBValue **columns_values = allocator->alloc<DBValue *>(columns_to_insert.count);
     memcpy(columns_names, columns_names_ptr, sizeof(*columns_names) * columns_to_insert.count);
     memcpy(columns_values, columns_values_ptr, sizeof(*columns_values) * columns_to_insert.count);
 
-    // FIXME(oleh): Should probably introduce a way to fetch a pointer to a value in the table,
-    // and instead of inserting the list again just modify it.
-    Optional<ok::MultiList<UZ, StringView *, DBValue *>> rows = rows_to_insert.get(table);
-    if (rows.has_value()) {
-        rows.value.push(columns_to_insert.count, columns_names, columns_values);
-        rows_to_insert.put(table, rows.value);
-    } else {
-        ok::MultiList<UZ, StringView *, DBValue *> rows = ok::MultiList<UZ, StringView *, DBValue *>::alloc(allocator);
-        rows.push(columns_to_insert.count, columns_names, columns_values);
-        rows_to_insert.put(table, rows);
-    }
+    rows_to_insert.push(columns_to_insert.count, columns_names, columns_values);
 
     columns_to_insert.count = 0;
-#else
-    OK_UNUSED(table);
-    OK_TODO();
-#endif // 0
 }
 
 void QueryExecutionContext::commit_insert() {
-#if 0
     CHECK_WRITE(this);
 
-    OK_TABLE_FOREACH(rows_to_insert, table, rows, {
-        UZ *rows_to_insert_columns_count = rows.get_items<UZ>();
-        StringView **rows_to_insert_columns_names = rows.get_items<StringView *>();
-        DBValue **rows_to_insert_columns_values = rows.get_items<DBValue *>();
+    OK_ASSERT(table_to_insert);
 
-        for (UZ i = 0; i < rows.count; ++i) {
-            UZ columns_to_insert_count = rows_to_insert_columns_count[i];
-            StringView *columns_to_insert_names = rows_to_insert_columns_names[i];
-            DBValue *columns_to_insert_values = rows_to_insert_columns_values[i];
+    DBTable *table = table_to_insert.get();
 
-            for (UZ j = 0; j < columns_to_insert_count; ++j) {
-                StringView column_name = columns_to_insert_names[j];
-                for (UZ c = 0; c < table->columns_count(); ++c) {
-                    if (table->columns_names()[c] != column_name) continue;
+    if (table->flags() & DBTable::F_PERSIST) {
+        XMDB_FAIL(this, "Insertion into a table on-disk is not implemented yet");
+    }
 
-                    DBValue column_value = columns_to_insert_values[j];
-                    DBValue old_value = table->columns_values()[c];
-                    DBValue new_value = DBValue::concat(allocator, old_value, column_value);
+    Slice<DBValue *> table_columns_values = table->proxy_column_values();
 
-                    table->columns_values()[c] = new_value;
-                    break;
-                }
+    auto &rows = rows_to_insert;
+
+    UZ *rows_to_insert_columns_count = rows.get_items<UZ>();
+    StringView **rows_to_insert_columns_names = rows.get_items<StringView *>();
+    DBValue ***rows_to_insert_columns_values = rows.get_items<DBValue **>();
+
+    for (UZ row_idx = 0; row_idx < rows.count; ++row_idx) {
+        UZ columns_to_insert_count = rows_to_insert_columns_count[row_idx];
+        StringView *columns_to_insert_names = rows_to_insert_columns_names[row_idx];
+        DBValue **columns_to_insert_values = rows_to_insert_columns_values[row_idx];
+
+        for (UZ column_to_insert_idx = 0;
+             column_to_insert_idx < columns_to_insert_count;
+             ++column_to_insert_idx) {
+            StringView column_name = columns_to_insert_names[column_to_insert_idx];
+            for (UZ column_idx = 0; column_idx < table->columns_count(); ++column_idx) {
+                if (table->columns_names()[column_idx] != column_name) continue;
+
+                DBValue *old_value = table_columns_values[column_idx];
+                DBValue *value_to_insert = columns_to_insert_values[column_idx];
+                DBValue *new_value = DBValue::concat(allocator, old_value, value_to_insert);
+
+                table_columns_values[column_idx] = new_value;
+                break;
             }
         }
+    }
 
-        table->set_rows_count(table->rows_count() + rows.count);
-    });
+    table->set_rows_count(table->rows_count() + rows.count);
 
-    rows_to_insert.clear();
-#else
-    OK_TODO();
-#endif // 0
+    rows_to_insert.count = 0;
 }
 
 void QueryExecutionContext::update_column(DBTable *table, StringView column_name, DBValue *column_value) {
@@ -246,7 +242,6 @@ void QueryExecutionContext::create_user(StringView name) {
 }
 
 void QueryExecutionContext::alter_user_property(StringView user_name, StringView property_name, DBValue *value) {
-#if 0
     CHECK_ADMIN(this);
 
     if (!alter_user_atomic_node) {
@@ -257,21 +252,16 @@ void QueryExecutionContext::alter_user_property(StringView user_name, StringView
 
     if (property_name == "PASSWORD"_sv) {
         if (value->type() != SQL::TYPE_STRING)
-            FAIL_FMT(this, "expected user password to be of type string, got type '%s' instead",
+            XMDB_FAIL_FMT(this, "expected user password to be of type string, got type '%s' instead",
                      SQL::type_name(value->type()));
 
-        const QueryGraph::Node *value_node = value->node_repr();
+        QueryGraph::ValueNode *value_node = new (allocator) QueryGraph::ValueNode{value};
         auto *alter_node = new (allocator) QueryGraph::AlterUserNode{user_name, QueryGraph::AlterUserNode::Property::PASSWORD, value_node};
         atomic_node->add(alter_node);
     } else {
-        FAIL_FMT(this, "user '" OK_SV_FMT "' does not have property '" OK_SV_FMT "'", OK_SV_ARG(user_name),
+        XMDB_FAIL_FMT(this, "user '" OK_SV_FMT "' does not have property '" OK_SV_FMT "'", OK_SV_ARG(user_name),
                  OK_SV_ARG(property_name));
     }
-#else
-    OK_UNUSED(user_name);
-    OK_UNUSED(property_name);
-    OK_UNUSED(value);
-#endif // 0
 }
 
 void QueryExecutionContext::commit_alter_user() {

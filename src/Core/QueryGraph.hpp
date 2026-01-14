@@ -2,6 +2,7 @@
 
 #include "ok.hpp"
 #include "new.hpp"
+#include "DBValue.hpp"
 
 namespace xmdb {
 // Nodes in this graph represent an action performed on either a record in a table or another node.
@@ -20,10 +21,9 @@ public:
         enum class Type {
             READ,
             WRITE,
-            COMPARE,
-            CONSTANT,
             ALTER_USER,
             ATOMIC,
+            VALUE,
         };
 
         Type type() const {
@@ -89,48 +89,30 @@ public:
         U64 m_offset;
     };
 
-    class CompareNode : public Node {
-    public:
-        CompareNode(const Node *lhs, const Node *rhs) : Node{Type::COMPARE}, m_lhs{lhs}, m_rhs{rhs} {}
-
-    private:
-        const Node *m_lhs;
-        const Node *m_rhs;
-    };
-
-    class ConstantNode : public Node {
-    public:
-        explicit ConstantNode(bool b) : Node{Type::CONSTANT}, m_kind{Kind::BOOL}, m_u{.b = b} {}
-        explicit ConstantNode(S64 i) : Node{Type::CONSTANT}, m_kind{Kind::INT}, m_u{.i = i} {}
-        explicit ConstantNode(ok::StringView s) : Node{Type::CONSTANT}, m_kind{Kind::STRING}, m_u{.s = s} {}
-
-        enum class Kind {
-            BOOL,
-            INT,
-            STRING,
-        };
-
-    private:
-        Kind m_kind;
-        union {
-            bool b;
-            S64 i;
-            ok::StringView s;
-        } m_u;
-    };
-
     class AlterUserNode : public Node {
     public:
         enum class Property {
             PASSWORD,
         };
 
-        explicit AlterUserNode(ok::StringView user_name, Property property, const Node *property_value) : Node{Type::ALTER_USER}, m_user_name{user_name}, m_property{property}, m_property_value{property_value} {}
+        explicit AlterUserNode(ok::StringView user_name, Property property, Node *property_value) : Node{Type::ALTER_USER}, m_user_name{user_name}, m_property{property}, m_property_value{property_value} {}
+
+        ok::StringView user_name() const {
+            return m_user_name;
+        }
+
+        Property property() const {
+            return m_property;
+        }
+
+        Node *property_value() {
+            return m_property_value;
+        }
 
     private:
         ok::StringView m_user_name;
         Property m_property;
-        const Node *m_property_value;
+        Node *m_property_value;
     };
 
     class AtomicNode : public Node {
@@ -143,8 +125,24 @@ public:
             m_nodes.push(node);
         }
 
+        ok::Slice<Node *> nodes() {
+            return m_nodes.slice();
+        }
+
     private:
         ok::List<Node *> m_nodes;
+    };
+
+    class ValueNode : public Node {
+    public:
+        explicit ValueNode(DBValue *value) : Node{Type::VALUE}, m_value{value} {}
+
+        DBValue *value() {
+            return m_value;
+        }
+
+    private:
+        DBValue *m_value;
     };
 
     ok::Optional<Node *> root_node() const {
@@ -157,22 +155,6 @@ public:
 
     WriteNode *write(U64 offset, U64 size) {
         return add_generic_node<WriteNode>(offset, size);
-    }
-
-    CompareNode *compare(const Node *lhs, const Node *rhs) {
-        return add_generic_node<CompareNode>(lhs, rhs);
-    }
-
-    ConstantNode *const_bool(bool b) {
-        return add_generic_node<ConstantNode>(b);
-    }
-
-    ConstantNode *const_int(S64 i) {
-        return add_generic_node<ConstantNode>(i);
-    }
-
-    ConstantNode *const_string(ok::StringView s) {
-        return add_generic_node<ConstantNode>(s);
     }
 
     AtomicNode *atomic() {

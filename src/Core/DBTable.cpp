@@ -133,6 +133,10 @@ DBTableStream DBTableStream::from_value(ok::Allocator *allocator, DBValue *value
     OK_UNREACHABLE();
 }
 
+ok::Optional<Value> DBTableStream::next() {
+    OK_TODO();
+}
+
 Value Value::compare(Value) {
     OK_TODO();
 }

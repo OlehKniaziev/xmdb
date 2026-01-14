@@ -38,7 +38,7 @@ QueryExecutionContext *DBPool::rent_empty_execution_context(DBDescriptor *db, DB
         ctx->tables.clear();
         ctx->emitted_columns.count = 0;
         ctx->columns_to_insert.count = 0;
-        ctx->rows_to_insert.clear();
+        ctx->rows_to_insert.count = 0;
         ctx->columns_to_update.count = 0;
         ctx->table_to_update = {};
         ctx->last_emitted_query = {};
@@ -56,7 +56,7 @@ QueryExecutionContext *DBPool::rent_empty_execution_context(DBDescriptor *db, DB
     ctx->tables = ok::Table<U32, DBTable *>::alloc(allocator);
     ctx->emitted_columns = ok::MultiList<StringView, DBValue *, DBTable *>::alloc(allocator);
     ctx->columns_to_insert = ok::MultiList<StringView, DBValue *>::alloc(allocator);
-    ctx->rows_to_insert = ok::Table<DBTable *, ok::MultiList<UZ, StringView *, DBValue *>>::alloc(allocator);
+    ctx->rows_to_insert = ok::MultiList<UZ, StringView *, DBValue **>::alloc(allocator);
     ctx->columns_to_update = ok::MultiList<StringView, DBValue *>::alloc(allocator);
     ctx->current_db = db;
     ctx->table_to_update = {};

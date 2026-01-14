@@ -2,7 +2,6 @@
 
 #include <SQL/type_check.hpp>
 
-#include "QueryGraph.hpp"
 #include "ColumnLayout.hpp"
 
 namespace xmdb {
@@ -19,7 +18,7 @@ public:
 
     DBValue() = delete;
 
-    static DBValue concat(ok::Allocator *, DBValue, DBValue) {
+    static DBValue *concat(ok::Allocator *, DBValue *, DBValue *) {
         OK_TODO();
     }
 

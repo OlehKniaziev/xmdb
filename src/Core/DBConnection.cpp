@@ -1,4 +1,6 @@
 #include "DBConnection.hpp"
+#include "Logger.hpp"
+
 #include <SQL/ir.hpp>
 #include <csetjmp>
 
@@ -180,10 +182,12 @@ static void execute_instruction(TypedCompiledQuery *query, UZ i, QueryExecutionC
         break;
     }
     case IRInstructionOperator_InsertRow: {
+        // TODO(oleh): Make this instruction not carry any operands
         U32 table_ip = operands_of_InsertRow(&query->untyped, i);
 
         DBTable *table = ctx->fetch_table(table_ip);
-        ctx->insert_row(table);
+        OK_UNUSED(table);
+        ctx->insert_row();
 
         break;
     }
@@ -274,9 +278,85 @@ static void execute_instruction(TypedCompiledQuery *query, UZ i, QueryExecutionC
     }
 }
 
+static DBValue *eval_node(QueryExecutionContext *ctx, QueryGraph::Node *node) {
+    OK_UNUSED(ctx);
+
+    switch (node->type()) {
+    case QueryGraph::Node::Type::VALUE: {
+        QueryGraph::ValueNode *value_node = static_cast<QueryGraph::ValueNode *>(node);
+        return value_node->value();
+    }
+    case QueryGraph::Node::Type::ATOMIC:
+        OK_TODO();
+    case QueryGraph::Node::Type::READ:
+    case QueryGraph::Node::Type::WRITE:
+    case QueryGraph::Node::Type::ALTER_USER:
+        OK_UNREACHABLE();
+    }
+
+    OK_UNREACHABLE();
+}
+
+static void run_single_node(QueryExecutionContext *ctx, QueryGraph::Node *node) {
+    switch (node->type()) {
+    case QueryGraph::Node::Type::ALTER_USER: {
+        QueryGraph::AlterUserNode *alter_node = static_cast<QueryGraph::AlterUserNode *>(node);
+
+        ok::StringView user_name = alter_node->user_name();
+
+        ok::Optional<DBUser *> user_opt = ctx->current_db->find_user(user_name);
+
+        if (!user_opt) {
+            XMDB_FAIL_FMT(ctx, "Could not find requested user with name '" OK_SV_FMT "'", OK_SV_ARG(user_name));
+        }
+
+        DBUser *user = user_opt.get();
+
+        switch (alter_node->property()) {
+        case QueryGraph::AlterUserNode::Property::PASSWORD: {
+            QueryGraph::Node *password_db_node = alter_node->property_value();
+            DBValue *password_db_value = eval_node(ctx, password_db_node);
+            DBTableStream password_value_stream = DBTableStream::from_value(ctx->allocator, password_db_value);
+
+            Value password_value = password_value_stream.next().get();
+            ok::String new_password = password_value.cast<ok::String>();
+            user->sha256_password_digest = sha256_digest(new_password.view());
+
+            break;
+        }
+        }
+
+        break;
+    }
+    case QueryGraph::Node::Type::READ:
+        OK_TODO_MSG("READ");
+    case QueryGraph::Node::Type::WRITE:
+        OK_TODO_MSG("WRITE");
+    case QueryGraph::Node::Type::ATOMIC: {
+        XMDB_FIXME("This is not atomic at all bruh");
+
+        QueryGraph::AtomicNode *atomic_node = static_cast<QueryGraph::AtomicNode *>(node);
+
+        ok::Slice<QueryGraph::Node *> child_nodes = atomic_node->nodes();
+
+        for (UZ i = 0; i < child_nodes.count; ++i) {
+            QueryGraph::Node *child_node = child_nodes[i];
+            run_single_node(ctx, child_node);
+        }
+
+        break;
+    }
+    case QueryGraph::Node::Type::VALUE:
+        OK_UNREACHABLE();
+    }
+
+}
+
 void DBConnection::execute(TypedCompiledQuery *query, QueryResults *results) {
     results->error = {};
     results->value = {};
+
+    ok::Optional<QueryGraph::Node *> cur_node_opt{};
 
     QueryExecutionContext *ctx = db_pool->rent_empty_execution_context(db, user);
 
@@ -294,6 +374,14 @@ void DBConnection::execute(TypedCompiledQuery *query, QueryResults *results) {
 
     for (UZ i = 0; i < instructions_count; ++i) {
         execute_instruction(query, i, ctx, this);
+    }
+
+    // Run the query graph, NOW!
+    cur_node_opt = ctx->query_graph.root_node();
+    while (cur_node_opt) {
+        QueryGraph::Node *cur_node = cur_node_opt.get();
+        run_single_node(ctx, cur_node);
+        cur_node_opt = cur_node->next();
     }
 
     if (ctx->last_emitted_query.has_value()) {
