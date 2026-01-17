@@ -1,5 +1,6 @@
 #include "DBTable.hpp"
 #include "FixedString.hpp"
+#include "new.hpp"
 
 namespace xmdb {
 template <>
@@ -61,6 +62,7 @@ static ColumnLayout *compute_columns_layout(ok::Allocator *allocator,
         }
 
         ColumnLayout column_layout = {
+            .index = i,
             .offset = offset,
             .size = t_layout.size,
         };
@@ -78,10 +80,28 @@ DBTable::DBTable(ok::Allocator *allocator,
                  ok::StringView name,
                  UZ columns_count,
                  ok::StringView *columns_names,
-                 SQL::ColumnType *columns_types) : m_name{name}, m_flags{flags}, m_columns_count{columns_count}, m_columns_names{columns_names}, m_columns_types{columns_types} {
+                 SQL::ColumnType *columns_types) : m_name{name},
+                                                   m_flags{flags},
+                                                   m_columns_count{columns_count},
+                                                   m_columns_names{columns_names},
+                                                   m_columns_types{columns_types} {
     m_indices = ok::Table<UZ, DBIndex>::alloc(allocator);
     m_columns_layout = compute_columns_layout(allocator, columns_count, columns_types);
+
+    if (flags & F_PROXY) {
+        OK_ASSERT(flags & F_ANON);
+
+        m_proxy_columns_values = allocator->alloc<DBValue *>(m_columns_count);
+        for (UZ i = 0; i < m_columns_count; ++i) {
+            m_proxy_columns_values[i] = new (allocator) NoneDBValue{};
+        }
+    }
 }
+
+struct StreamPair {
+    DBTableStream lhs;
+    DBTableStream rhs;
+};
 
 DBTableStream DBTableStream::from_value(ok::Allocator *allocator, DBValue *value) {
     switch (value->kind()) {
@@ -90,19 +110,16 @@ DBTableStream DBTableStream::from_value(ok::Allocator *allocator, DBValue *value
         return DBTableStream{*const_val};
     }
     case DBValue::Kind::COMPARE: {
-        struct CompareState {
-            DBTableStream lhs;
-            DBTableStream rhs;
-        };
-
         auto *cmp_val = static_cast<CompareDBValue *>(value);
-        auto *cmp_state = allocator->alloc<CompareState>();
-        cmp_state->lhs = from_value(allocator, cmp_val->lhs());
-        cmp_state->rhs = from_value(allocator, cmp_val->rhs());
+
+        DBTableStream lhs = from_value(allocator, cmp_val->lhs());
+        DBTableStream rhs = from_value(allocator, cmp_val->rhs());
+
+        auto *cmp_state = new (allocator) StreamPair{lhs, rhs};
 
         return DBTableStream{
             [](void *arg) -> ok::Optional<Value> {
-                auto *state = static_cast<CompareState *>(arg);
+                auto *state = static_cast<StreamPair *>(arg);
                 ok::Optional<Value> lhs_opt = state->lhs.next();
                 ok::Optional<Value> rhs_opt = state->rhs.next();
 
@@ -125,8 +142,47 @@ DBTableStream DBTableStream::from_value(ok::Allocator *allocator, DBValue *value
             static_cast<void *>(cmp_state),
         };
     }
+    case DBValue::Kind::NONE: {
+        return DBTableStream{
+            [](void *arg) -> ok::Optional<Value> {
+                OK_UNUSED(arg);
+                return ok::Optional<Value>::empty();
+            },
+            nullptr,
+        };
+    }
+    case DBValue::Kind::CONCAT: {
+        auto *concat_value = static_cast<ConcatDBValue *>(value);
+
+        DBTableStream lhs = from_value(allocator, concat_value->lhs());
+        DBTableStream rhs = from_value(allocator, concat_value->rhs());
+
+        auto *stream_pair = new (allocator) StreamPair{lhs, rhs};
+
+        return DBTableStream{
+            [](void *arg) -> ok::Optional<Value> {
+                auto *pair = reinterpret_cast<StreamPair *>(arg);
+
+                if (ok::Optional<Value> lhs = pair->lhs.next(); lhs) {
+                    return lhs;
+                } else {
+                    return pair->rhs.next();
+                }
+            },
+            stream_pair,
+        };
+    }
     case DBValue::Kind::COLUMN: {
-        OK_TODO_MSG("disk DBTableStream");
+        auto *column_value = static_cast<ColumnDBValue *>(value);
+        DBTable *table = column_value->table();
+
+        ok::Slice<DBValue *> columns_values = table->proxy_column_values();
+
+        ColumnLayout column_layout = column_value->layout();
+
+        DBValue *value = columns_values[column_layout.index];
+
+        return DBTableStream::from_value(allocator, value);
     }
     }
 
@@ -155,9 +211,12 @@ ok::Optional<Value> DBTableStream::next() {
 
         OK_UNREACHABLE();
     }
-    case Type::COMPUTE:
+    case Type::COMPUTE: {
+        ComputationStream comp = m_u.compute;
+        return comp.comp(comp.arg);
+    }
     case Type::DISK:
-        OK_TODO();
+        OK_TODO_MSG("Disk table stream. FUCK!");
     }
 
     OK_UNREACHABLE();

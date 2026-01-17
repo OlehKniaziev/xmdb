@@ -9,18 +9,13 @@ class DBValue {
 public:
     enum class Kind {
         COLUMN,
-        // WRITE,
         COMPARE,
         CONSTANT,
-        // ALTER_USER,
-        // ATOMIC,
+        NONE,
+        CONCAT,
     };
 
     DBValue() = delete;
-
-    static DBValue *concat(ok::Allocator *, DBValue *, DBValue *) {
-        OK_TODO();
-    }
 
     static DBValue *null() {
         OK_TODO();
@@ -34,19 +29,42 @@ public:
         return m_kind;
     }
 
+    bool is_compatible_with(const DBValue *other) const {
+        if (m_kind == Kind::NONE || other->m_kind == Kind::NONE) {
+            return true;
+        }
+
+        return m_type == other->m_type;
+    }
+
 protected:
-    explicit DBValue(SQL::Type type, Kind kind) : m_type{type}, m_kind{kind} {}
+    DBValue(SQL::Type type, Kind kind) : m_type{type}, m_kind{kind} {}
 
     SQL::Type m_type;
     Kind m_kind;
 };
 
+class DBTable;
+
 class ColumnDBValue : public DBValue {
 public:
-    ColumnDBValue(SQL::Type type, ColumnLayout layout) : DBValue{type, Kind::COLUMN}, m_layout{layout} {}
+    ColumnDBValue(SQL::Type type,
+                  ColumnLayout layout,
+                  DBTable *table) : DBValue{type, Kind::COLUMN},
+                                    m_layout{layout},
+                                    m_table{table} {}
+
+    DBTable *table() {
+        return m_table;
+    }
+
+    ColumnLayout layout() {
+        return m_layout;
+    }
 
 private:
     ColumnLayout m_layout;
+    DBTable *m_table;
 };
 
 class ConstDBValue : public DBValue {
@@ -87,7 +105,7 @@ private:
 class CompareDBValue : public DBValue {
 public:
     CompareDBValue(DBValue *lhs, DBValue *rhs) : DBValue{lhs->type(), Kind::COMPARE}, m_lhs{lhs}, m_rhs{rhs} {
-        OK_ASSERT(lhs->type() == rhs->type());
+        OK_ASSERT(lhs->is_compatible_with(rhs));
     }
 
     DBValue *lhs() {
@@ -96,6 +114,47 @@ public:
 
     DBValue *rhs() {
         return m_rhs;
+    }
+
+private:
+    DBValue *m_lhs;
+    DBValue *m_rhs;
+};
+
+class NoneDBValue : public DBValue {
+public:
+    NoneDBValue() : DBValue{SQL::TYPE_NULL, Kind::NONE} {}
+};
+
+class PairDBValue : public DBValue {
+public:
+    PairDBValue() = delete;
+
+    DBValue *lhs() {
+        return m_lhs;
+    }
+
+    DBValue *rhs() {
+        return m_rhs;
+    }
+
+protected:
+    PairDBValue(SQL::Type type,
+                Kind kind,
+                DBValue *lhs,
+                DBValue *rhs) : DBValue{type, kind},
+                                m_lhs{lhs},
+                                m_rhs{rhs} {
+    }
+
+    DBValue *m_lhs;
+    DBValue *m_rhs;
+};
+
+class ConcatDBValue : public PairDBValue {
+public:
+    ConcatDBValue(DBValue *lhs, DBValue *rhs) : PairDBValue{lhs->type(), Kind::CONCAT, lhs, rhs} {
+        OK_ASSERT(lhs->is_compatible_with(rhs));
     }
 
 private:

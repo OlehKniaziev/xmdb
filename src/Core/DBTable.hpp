@@ -6,6 +6,8 @@
 #include "ok.hpp"
 
 namespace xmdb {
+// TODO(oleh): Create some sort of table builder abstraction so that I never forget to set proxy
+// values.
 class DBTable {
 public:
     using Flags = U16;
@@ -47,6 +49,7 @@ public:
     }
 
     UZ rows_count() const {
+        OK_VERIFY(m_flags & F_PROXY);
         return m_rows_count;
     }
 

@@ -36,7 +36,7 @@ DBValue *QueryExecutionContext::fetch_column(DBTable *table, StringView column_n
             ColumnLayout layout = table->columns_layout()[i];
             SQL::ColumnType column_type = table->columns_types()[i];
             SQL::Type value_type = column_type_to_type(column_type);
-            return new (allocator) ColumnDBValue{value_type, layout};
+            return new (allocator) ColumnDBValue{value_type, layout, table};
         }
     }
 
@@ -73,7 +73,13 @@ void QueryExecutionContext::create_table(StringView table_name, SQL::TableSchema
         }
     }
 
-    DBTable *new_table = new /* (this->allocator) */ DBTable(allocator, DBTable::F_PERSIST, table_name, column_types.count, column_names, column_types.items);
+    DBTable::Flags table_flags = DBTable::F_ANON | DBTable::F_PROXY;
+    DBTable *new_table = new (allocator) DBTable(allocator,
+                                                 table_flags,
+                                                 table_name,
+                                                 column_types.count,
+                                                 column_names,
+                                                 column_types.items);
     current_db->tables.push(new_table);
 }
 
@@ -106,6 +112,10 @@ DBTable *QueryExecutionContext::emit_query(U32 columns_count, SQL::ColumnType *c
     emitted_columns.count = 0;
 
     DBTable *table = new (allocator) DBTable{allocator, DBTable::F_ANON | DBTable::F_PROXY, ""_sv, columns_count, columns_names, columns_types};
+
+    Slice<DBValue *> columns_values_slice = {columns_values, columns_count};
+    table->set_proxy_column_values(columns_values_slice);
+    table->set_rows_count(rows_count);
     last_emitted_query = table;
     return table;
 }
@@ -169,7 +179,7 @@ void QueryExecutionContext::commit_insert() {
 
                 DBValue *old_value = table_columns_values[column_idx];
                 DBValue *value_to_insert = columns_to_insert_values[column_idx];
-                DBValue *new_value = DBValue::concat(allocator, old_value, value_to_insert);
+                DBValue *new_value = new (allocator) ConcatDBValue{old_value, value_to_insert};
 
                 table_columns_values[column_idx] = new_value;
                 break;
