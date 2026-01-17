@@ -61,6 +61,22 @@ public:
     explicit ConstDBValue(ok::String *s) : ConstDBValue{SQL::TYPE_STRING, ConstKind::STRING, static_cast<void *>(s)} {}
     explicit ConstDBValue(bool b) : ConstDBValue{SQL::TYPE_BOOL, ConstKind::BOOL, reinterpret_cast<void *>(static_cast<U64>(b))} {}
 
+    ConstKind kind() const {
+        return m_const_kind;
+    }
+
+    S64 as_int() const {
+        return reinterpret_cast<S64>(m_data);
+    }
+
+    bool as_bool() const {
+        return static_cast<bool>(reinterpret_cast<U64>(m_data));
+    }
+
+    ok::String *as_string() {
+        return static_cast<ok::String *>(m_data);
+    }
+
 private:
     explicit ConstDBValue(SQL::Type type, ConstKind kind, void *data) : DBValue{type, Kind::CONSTANT}, m_const_kind{kind}, m_data{data} {}
 

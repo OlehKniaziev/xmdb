@@ -93,6 +93,14 @@ public:
         return Value{SQL::TYPE_INT, reinterpret_cast<void *>(static_cast<U64>(value))};
     }
 
+    static Value boolean(bool value) {
+        return Value{SQL::TYPE_BOOL, reinterpret_cast<void *>(static_cast<U64>(value))};
+    }
+
+    static Value string(ok::String *value) {
+        return Value{SQL::TYPE_STRING, reinterpret_cast<void *>(value)};
+    }
+
     static Value greater() {
         return integer(1);
     }
@@ -138,7 +146,7 @@ public:
         COMPUTE,
     };
 
-    explicit DBTableStream(ConstDBValue *constant) : m_type{Type::CONSTANT}, m_u{.constant = constant} {}
+    explicit DBTableStream(ConstDBValue constant) : m_type{Type::CONSTANT}, m_u{.constant = constant} {}
 
     using Computation = ok::Optional<Value> (*)(void *);
 
@@ -156,7 +164,7 @@ private:
 
     Type m_type;
     union {
-        ConstDBValue *constant;
+        ConstDBValue constant;
         ComputationStream compute;
     } m_u;
 };

@@ -87,7 +87,7 @@ DBTableStream DBTableStream::from_value(ok::Allocator *allocator, DBValue *value
     switch (value->kind()) {
     case DBValue::Kind::CONSTANT: {
         auto *const_val = static_cast<ConstDBValue *>(value);
-        return DBTableStream{const_val};
+        return DBTableStream{*const_val};
     }
     case DBValue::Kind::COMPARE: {
         struct CompareState {
@@ -134,7 +134,33 @@ DBTableStream DBTableStream::from_value(ok::Allocator *allocator, DBValue *value
 }
 
 ok::Optional<Value> DBTableStream::next() {
-    OK_TODO();
+    switch (m_type) {
+    case Type::CONSTANT: {
+        ConstDBValue constant = m_u.constant;
+
+        switch (constant.kind()) {
+        case ConstDBValue::ConstKind::INT: {
+            S64 value = constant.as_int();
+            return Value::integer(value);
+        }
+        case ConstDBValue::ConstKind::BOOL: {
+            bool value = constant.as_bool();
+            return Value::boolean(value);
+        }
+        case ConstDBValue::ConstKind::STRING: {
+            ok::String *value = constant.as_string();
+            return Value::string(value);
+        }
+        }
+
+        OK_UNREACHABLE();
+    }
+    case Type::COMPUTE:
+    case Type::DISK:
+        OK_TODO();
+    }
+
+    OK_UNREACHABLE();
 }
 
 Value Value::compare(Value) {
