@@ -374,7 +374,7 @@ struct IrContext {
 
     explicit IrContext(Allocator *allocator, StringView source) :
         allocator{allocator}, source{source}, ir_emitter{allocator} {
-        auto default_schema = DBSchema::alloc_default(ok::static_allocator);
+        auto default_schema = DBSchema::alloc_default(allocator);
         database_schemas = List<DBSchema>::alloc(allocator);
         database_schemas.push(default_schema);
 

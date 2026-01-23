@@ -23,17 +23,14 @@ longjmp((ctx)->jmpbuf, 1);                                                      
 (ctx)->error =                                                                                                   \
     ErrorWithSourceLocation{.message = String::format((ctx)->allocator, fmt, __VA_ARGS__), .location = {}};  \
 longjmp((ctx)->jmpbuf, 1);                                                                                       \
-                                                                                                                       \
     } while (false)
-
-
 
 namespace xmdb {
 struct QueryExecutionContext {
-    DBValue * fetch_var(U32);
+    DBValue *fetch_var(U32);
     void put_var(U32, StringView, DBValue *);
 
-    DBValue * fetch_column(DBTable *, StringView);
+    DBValue *fetch_column(DBTable *, StringView);
     void emit_column(DBTable *, DBValue *, StringView);
 
     DBTable *fetch_table(StringView);
@@ -67,9 +64,9 @@ struct QueryExecutionContext {
     DBUser *user;
     ok::Table<U32, DBValue *> vars;
     ok::Table<U32, DBTable *> tables;
+    ok::Table<StringView, ok::List<DBValue *>> rows_to_insert;
+    UZ rows_to_insert_count;
     ok::MultiList<StringView, DBValue *, DBTable *> emitted_columns;
-    ok::MultiList<StringView, DBValue *> columns_to_insert;
-    ok::MultiList<UZ, StringView *, DBValue **> rows_to_insert;
     ok::MultiList<StringView, DBValue *> columns_to_update;
     Optional<QueryGraph::AtomicNode *> alter_user_atomic_node;
     DBDescriptor *current_db;

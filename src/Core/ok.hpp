@@ -304,8 +304,7 @@ struct Allocator {
     }
 };
 
-extern Allocator* temp_allocator;
-extern Allocator* static_allocator;
+Allocator *temp_allocator();
 
 struct FixedBufferAllocator : public Allocator {
     void* raw_alloc(UZ size) override;
@@ -1634,13 +1633,20 @@ struct File {
     struct WriteError {};
     struct CloseError {};
     struct RemoveError {};
-
 #endif // Platform check.
 
     static Optional<OpenError> open(File* out, const char* path);
     static Optional<OpenError> open(File* out, StringView path);
 
 #if OK_UNIX
+    static File from_fd(int fd, const char *path) {
+        return File{
+            .fd = fd,
+            .offset = 0,
+            .path = path,
+        };
+    }
+
     static String error_string(Allocator*, OpenError);
     static String error_string(Allocator*, ReadError);
     static String error_string(Allocator*, WriteError);
@@ -1659,10 +1665,10 @@ struct File {
     Optional<ReadError> read(U8* buf, UZ count, UZ* n_read);
     Optional<ReadError> read_full(Allocator* a, List<U8>* out);
 
-    Optional<WriteError> write(U8 *data, UZ count);
+    Optional<WriteError> write(U8 *data, UZ count, UZ *n_written);
 
     inline Optional<WriteError> write(Slice<U8> data) {
-        return write(data.items, data.count);
+        return write(data.items, data.count, nullptr);
     }
 
     UZ size();
@@ -1746,11 +1752,11 @@ static inline U64 nanos_timestamp() {
     }
 #endif // OK_NO_STDLIB
 
-FixedBufferAllocator _temp_allocator_impl{};
-Allocator* temp_allocator = &_temp_allocator_impl;
+static FixedBufferAllocator temp_allocator_impl{};
 
-ArenaAllocator _static_allocator_impl{};
-Allocator* static_allocator = &_static_allocator_impl;
+Allocator *temp_allocator() {
+    return &temp_allocator_impl;
+}
 
 static void _init_region(ArenaAllocator::Region* region, UZ size) {
     region->data = (U8*)OK_ALLOC_PAGE(size);
@@ -2045,7 +2051,7 @@ Optional<File::OpenError> File::open(File* out, const char* path) {
 
 Optional<File::OpenError> File::open(File* out, StringView path) {
     // FIXME: Temporary allocation in potentially multi-threaded context.
-    char* path_cstr = temp_allocator->alloc<char>(path.count + 1);
+    char* path_cstr = temp_allocator()->alloc<char>(path.count + 1);
     memcpy(path_cstr, path.data, path.count);
     path_cstr[path.count] = '\0';
     return File::open(out, path_cstr);
@@ -2242,17 +2248,26 @@ Optional<File::CloseError> File::close() const {
 #endif // Platform check.
 }
 
-Optional<File::WriteError> File::write(U8* data, UZ count) {
+Optional<File::WriteError> File::write(U8* data, UZ count, UZ *n_written) {
 #if OK_UNIX
+    OK_VERIFY(data != nullptr);
+
     S64 ret = ::write(fd, (const void*)data, count);
 
-    if (ret != -1) return {};
+    if (ret != -1) {
+        if (n_written != nullptr) {
+            *n_written = (UZ) ret;
+        }
+
+        this->seek_to(this->offset);
+        return {};
+    }
 
     switch (errno) {
     case EBADF:  return WriteError::NOT_ALLOWED;
     case ENOSPC: return WriteError::OUT_OF_SPACE;
     case EINVAL: return WriteError::BAD_DATA;
-    default:     OK_UNREACHABLE();
+    default:     OK_PANIC_FMT("Unhandled error %s", strerror(errno));
     }
 #elif OK_WINDOWS
     // We first seek to the start of the file, and then set that as the end of file,
@@ -2596,7 +2611,7 @@ Optional<File::OpenError> create_temp_file(File* file) {
 #if OK_UNIX
     U64 timestamp = nanos_timestamp();
 
-    String file_path = String::alloc(temp_allocator, "/tmp/");
+    String file_path = String::alloc(temp_allocator(), "/tmp/");
     file_path.reserve(13);
 
     for (U8 i = 0; i < 8; ++i) {

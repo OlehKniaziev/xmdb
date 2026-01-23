@@ -1,5 +1,7 @@
 #pragma once
 
+#include "DBState.hpp"
+
 namespace xmdb {
 constexpr U64 BTREE_PAGE_SIZE = 4096;
 
@@ -13,4 +15,6 @@ static_assert(BTREE_ORDER >= 2, "Order of the B-Tree is not allowed to be less t
 
 constexpr auto BTREE_MAX_KEYS = BTREE_ORDER * 2 - 1;
 constexpr auto BTREE_MAX_CHILDREN = BTREE_ORDER * 2;
+
+constexpr auto DB_STATE_HEADER_LENGTH = sizeof(DBStateHeader);
 }

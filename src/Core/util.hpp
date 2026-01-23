@@ -17,6 +17,8 @@ struct ErrorWithSourceLocation {
     ok::String message;
     SourceLocation location;
 };
+
+ok::String to_hex_string(ok::Allocator *, ok::Slice<U8>);
 } // namespace xmdb
 
 #endif // XMDB_UTIL_HPP

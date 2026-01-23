@@ -1,20 +1,21 @@
 #pragma once
 
-#include "DBIndex.hpp"
+#include "BTreeIndex.hpp"
 #include "DBValue.hpp"
 #include "ColumnLayout.hpp"
 #include "ok.hpp"
+#include "Value.hpp"
+#include "DBState.hpp"
 
 namespace xmdb {
-// TODO(oleh): Create some sort of table builder abstraction so that I never forget to set proxy
-// values.
 class DBTable {
 public:
     using Flags = U16;
     enum : Flags {
-        F_ANON    = 1 << 0,
-        F_PERSIST = 1 << 1,
-        F_PROXY   = 1 << 2,
+        F_ANON      = 1 << 0,
+        F_PERSIST   = 1 << 1,
+        F_PROXY     = 1 << 2,
+        F_EPHEMERAL = 1 << 3,
     };
 
     DBTable(ok::Allocator *allocator,
@@ -44,17 +45,22 @@ public:
         return {m_columns_types, m_columns_count};
     }
 
-    ok::Slice<ColumnLayout> columns_layout() {
-        return {m_columns_layout, m_columns_count};
+    TableLayout layout() const {
+        return m_layout;
     }
 
-    UZ rows_count() const {
-        OK_VERIFY(m_flags & F_PROXY);
-        return m_rows_count;
+    UZ rows_count() {
+        if (m_flags & F_PROXY) {
+            return m_proxy_rows_count;
+        } else {
+            OK_ASSERT(m_flags & F_PERSIST);
+            return m_index.node_count();
+        }
     }
 
     void set_rows_count(UZ x) {
-        m_rows_count = x;
+        OK_VERIFY(m_flags & F_PROXY);
+        m_proxy_rows_count = x;
     }
 
     void set_proxy_column_values(ok::Slice<DBValue *> values) {
@@ -76,84 +82,69 @@ public:
         return {m_proxy_columns_values, m_columns_count};
     }
 
-protected:
+    BTreeIndex *index() {
+        OK_ASSERT(m_flags & F_PERSIST);
+        return &m_index;
+    }
+
+    void set_index(BTreeIndex index) {
+        m_index = index;
+    }
+
+    DBState *state() {
+        OK_VERIFY(m_flags & F_PERSIST);
+        return &m_state;
+    }
+
+    void set_state(DBState state) {
+        OK_VERIFY(m_flags & F_PERSIST);
+        m_state = state;
+    }
+
+private:
     ok::StringView m_name;
     U16 m_flags;
     UZ m_columns_count;
-    UZ m_rows_count;
     ok::StringView *m_columns_names;
     SQL::ColumnType *m_columns_types;
-    ok::Table<UZ, DBIndex> m_indices;
-    ColumnLayout *m_columns_layout;
-    DBValue **m_proxy_columns_values; // NOTE(oleh): I just don't fucking care anymore.
+    TableLayout m_layout;
+    DBValue **m_proxy_columns_values;
+    UZ m_proxy_rows_count;
+    BTreeIndex m_index;
+    DBState m_state;
 };
-
-class Value {
-public:
-    Value() = delete;
-
-    static Value integer(S64 value) {
-        return Value{SQL::TYPE_INT, reinterpret_cast<void *>(static_cast<U64>(value))};
-    }
-
-    static Value boolean(bool value) {
-        return Value{SQL::TYPE_BOOL, reinterpret_cast<void *>(static_cast<U64>(value))};
-    }
-
-    static Value string(ok::String *value) {
-        return Value{SQL::TYPE_STRING, reinterpret_cast<void *>(value)};
-    }
-
-    static Value greater() {
-        return integer(1);
-    }
-
-    static Value less() {
-        return integer(-1);
-    }
-
-    static Value equal() {
-        return integer(0);
-    }
-
-    template <typename T>
-    T cast() = delete;
-
-    SQL::Type type() const {
-        return m_type;
-    }
-
-    Value compare(Value);
-
-private:
-    Value(SQL::Type type, void *data) : m_type{type}, m_data{data} {}
-
-    SQL::Type m_type;
-    void *m_data;
-};
-
-template <>
-S64 Value::cast<S64>();
-
-template <>
-ok::String Value::cast<ok::String>();
-
-template <>
-bool Value::cast<bool>();
 
 class DBTableStream {
 public:
     enum class Type {
         CONSTANT,
-        DISK,
+        COLUMN,
         COMPUTE,
     };
 
-    explicit DBTableStream(ConstDBValue constant) : m_type{Type::CONSTANT}, m_u{.constant = constant} {}
+    explicit DBTableStream(ok::Allocator *allocator, ConstDBValue constant) : m_allocator{allocator}, m_type{Type::CONSTANT}, m_u{.constant = constant} {}
 
     using Computation = ok::Optional<Value> (*)(void *);
 
-    explicit DBTableStream(Computation comp, void *arg) : m_type{Type::COMPUTE}, m_u{.compute = {.comp = comp, .arg = arg}} {}
+    DBTableStream(ok::Allocator *allocator, Computation comp, void *arg) : m_allocator{allocator}, m_type{Type::COMPUTE}, m_u{.compute = {.comp = comp, .arg = arg}} {}
+
+    DBTableStream(ok::Allocator *allocator,
+                  DBTable *table,
+                  UZ column_index) : m_allocator{allocator},
+                                     m_type{Type::COLUMN},
+                                     m_u{
+                                         .column = {
+                                             .table = table,
+                                             .column_index = column_index,
+                                             .current_record = 0,
+                                             .buffer = nullptr,
+                                         }
+                                     }
+    {
+        TableLayout layout = table->layout();
+        ColumnLayout col_layout = layout.columns[column_index];
+        m_u.column.buffer = allocator->alloc<U8>(col_layout.size);
+    }
 
     static DBTableStream from_value(ok::Allocator *, DBValue *);
 
@@ -165,10 +156,19 @@ private:
         void *arg;
     };
 
+    struct ColumnStream {
+        DBTable *table;
+        UZ column_index;
+        UZ current_record;
+        U8 *buffer;
+    };
+
+    ok::Allocator *m_allocator;
     Type m_type;
     union {
         ConstDBValue constant;
         ComputationStream compute;
+        ColumnStream column;
     } m_u;
 };
 
@@ -185,4 +185,8 @@ public:
 private:
     DBTable *m_table;
 };
+
+static inline ok::Optional<Value> poll(ok::Allocator *allocator, DBValue *value) {
+    return DBTableStream::from_value(allocator, value).next();
+}
 }; // namespace xmdb

@@ -1,1 +1,2 @@
 - Uncomment DBConnection tests
+- Modify the `ok` library to not commit all of the memory on windows upfront

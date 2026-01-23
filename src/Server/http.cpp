@@ -186,16 +186,16 @@ DECLARE_HANDLER(run_query_handler) {
 
                     switch (value.type()) {
                     case xmdb::SQL::TYPE_INT: {
-                        S64 n = value.cast<S64>();
+                        S64 n = value.as_int();
                         WebJsonPutKey(column_name);
                         WebJsonPutNumber(n);
                         break;
                     }
                     case xmdb::SQL::TYPE_STRING: {
-                        String s = value.cast<String>();
+                        FixedString s = value.as_string();
                         web_string_view value = {
-                                .Items = (u8 *) s.cstr(),
-                                .Count = s.count(),
+                                .Items = (u8 *) s.items,
+                                .Count = s.count,
                         };
 
                         WebJsonPutKey(column_name);
@@ -204,7 +204,7 @@ DECLARE_HANDLER(run_query_handler) {
                         break;
                     }
                     case xmdb::SQL::TYPE_BOOL: {
-                        bool b = value.cast<bool>();
+                        bool b = value.as_bool();
 
                         WebJsonPutKey(column_name);
 

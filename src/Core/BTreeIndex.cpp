@@ -1,7 +1,7 @@
 // TODO(oleh): Make this load nodes only if they aren't in memory already.
 // This would require an in-memory index of live nodes, or something like that.
 #include "BTreeIndex.hpp"
-
+#include "Logger.hpp"
 #include "constants.hpp"
 
 namespace xmdb {
@@ -124,13 +124,17 @@ struct BTreeState {
             state->root->id = 0;
 
             UZ temp_buf_count = BTREE_HEADER_LENGTH + BTREE_PAGE_SIZE;
-            U8 *temp_buf = ok::temp_allocator->alloc<U8>(temp_buf_count);
+            U8 *temp_buf = ok::temp_allocator()->alloc<U8>(temp_buf_count);
 
             memcpy(temp_buf, state->header, sizeof(*state->header));
             memcpy(temp_buf + BTREE_HEADER_LENGTH, state->root->disk, BTREE_PAGE_SIZE);
 
-            auto write_err = state_file.write(temp_buf, temp_buf_count);
+            state_file.seek_start();
+
+            UZ n_written = 0;
+            auto write_err = state_file.write(temp_buf, temp_buf_count, &n_written);
             if (write_err) return ok::File::error_string(allocator, write_err.value);
+            OK_VERIFY(n_written == temp_buf_count);
         } else {
             // NOTE(oleh): Read in the header and root.
             constexpr auto buffer_count = BTREE_HEADER_LENGTH + BTREE_PAGE_SIZE;
@@ -243,8 +247,10 @@ struct BTreeState {
     void save_node_to_disk(Node *node) {
         state_file.seek_to(BTREE_HEADER_LENGTH + node->id * BTREE_PAGE_SIZE);
 
-        auto write_err = state_file.write(reinterpret_cast<U8 *>(node->disk), BTREE_PAGE_SIZE);
+        UZ n_written = 0;
+        auto write_err = state_file.write(reinterpret_cast<U8 *>(node->disk), BTREE_PAGE_SIZE, &n_written);
         if (write_err) OK_TODO();
+        OK_VERIFY(n_written == BTREE_PAGE_SIZE);
     }
 
     void split_child(Node *parent, Node *full_child, U64 full_child_index) {
@@ -320,11 +326,12 @@ struct BTreeState {
         S64 i = (S64) node->keys_count() - 1;
 
         if (node->is_leaf()) {
+            node->add_keys_count(1);
+
             for (; i >= 0 && key < node->keys()[i]; --i) {
                 node->keys()[i + 1] = node->keys()[i];
             }
 
-            node->add_keys_count(1);
             node->keys()[i + 1] = key;
 
             save_node_to_disk(node);
@@ -425,4 +432,4 @@ U64 BTreeIndex::node_count() {
     auto *impl = static_cast<BTreeState *>(pImpl);
     return impl->header->index_nodes_count;
 }
-}; // namespace xmdb
+} // namespace xmdb

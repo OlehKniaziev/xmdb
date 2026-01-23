@@ -1,15 +1,24 @@
 #pragma once
 
+#include "ok.hpp"
+
 namespace xmdb {
-class FixedString {
-public:
-    static constexpr UZ SIZE = 256;
+struct FixedString {
+    static constexpr UZ DATA_SIZE = 63;
+    static constexpr UZ PREFIX_SIZE = 1;
 
-    ok::Slice<const U8> slice() const {
-        return {reinterpret_cast<const U8 *>(m_buffer), SIZE};
-    }
-
-private:
-    U8 m_buffer[SIZE];
+    U8 count;
+    U8 items[DATA_SIZE];
 };
+
+static_assert(sizeof(FixedString::count) == FixedString::PREFIX_SIZE);
+static_assert(sizeof(FixedString) == FixedString::PREFIX_SIZE + FixedString::DATA_SIZE);
+
+FixedString create_fixed_string(ok::StringView);
+
+static inline ok::StringView view(ok::Allocator *a, FixedString fs) {
+    U8 *buffer = a->alloc<U8>(fs.count);
+    memcpy(buffer, fs.items, fs.count);
+    return {(const char *)buffer, fs.count};
+}
 }

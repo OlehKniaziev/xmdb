@@ -9,6 +9,12 @@ using namespace ok::literals;
 using namespace xmdb;
 using namespace xmdb::SQL;
 
+bool eq(ok::StringView lhs, ok::StringView rhs) {
+    if (lhs.count != rhs.count) return false;
+    for (UZ i = 0; i < lhs.count; ++i) if (lhs[i] != rhs[i]) return false;
+    return true;
+}
+
 TEST(DBConnection, execute_create_and_select_on_empty_table) {
     ok::ArenaAllocator arena{};
     StringView source = R"sql(CREATE TABLE MyTable (
@@ -45,7 +51,18 @@ TEST(DBConnection, execute_create_and_select_on_empty_table) {
 }
 
 TEST(DBConnection, execute_create_insert_and_select_on_table_with_one_row) {
-    ok::ArenaAllocator arena{};
+    struct Malloc : public ok::ArenaAllocator {
+        void *raw_alloc(UZ size) override {
+            return calloc(1, size);
+        }
+
+        void raw_dealloc(void *ptr, UZ size) override {
+            (void) size;
+            ::free(ptr);
+        }
+    };
+
+    Malloc arena{};
     StringView source = R"sql(CREATE TABLE MyTable (
         column1 int,
         column2 text
@@ -64,7 +81,7 @@ TEST(DBConnection, execute_create_insert_and_select_on_table_with_one_row) {
 
     bool ok = compile_and_execute_source(&arena, &db_conn, source, &query_results, &error);
 
-    ASSERT_TRUE(ok);
+    ASSERT_TRUE(ok) << error.cstr();
 
     ASSERT_FALSE(query_results.error.has_value());
     ASSERT_TRUE(query_results.value.has_value());
@@ -88,16 +105,21 @@ TEST(DBConnection, execute_create_insert_and_select_on_table_with_one_row) {
 
     ASSERT_TRUE(next_value);
     ASSERT_EQ(next_value.get().type(), SQL::TYPE_INT);
-    ASSERT_EQ(next_value.get().cast<S64>(), 1);
+    ASSERT_EQ(next_value.get().as_int(), 1);
 
     ASSERT_FALSE(column1_value.next());
-    // ASSERT_EQ(column1_value.u.integer.next(), ok::Optional<S64>::NONE);
 
-    // DBValue column2_value = results_table->columns_values()[1];
+    DBTableStream column2_value = results_outlet.column_stream(&arena, 1);
 
-    // ASSERT_EQ(column2_value.type, SQL::TYPE_STRING);
-    // ASSERT_EQ(column2_value.u.string.next(), ok::Optional<StringView>{"1"_sv});
-    // ASSERT_EQ(column2_value.u.string.next(), ok::Optional<StringView>::NONE);
+    next_value = column2_value.next();
+
+    ASSERT_TRUE(next_value);
+    ASSERT_EQ(next_value.get().type(), SQL::TYPE_STRING);
+
+    ok::StringView val = view(&arena, next_value.get().as_string());
+    ASSERT_EQ(val, "1"_sv);
+
+    ASSERT_FALSE(column2_value.next());
 }
 
 #if 0

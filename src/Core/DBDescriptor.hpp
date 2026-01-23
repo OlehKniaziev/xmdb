@@ -22,9 +22,18 @@ struct DBDescriptor {
         return {};
     }
 
+    DBTable *create_new_table(ok::Allocator *allocator,
+                              ok::StringView name,
+                              DBTable::Flags flags,
+                              UZ columns_count,
+                              ok::Slice<ok::StringView> column_names,
+                              ok::Slice<SQL::ColumnType> column_types);
+
+    ok::Optional<DBTable *> load_existing_table(ok::StringView);
+
     DBDescriptor *next;
     ok::StringView name;
     DBUser *users;
     ok::List<DBTable *> tables;
 };
-};
+}

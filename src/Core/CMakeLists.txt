@@ -14,6 +14,10 @@ add_library(LibCore
   BTreeIndex.cpp
   QueryGraph.cpp
   Logger.cpp
+  SDFile.cpp
+  DBRecord.cpp
+  FixedString.cpp
+  DBState.cpp
 )
 
 set_property(TARGET LibCore PROPERTY POSITION_INDEPENDENT_CODE 1)

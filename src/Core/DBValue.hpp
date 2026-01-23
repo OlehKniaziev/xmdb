@@ -156,9 +156,5 @@ public:
     ConcatDBValue(DBValue *lhs, DBValue *rhs) : PairDBValue{lhs->type(), Kind::CONCAT, lhs, rhs} {
         OK_ASSERT(lhs->is_compatible_with(rhs));
     }
-
-private:
-    DBValue *m_lhs;
-    DBValue *m_rhs;
 };
 } // namespace xmdb

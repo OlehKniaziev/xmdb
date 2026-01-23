@@ -1,26 +1,12 @@
 #include "DBTable.hpp"
 #include "FixedString.hpp"
 #include "new.hpp"
+#include "Logger.hpp"
+#include "constants.hpp"
+
+using namespace ok::literals;
 
 namespace xmdb {
-template <>
-S64 Value::cast<S64>() {
-    OK_ASSERT(m_type == SQL::TYPE_INT);
-    return static_cast<S64>(reinterpret_cast<U64>(m_data));
-}
-
-template <>
-ok::String Value::cast<ok::String>() {
-    OK_ASSERT(m_type == SQL::TYPE_STRING);
-    return *reinterpret_cast<ok::String *>(m_data);
-}
-
-template <>
-bool Value::cast<bool>() {
-    OK_ASSERT(m_type == SQL::TYPE_BOOL);
-    return static_cast<bool>(reinterpret_cast<U64>(m_data));
-}
-
 struct TypeLayout {
     static constexpr UZ MAX_ALIGNMENT = sizeof(UZ);
 
@@ -29,14 +15,14 @@ struct TypeLayout {
 };
 
 static TypeLayout type_layout(SQL::ColumnType type) {
-    static_assert(FixedString::SIZE % 8 == 0);
+    static_assert(sizeof(FixedString) % 8 == 0);
 
     switch (type) {
     case SQL::ColumnType::INTEGER: return {.size = 8, .alignment = 8};
     case SQL::ColumnType::FLOAT:   return {.size = 4, .alignment = 4};
     case SQL::ColumnType::DOUBLE:  return {.size = 8, .alignment = 8};
     case SQL::ColumnType::BOOLEAN: return {.size = 1, .alignment = 1};
-    case SQL::ColumnType::TEXT:    return {.size = FixedString::SIZE, .alignment = 8};
+    case SQL::ColumnType::TEXT:    return {.size = sizeof(FixedString), .alignment = 8};
     case SQL::ColumnType::IMAGE:   OK_TODO();
     }
 
@@ -85,8 +71,26 @@ DBTable::DBTable(ok::Allocator *allocator,
                                                    m_columns_count{columns_count},
                                                    m_columns_names{columns_names},
                                                    m_columns_types{columns_types} {
-    m_indices = ok::Table<UZ, DBIndex>::alloc(allocator);
-    m_columns_layout = compute_columns_layout(allocator, columns_count, columns_types);
+    ColumnLayout *columns_layout = compute_columns_layout(allocator, columns_count, columns_types);
+
+    UZ id_column_index = (UZ)-1;
+    for (UZ i = 0; i < columns_count; ++i) {
+        if (columns_names[i] == "id"_sv) {
+            id_column_index = i;
+            break;
+        }
+    }
+
+    if (id_column_index == (UZ)-1) {
+        OK_VERIFY(columns_count > 0);
+        id_column_index = 0;
+    }
+
+    XMDB_FIXME("DBTable constructor searches for a column with name 'id' and sets it as a primary key column");
+
+    m_layout.primary_key_index = id_column_index;
+    m_layout.columns.items = columns_layout;
+    m_layout.columns.count = columns_count;
 
     if (flags & F_PROXY) {
         OK_ASSERT(flags & F_ANON);
@@ -95,6 +99,10 @@ DBTable::DBTable(ok::Allocator *allocator,
         for (UZ i = 0; i < m_columns_count; ++i) {
             m_proxy_columns_values[i] = new (allocator) NoneDBValue{};
         }
+    }
+
+    if (flags & F_EPHEMERAL) {
+        OK_ASSERT(flags & F_PERSIST);
     }
 }
 
@@ -107,7 +115,7 @@ DBTableStream DBTableStream::from_value(ok::Allocator *allocator, DBValue *value
     switch (value->kind()) {
     case DBValue::Kind::CONSTANT: {
         auto *const_val = static_cast<ConstDBValue *>(value);
-        return DBTableStream{*const_val};
+        return DBTableStream{allocator, *const_val};
     }
     case DBValue::Kind::COMPARE: {
         auto *cmp_val = static_cast<CompareDBValue *>(value);
@@ -118,6 +126,7 @@ DBTableStream DBTableStream::from_value(ok::Allocator *allocator, DBValue *value
         auto *cmp_state = new (allocator) StreamPair{lhs, rhs};
 
         return DBTableStream{
+            allocator,
             [](void *arg) -> ok::Optional<Value> {
                 auto *state = static_cast<StreamPair *>(arg);
                 ok::Optional<Value> lhs_opt = state->lhs.next();
@@ -144,6 +153,7 @@ DBTableStream DBTableStream::from_value(ok::Allocator *allocator, DBValue *value
     }
     case DBValue::Kind::NONE: {
         return DBTableStream{
+            allocator,
             [](void *arg) -> ok::Optional<Value> {
                 OK_UNUSED(arg);
                 return ok::Optional<Value>::empty();
@@ -160,6 +170,7 @@ DBTableStream DBTableStream::from_value(ok::Allocator *allocator, DBValue *value
         auto *stream_pair = new (allocator) StreamPair{lhs, rhs};
 
         return DBTableStream{
+            allocator,
             [](void *arg) -> ok::Optional<Value> {
                 auto *pair = reinterpret_cast<StreamPair *>(arg);
 
@@ -175,14 +186,23 @@ DBTableStream DBTableStream::from_value(ok::Allocator *allocator, DBValue *value
     case DBValue::Kind::COLUMN: {
         auto *column_value = static_cast<ColumnDBValue *>(value);
         DBTable *table = column_value->table();
-
-        ok::Slice<DBValue *> columns_values = table->proxy_column_values();
-
         ColumnLayout column_layout = column_value->layout();
 
-        DBValue *value = columns_values[column_layout.index];
+        if (table->flags() & DBTable::F_PROXY) {
+            ok::Slice<DBValue *> columns_values = table->proxy_column_values();
 
-        return DBTableStream::from_value(allocator, value);
+            DBValue *value = columns_values[column_layout.index];
+
+            return DBTableStream::from_value(allocator, value);
+        } else {
+            OK_ASSERT(table->flags() & DBTable::F_PERSIST);
+
+            return DBTableStream{
+                allocator,
+                table,
+                column_layout.index,
+            };
+        }
     }
     }
 
@@ -205,7 +225,11 @@ ok::Optional<Value> DBTableStream::next() {
         }
         case ConstDBValue::ConstKind::STRING: {
             ok::String *value = constant.as_string();
-            return Value::string(value);
+            OK_VERIFY(value->count() <= FixedString::DATA_SIZE);
+            FixedString fs{};
+            memcpy(fs.items, (U8 *) value->cstr(), value->count());
+            fs.count = (U8) value->count();
+            return Value::string(m_allocator, fs);
         }
         }
 
@@ -215,8 +239,67 @@ ok::Optional<Value> DBTableStream::next() {
         ComputationStream comp = m_u.compute;
         return comp.comp(comp.arg);
     }
-    case Type::DISK:
-        OK_TODO_MSG("Disk table stream. FUCK!");
+    case Type::COLUMN: {
+        ColumnStream *col = &m_u.column;
+        DBTable *table = col->table;
+        BTreeIndex *index = table->index();
+        UZ records_count = index->node_count();
+        DBState *state = table->state();
+
+        if (col->current_record >= records_count) {
+            return ok::Optional<Value>::empty();
+        }
+
+        TableLayout layout = table->layout();
+        ColumnLayout target_column = layout.columns[col->column_index];
+
+        OK_ASSERT(layout.columns.count > 0);
+        ColumnLayout last = layout.columns[layout.columns.count - 1];
+        UZ record_size = last.offset + last.size;
+
+        state->file.seek_to(DB_STATE_HEADER_LENGTH + col->current_record * record_size + target_column.offset);
+
+        UZ n_read = 0;
+
+        ok::Optional<ok::File::ReadError> read_err = state->file.read(col->buffer, target_column.size, &n_read);
+        OK_VERIFY(!read_err);
+        OK_VERIFY(n_read == target_column.size);
+
+        SQL::ColumnType column_type = table->columns_types()[col->column_index];
+
+        ++col->current_record;
+
+        switch (column_type) {
+        case SQL::ColumnType::INTEGER: {
+            U64 result_u = 0;
+
+            for (SZ i = 0; i < 7; ++i) {
+                result_u = (result_u | (U64) col->buffer[i]) << 8;
+            }
+
+            result_u |= (U64) col->buffer[7];
+
+            S64 result = (S64) result_u;
+
+            return Value::integer(result);
+        }
+        case SQL::ColumnType::TEXT: {
+            FixedString result{};
+            memcpy(&result, col->buffer, sizeof(FixedString));
+            return Value::string(m_allocator, result);
+        }
+        case SQL::ColumnType::BOOLEAN:
+            OK_TODO_MSG("[next] BOOL");
+        case SQL::ColumnType::FLOAT:
+            OK_TODO_MSG("[next] FLOAT");
+        case SQL::ColumnType::DOUBLE:
+            OK_TODO_MSG("[next] DOUBLE");
+        case SQL::ColumnType::IMAGE:
+            OK_TODO_MSG("[next] IMAGE");
+        }
+
+        OK_UNREACHABLE();
+    }
     }
 
     OK_UNREACHABLE();

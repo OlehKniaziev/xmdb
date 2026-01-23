@@ -319,8 +319,8 @@ static void run_single_node(QueryExecutionContext *ctx, QueryGraph::Node *node) 
             DBTableStream password_value_stream = DBTableStream::from_value(ctx->allocator, password_db_value);
 
             Value password_value = password_value_stream.next().get();
-            ok::String new_password = password_value.cast<ok::String>();
-            user->sha256_password_digest = sha256_digest(new_password.view());
+            FixedString new_password = password_value.as_string();
+            user->sha256_password_digest = sha256_digest(view(ok::temp_allocator(), new_password));
 
             break;
         }
