@@ -50,19 +50,19 @@ TEST(DBConnection, execute_create_and_select_on_empty_table) {
     ASSERT_EQ(results_table->columns_types()[1], SQL::ColumnType::TEXT);
 }
 
+struct MallocAllocator : public ok::ArenaAllocator {
+    void *raw_alloc(UZ size) override {
+        return calloc(1, size);
+    }
+
+    void raw_dealloc(void *ptr, UZ size) override {
+        (void) size;
+        ::free(ptr);
+    }
+};
+
 TEST(DBConnection, execute_create_insert_and_select_on_table_with_one_row) {
-    struct Malloc : public ok::ArenaAllocator {
-        void *raw_alloc(UZ size) override {
-            return calloc(1, size);
-        }
-
-        void raw_dealloc(void *ptr, UZ size) override {
-            (void) size;
-            ::free(ptr);
-        }
-    };
-
-    Malloc arena{};
+    ok::ArenaAllocator arena{};
     StringView source = R"sql(CREATE TABLE MyTable (
         column1 int,
         column2 text
