@@ -123,7 +123,7 @@ DBTable *QueryExecutionContext::emit_query(U32 columns_count, SQL::ColumnType *c
 
     Slice<DBValue *> columns_values_slice = {columns_values, columns_count};
     table->set_proxy_column_values(columns_values_slice);
-    table->set_rows_count(rows_count);
+    table->set_proxy_rows_count(rows_count);
     last_emitted_query = table;
     return table;
 }
@@ -311,21 +311,24 @@ void QueryExecutionContext::commit_update() {
 }
 
 void QueryExecutionContext::delete_table(DBTable *table) {
-#if 0
     CHECK_WRITE(this);
 
-    for (UZ i = 0; i < table->columns_count(); ++i) {
-        SQL::ColumnType column_type = table->columns_types()[i];
-        SQL::Type value_type = column_type_to_type(column_type);
-        DBValue new_value = DBValue::empty(value_type);
-        table->columns_values()[i] = new_value;
-    }
+    if (table->flags() & DBTable::F_PROXY) {
+        ok::Slice<DBValue *> values = table->proxy_column_values();
 
-    table->set_rows_count(0);
-#else
-    OK_UNUSED(table);
-    OK_TODO();
-#endif // 0
+        for (UZ i = 0; i < table->columns_count(); ++i) {
+            DBValue *new_value = new (allocator) NoneDBValue{};
+            values[i] = new_value;
+        }
+
+        table->set_proxy_rows_count(0);
+    } else {
+        BTreeIndex *index = table->index();
+        OK_VERIFY(index->reset());
+
+        DBState *state = table->state();
+        OK_VERIFY(db_state_reset(state));
+    }
 }
 
 void QueryExecutionContext::create_user(StringView name) {

@@ -116,7 +116,8 @@ TEST(DBConnection, execute_create_insert_and_select_on_table_with_one_row) {
     ASSERT_TRUE(next_value);
     ASSERT_EQ(next_value.get().type(), SQL::TYPE_STRING);
 
-    ok::StringView val = view(&arena, next_value.get().as_string());
+    FixedString val_fs = next_value.get().as_string();
+    ok::StringView val = view(&val_fs);
     ASSERT_EQ(val, "1"_sv);
 
     ASSERT_FALSE(column2_value.next());
@@ -159,21 +160,32 @@ TEST(DBConnection, execute_create_insert_update_and_select_on_table_with_one_row
     ASSERT_EQ(results_table->columns_types()[0], SQL::ColumnType::INTEGER);
     ASSERT_EQ(results_table->columns_types()[1], SQL::ColumnType::TEXT);
 
-    DBValue column1_value = results_table->columns_values()[0];
+    DBTableOutlet results_outlet{results_table};
 
-    ASSERT_EQ(column1_value.type(), SQL::TYPE_INT);
-    ASSERT_EQ(column1_value.u.integer.next(), ok::Optional<S64>{2});
-    ASSERT_EQ(column1_value.u.integer.next(), ok::Optional<S64>::NONE);
+    DBTableStream column1_stream = results_outlet.column_stream(&arena, 0);
+    DBTableStream column2_stream = results_outlet.column_stream(&arena, 1);
 
-    DBValue column2_value = results_table->columns_values()[1];
+    ok::Optional<Value> val1 = column1_stream.next();
 
-    ASSERT_EQ(column2_value.type, SQL::TYPE_STRING);
-    ASSERT_EQ(column2_value.u.string.next(), ok::Optional<StringView>{"2"_sv});
-    ASSERT_EQ(column2_value.u.string.next(), ok::Optional<StringView>::NONE);
+    ASSERT_TRUE(val1);
+    ASSERT_EQ(val1.get().type(), SQL::TYPE_INT);
+    ASSERT_EQ(val1.get().as_int(), 1);
+
+    ASSERT_FALSE(column1_stream.next());
+
+    ok::Optional<Value> val2 = column2_stream.next();
+
+    ASSERT_TRUE(val2);
+
+    FixedString val2_fs = val2.get().as_string();
+
+    ASSERT_EQ(val2.get().type(), SQL::TYPE_STRING);
+    ASSERT_EQ(view(&val2_fs), "2"_sv);
+
+    ASSERT_FALSE(column2_stream.next());
 }
 #endif // 0
 
-#if 0
 TEST(DBConnection, execute_create_insert_delete_and_select_on_table_with_one_row) {
     ok::ArenaAllocator arena{};
     StringView source = R"sql(CREATE TABLE MyTable (
@@ -210,19 +222,15 @@ TEST(DBConnection, execute_create_insert_delete_and_select_on_table_with_one_row
     ASSERT_EQ(results_table->columns_types()[0], SQL::ColumnType::INTEGER);
     ASSERT_EQ(results_table->columns_types()[1], SQL::ColumnType::TEXT);
 
-    DBValue column1_value = results_table->columns_values()[0];
+    DBTableOutlet outlet{results_table};
 
-    ASSERT_EQ(column1_value.type, SQL::TYPE_INT);
-    ASSERT_EQ(column1_value.u.integer.next(), ok::Optional<S64>::NONE);
+    DBTableStream column1_stream = outlet.column_stream(&arena, 0);
+    DBTableStream column2_stream = outlet.column_stream(&arena, 1);
 
-    DBValue column2_value = results_table->columns_values()[1];
-
-    ASSERT_EQ(column2_value.type, SQL::TYPE_STRING);
-    ASSERT_EQ(column2_value.u.string.next(), ok::Optional<StringView>::NONE);
+    ASSERT_FALSE(column1_stream.next());
+    ASSERT_FALSE(column2_stream.next());
 }
-#endif // 0
 
-#if 0
 TEST(DBConnection, create_new_db_and_execute_create_insert_and_select_on_table_with_one_row) {
     ok::ArenaAllocator arena{};
     StringView source = R"sql(
@@ -264,21 +272,31 @@ TEST(DBConnection, create_new_db_and_execute_create_insert_and_select_on_table_w
     ASSERT_EQ(results_table->columns_types()[0], SQL::ColumnType::INTEGER);
     ASSERT_EQ(results_table->columns_types()[1], SQL::ColumnType::TEXT);
 
-    DBValue column1_value = results_table->columns_values()[0];
+    DBTableOutlet outlet{results_table};
 
-    ASSERT_EQ(column1_value.type, SQL::TYPE_INT);
-    ASSERT_EQ(column1_value.u.integer.next(), ok::Optional<S64>{1});
-    ASSERT_EQ(column1_value.u.integer.next(), ok::Optional<S64>::NONE);
+    DBTableStream column1_stream = outlet.column_stream(&arena, 0);
+    DBTableStream column2_stream = outlet.column_stream(&arena, 1);
 
-    DBValue column2_value = results_table->columns_values()[1];
+    ok::Optional<Value> val1 = column1_stream.next();
+    ok::Optional<Value> val2 = column2_stream.next();
 
-    ASSERT_EQ(column2_value.type, SQL::TYPE_STRING);
-    ASSERT_EQ(column2_value.u.string.next(), ok::Optional<StringView>{"1"_sv});
-    ASSERT_EQ(column2_value.u.string.next(), ok::Optional<StringView>::NONE);
+    ASSERT_TRUE(val1);
+
+    ASSERT_EQ(val1.get().type(), SQL::TYPE_INT);
+    ASSERT_EQ(val1.get().as_int(), 1);
+
+    ASSERT_FALSE(column1_stream.next());
+
+    ASSERT_TRUE(val2);
+
+    FixedString val2_fs = val2.get().as_string();
+
+    ASSERT_EQ(val2.get().type(), SQL::TYPE_STRING);
+    ASSERT_EQ(view(&val2_fs), "1"_sv);
+
+    ASSERT_FALSE(column2_stream.next());
 }
-#endif // 0
 
-#if 0
 TEST(DBConnection, create_and_drop_empty_table) {
     ok::ArenaAllocator arena{};
     StringView source = R"sql(
@@ -306,9 +324,7 @@ TEST(DBConnection, create_and_drop_empty_table) {
 
     ASSERT_EQ(default_db->tables.count, 0);
 }
-#endif // 0
 
-#if 0
 TEST(DBConnection, create_and_drop_empty_database) {
     ok::ArenaAllocator arena{};
     StringView source = R"sql(
@@ -336,9 +352,6 @@ TEST(DBConnection, create_and_drop_empty_database) {
     }
 }
 
-#endif // 0
-
-#if 0
 TEST(DBConnection, execute_multiple_queries_with_the_same_connection) {
     ok::ArenaAllocator arena{};
     StringView source = "CREATE DATABASE DB;"_sv;
@@ -384,12 +397,10 @@ TEST(DBConnection, execute_multiple_queries_with_the_same_connection) {
     ASSERT_EQ(results_table->columns_names()[0], "column1"_sv);
     ASSERT_EQ(results_table->columns_types()[0], SQL::ColumnType::INTEGER);
 
-    DBValue column1_value = results_table->columns_values()[0];
-
-    ASSERT_EQ(column1_value.type, SQL::TYPE_INT);
-    ASSERT_EQ(column1_value.u.integer.next(), ok::Optional<S64>::NONE);
+    DBTableOutlet outlet{results_table};
+    DBTableStream stream = outlet.column_stream(&arena, 0);
+    ASSERT_FALSE(stream.next());
 }
-#endif // 0
 
 TEST(DBConnection, user_permissions) {
     ok::ArenaAllocator arena{};

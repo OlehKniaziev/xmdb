@@ -41,4 +41,9 @@ bool db_state_sync(DBState *state) {
 
     return true;
 }
+
+bool db_state_reset(DBState *state) {
+    state->header.record_count = 0;
+    return db_state_sync(state);
+}
 } // namespace xmdb

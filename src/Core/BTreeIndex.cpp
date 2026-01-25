@@ -112,29 +112,12 @@ struct BTreeState {
 
         if (state_file.size() == 0) {
             state = allocator->alloc<BTreeState>();
-            state->flags = FLAG_FIRST_CONSTRUCTION;
-            state->header = DiskHeader::alloc(allocator);
-            state->header->height = 1;
-            state->header->index_nodes_count = 1;
             state->allocator = allocator;
             state->state_file = state_file;
-            state->root = Node::alloc_with_backing_disk_buffer(allocator);
-            state->root->set_leaf(true);
-            state->root->set_root(true);
-            state->root->id = 0;
 
-            UZ temp_buf_count = BTREE_HEADER_LENGTH + BTREE_PAGE_SIZE;
-            U8 *temp_buf = ok::temp_allocator()->alloc<U8>(temp_buf_count);
-
-            memcpy(temp_buf, state->header, sizeof(*state->header));
-            memcpy(temp_buf + BTREE_HEADER_LENGTH, state->root->disk, BTREE_PAGE_SIZE);
-
-            state_file.seek_start();
-
-            UZ n_written = 0;
-            auto write_err = state_file.write(temp_buf, temp_buf_count, &n_written);
-            if (write_err) return ok::File::error_string(allocator, write_err.value);
-            OK_VERIFY(n_written == temp_buf_count);
+            if (auto err = state->reset()) return err;
+            *out_state = state;
+            return {};
         } else {
             // NOTE(oleh): Read in the header and root.
             constexpr auto buffer_count = BTREE_HEADER_LENGTH + BTREE_PAGE_SIZE;
@@ -156,6 +139,31 @@ struct BTreeState {
         }
 
         *out_state = state;
+        return {};
+    }
+
+    ok::Optional<ok::String> reset() {
+        this->flags = FLAG_FIRST_CONSTRUCTION;
+        this->header = DiskHeader::alloc(allocator);
+        this->header->height = 1;
+        this->header->index_nodes_count = 1;
+        this->root = Node::alloc_with_backing_disk_buffer(allocator);
+        this->root->set_leaf(true);
+        this->root->set_root(true);
+        this->root->id = 0;
+
+        UZ temp_buf_count = BTREE_HEADER_LENGTH + BTREE_PAGE_SIZE;
+        U8 *temp_buf = ok::temp_allocator()->alloc<U8>(temp_buf_count);
+
+        memcpy(temp_buf, this->header, sizeof(*this->header));
+        memcpy(temp_buf + BTREE_HEADER_LENGTH, this->root->disk, BTREE_PAGE_SIZE);
+
+        state_file.seek_start();
+
+        UZ n_written = 0;
+        auto write_err = state_file.write(temp_buf, temp_buf_count, &n_written);
+        if (write_err) return ok::File::error_string(allocator, write_err.value);
+        OK_VERIFY(n_written == temp_buf_count);
         return {};
     }
 
@@ -431,5 +439,10 @@ U64 BTreeIndex::height() {
 U64 BTreeIndex::node_count() {
     auto *impl = static_cast<BTreeState *>(pImpl);
     return impl->header->index_nodes_count;
+}
+
+bool BTreeIndex::reset() {
+    auto *impl = static_cast<BTreeState *>(pImpl);
+    return !impl->reset().has_value();
 }
 } // namespace xmdb

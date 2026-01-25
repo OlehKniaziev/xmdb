@@ -58,7 +58,7 @@ public:
         }
     }
 
-    void set_rows_count(UZ x) {
+    void set_proxy_rows_count(UZ x) {
         OK_VERIFY(m_flags & F_PROXY);
         m_proxy_rows_count = x;
     }

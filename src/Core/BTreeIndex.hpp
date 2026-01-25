@@ -22,6 +22,8 @@ struct BTreeIndex {
 
     U64 node_count();
 
+    bool reset();
+
     void *pImpl;
 };
 }; // namespace xmdb

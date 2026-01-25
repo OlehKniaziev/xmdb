@@ -320,7 +320,7 @@ static void run_single_node(QueryExecutionContext *ctx, QueryGraph::Node *node) 
 
             Value password_value = password_value_stream.next().get();
             FixedString new_password = password_value.as_string();
-            user->sha256_password_digest = sha256_digest(view(ok::temp_allocator(), new_password));
+            user->sha256_password_digest = sha256_digest(view(&new_password));
 
             break;
         }

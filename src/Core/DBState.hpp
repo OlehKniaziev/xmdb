@@ -15,7 +15,7 @@ struct DBState {
     DBStateHeader header;
 };
 
-bool db_state_sync(DBState *);
-
 bool db_state_create(ok::File, DBState *);
+bool db_state_sync  (DBState *);
+bool db_state_reset (DBState *);
 } // namespace xmdb

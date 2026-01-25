@@ -242,9 +242,8 @@ ok::Optional<Value> DBTableStream::next() {
     case Type::COLUMN: {
         ColumnStream *col = &m_u.column;
         DBTable *table = col->table;
-        BTreeIndex *index = table->index();
-        UZ records_count = index->node_count();
         DBState *state = table->state();
+        UZ records_count = state->header.record_count;
 
         if (col->current_record >= records_count) {
             return ok::Optional<Value>::empty();
