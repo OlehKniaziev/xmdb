@@ -1,7 +1,10 @@
 #include "hash.hpp"
+#include "Logger.hpp"
 
 namespace xmdb {
 SHA256Digest sha256_digest(ok::StringView sv) {
+    XMDB_FIXME("Replace memcpy by an actual SHA-256 implementation");
+
     SHA256Digest digest{};
 
     UZ count = ok::min(sv.count, SHA256Digest::SIZE);

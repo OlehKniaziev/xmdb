@@ -16,15 +16,13 @@ using ok::Table;
 
 namespace xmdb::SQL {
 
-enum ColumnType {
-    COLUMN_INTEGER,
-    COLUMN_FLOAT,
-    COLUMN_DOUBLE,
-    COLUMN_TEXT,
-    COLUMN_IMAGE,
-    COLUMN_BOOLEAN,
-
-    COLUMN_MAX,
+enum class ColumnType {
+    INTEGER,
+    FLOAT,
+    DOUBLE,
+    TEXT,
+    IMAGE,
+    BOOLEAN,
 };
 
 struct TableSchema {
@@ -376,7 +374,7 @@ struct IrContext {
 
     explicit IrContext(Allocator *allocator, StringView source) :
         allocator{allocator}, source{source}, ir_emitter{allocator} {
-        auto default_schema = DBSchema::alloc_default(ok::static_allocator);
+        auto default_schema = DBSchema::alloc_default(allocator);
         database_schemas = List<DBSchema>::alloc(allocator);
         database_schemas.push(default_schema);
 

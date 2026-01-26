@@ -2,118 +2,159 @@
 
 #include <SQL/type_check.hpp>
 
-#include "TableStream.hpp"
+#include "ColumnLayout.hpp"
 
 namespace xmdb {
-struct DBTable;
+class DBValue {
+public:
+    enum class Kind {
+        COLUMN,
+        COMPARE,
+        CONSTANT,
+        NONE,
+        CONCAT,
+    };
 
-struct Null {
+    DBValue() = delete;
+
+    static DBValue *null() {
+        OK_TODO();
+    }
+
+    SQL::Type type() const {
+        return m_type;
+    }
+
+    Kind kind() const {
+        return m_kind;
+    }
+
+    bool is_compatible_with(const DBValue *other) const {
+        if (m_kind == Kind::NONE || other->m_kind == Kind::NONE) {
+            return true;
+        }
+
+        return m_type == other->m_type;
+    }
+
+protected:
+    DBValue(SQL::Type type, Kind kind) : m_type{type}, m_kind{kind} {}
+
+    SQL::Type m_type;
+    Kind m_kind;
 };
 
-struct DBValue {
-    DBValue() : u{0} {
+class DBTable;
+
+class ColumnDBValue : public DBValue {
+public:
+    ColumnDBValue(SQL::Type type,
+                  ColumnLayout layout,
+                  DBTable *table) : DBValue{type, Kind::COLUMN},
+                                    m_layout{layout},
+                                    m_table{table} {}
+
+    DBTable *table() {
+        return m_table;
     }
 
-    SQL::Type type;
-    union {
-        DBTable *table;
-        TableStream<bool> boolean;
-        TableStream<S64> integer;
-        TableStream<String> string;
-        TableStream<Null> null;
-    } u;
-
-    static DBValue boolean(TableStream<bool> b) {
-        DBValue value{};
-        value.type = SQL::Type::TYPE_BOOL;
-        value.u.boolean = b;
-        return value;
+    ColumnLayout layout() {
+        return m_layout;
     }
 
-    static DBValue integer(TableStream<S64> integer) {
-        DBValue value{};
-        value.type = SQL::Type::TYPE_INT;
-        value.u.integer = integer;
-        return value;
+private:
+    ColumnLayout m_layout;
+    DBTable *m_table;
+};
+
+class ConstDBValue : public DBValue {
+public:
+    enum class ConstKind {
+        INT,
+        STRING,
+        BOOL,
+    };
+
+    explicit ConstDBValue(S64 i) : ConstDBValue{SQL::TYPE_INT, ConstKind::INT, reinterpret_cast<void *>(i)} {}
+    explicit ConstDBValue(ok::String *s) : ConstDBValue{SQL::TYPE_STRING, ConstKind::STRING, static_cast<void *>(s)} {}
+    explicit ConstDBValue(bool b) : ConstDBValue{SQL::TYPE_BOOL, ConstKind::BOOL, reinterpret_cast<void *>(static_cast<U64>(b))} {}
+
+    ConstKind kind() const {
+        return m_const_kind;
     }
 
-    static DBValue table(DBTable *table) {
-        DBValue value{};
-        value.type = SQL::Type::TYPE_TABLE;
-        value.u.table = table;
-        return value;
+    S64 as_int() const {
+        return reinterpret_cast<S64>(m_data);
     }
 
-    static DBValue string(TableStream<String> string) {
-        DBValue value{};
-        value.type = SQL::Type::TYPE_STRING;
-        value.u.string = string;
-        return value;
+    bool as_bool() const {
+        return static_cast<bool>(reinterpret_cast<U64>(m_data));
     }
 
-    static DBValue null(TableStream<Null> null) {
-        DBValue value{};
-        value.type = SQL::Type::TYPE_NULL;
-        value.u.null = null;
-        return value;
+    ok::String *as_string() {
+        return static_cast<ok::String *>(m_data);
     }
 
-    static DBValue concat(ok::Allocator *allocator, DBValue lhs, DBValue rhs) {
-        if (lhs.type != rhs.type) {
-            OK_PANIC("Type mismatch for concatenation of DBValues");
-        }
+private:
+    explicit ConstDBValue(SQL::Type type, ConstKind kind, void *data) : DBValue{type, Kind::CONSTANT}, m_const_kind{kind}, m_data{data} {}
 
-        switch (lhs.type) {
-        case SQL::TYPE_INT: {
-            TableStream<S64> lhs_stream = lhs.u.integer;
-            TableStream<S64> rhs_stream = rhs.u.integer;
-            TableStream<S64> result_stream = TableStream<S64>::concat(allocator, lhs_stream, rhs_stream);
-            return DBValue::integer(result_stream);
-        }
-        case SQL::TYPE_STRING: {
-            TableStream<String> lhs_stream = lhs.u.string;
-            TableStream<String> rhs_stream = rhs.u.string;
-            TableStream<String> result_stream = TableStream<String>::concat(allocator, lhs_stream, rhs_stream);
-            return DBValue::string(result_stream);
-        }
-        case SQL::TYPE_BOOL: {
-            TableStream<bool> lhs_stream = lhs.u.boolean;
-            TableStream<bool> rhs_stream = rhs.u.boolean;
-            TableStream<bool> result_stream = TableStream<bool>::concat(allocator, lhs_stream, rhs_stream);
-            return DBValue::boolean(result_stream);
-        }
-        case SQL::TYPE_FLOAT:
-        case SQL::TYPE_DOUBLE:
-        case SQL::TYPE_IMAGE: OK_TODO();
-        case SQL::TYPE_TABLE: OK_PANIC("Cannot concatenate table values");
-        case SQL::TYPE_NULL: OK_UNREACHABLE();
-        }
+    ConstKind m_const_kind;
+    void *m_data;
+};
 
-        OK_UNREACHABLE();
+class CompareDBValue : public DBValue {
+public:
+    CompareDBValue(DBValue *lhs, DBValue *rhs) : DBValue{lhs->type(), Kind::COMPARE}, m_lhs{lhs}, m_rhs{rhs} {
+        OK_ASSERT(lhs->is_compatible_with(rhs));
     }
 
-    static DBValue empty(SQL::Type type) {
-        switch (type) {
-        case SQL::TYPE_BOOL: {
-            TableStream<bool> empty = TableStream<bool>::empty();
-            return DBValue::boolean(empty);
-        }
-        case SQL::TYPE_STRING: {
-            TableStream<String> empty = TableStream<String>::empty();
-            return DBValue::string(empty);
-        }
-        case SQL::TYPE_INT: {
-            TableStream<S64> empty = TableStream<S64>::empty();
-            return DBValue::integer(empty);
-        }
-        default: OK_UNREACHABLE();
-        }
-
-        OK_UNREACHABLE();
+    DBValue *lhs() {
+        return m_lhs;
     }
 
-    void reset();
+    DBValue *rhs() {
+        return m_rhs;
+    }
 
-    DBValue cmp(ok::Allocator *, DBValue);
+private:
+    DBValue *m_lhs;
+    DBValue *m_rhs;
+};
+
+class NoneDBValue : public DBValue {
+public:
+    NoneDBValue() : DBValue{SQL::TYPE_NULL, Kind::NONE} {}
+};
+
+class PairDBValue : public DBValue {
+public:
+    PairDBValue() = delete;
+
+    DBValue *lhs() {
+        return m_lhs;
+    }
+
+    DBValue *rhs() {
+        return m_rhs;
+    }
+
+protected:
+    PairDBValue(SQL::Type type,
+                Kind kind,
+                DBValue *lhs,
+                DBValue *rhs) : DBValue{type, kind},
+                                m_lhs{lhs},
+                                m_rhs{rhs} {
+    }
+
+    DBValue *m_lhs;
+    DBValue *m_rhs;
+};
+
+class ConcatDBValue : public PairDBValue {
+public:
+    ConcatDBValue(DBValue *lhs, DBValue *rhs) : PairDBValue{lhs->type(), Kind::CONCAT, lhs, rhs} {
+        OK_ASSERT(lhs->is_compatible_with(rhs));
+    }
 };
 } // namespace xmdb

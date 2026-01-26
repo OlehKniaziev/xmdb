@@ -1,4 +1,8 @@
 #include "DBConnection.hpp"
+#include "Logger.hpp"
+#include "DBRecord.hpp"
+#include "constants.hpp"
+
 #include <SQL/ir.hpp>
 #include <csetjmp>
 
@@ -12,12 +16,12 @@ DBConnection::DBConnection(DBPool *pool, DBDescriptor *db, DBUser *user) :
 
 static inline ColumnType type_to_column_type(Type type) {
     switch (type) {
-    case TYPE_INT:    return COLUMN_INTEGER;
-    case TYPE_STRING: return COLUMN_TEXT;
-    case TYPE_IMAGE:  return COLUMN_IMAGE;
-    case TYPE_BOOL:   return COLUMN_BOOLEAN;
-    case TYPE_FLOAT:  return COLUMN_FLOAT;
-    case TYPE_DOUBLE: return COLUMN_DOUBLE;
+    case TYPE_INT:    return ColumnType::INTEGER;
+    case TYPE_STRING: return ColumnType::TEXT;
+    case TYPE_IMAGE:  return ColumnType::IMAGE;
+    case TYPE_BOOL:   return ColumnType::BOOLEAN;
+    case TYPE_FLOAT:  return ColumnType::FLOAT;
+    case TYPE_DOUBLE: return ColumnType::DOUBLE;
     case TYPE_NULL:
     case TYPE_TABLE:  OK_PANIC("Unsupported type to column type conversion");
     }
@@ -31,9 +35,9 @@ static void execute_instruction(TypedCompiledQuery *query, UZ i, QueryExecutionC
     case IRInstructionOperator_Eq: {
         Triple<String, U32, U32> operands = operands_of_Eq(&query->untyped, i);
 
-        DBValue lhs = ctx->fetch_var(operands.op2);
-        DBValue rhs = ctx->fetch_var(operands.op3);
-        DBValue var_value = lhs.cmp(conn->db_pool->allocator, rhs);
+        DBValue *lhs = ctx->fetch_var(operands.op2);
+        DBValue *rhs = ctx->fetch_var(operands.op3);
+        DBValue *var_value = ctx->compare(lhs, rhs);
 
         StringView var_name = operands.op1.view();
         ctx->put_var(i, var_name, var_value);
@@ -41,11 +45,11 @@ static void execute_instruction(TypedCompiledQuery *query, UZ i, QueryExecutionC
         break;
     }
     case IRInstructionOperator_Gt: {
-        Triple<String, U32, U32> operands = operands_of_Eq(&query->untyped, i);
+        Triple<String, U32, U32> operands = operands_of_Gt(&query->untyped, i);
 
-        DBValue lhs = ctx->fetch_var(operands.op2);
-        DBValue rhs = ctx->fetch_var(operands.op3);
-        DBValue var_value = lhs.cmp(conn->db_pool->allocator, rhs);
+        DBValue *lhs = ctx->fetch_var(operands.op2);
+        DBValue *rhs = ctx->fetch_var(operands.op3);
+        DBValue *var_value = ctx->compare(lhs, rhs);
 
         StringView var_name = operands.op1.view();
         ctx->put_var(i, var_name, var_value);
@@ -53,11 +57,11 @@ static void execute_instruction(TypedCompiledQuery *query, UZ i, QueryExecutionC
         break;
     }
     case IRInstructionOperator_Lt: {
-        Triple<String, U32, U32> operands = operands_of_Eq(&query->untyped, i);
+        Triple<String, U32, U32> operands = operands_of_Lt(&query->untyped, i);
 
-        DBValue lhs = ctx->fetch_var(operands.op2);
-        DBValue rhs = ctx->fetch_var(operands.op3);
-        DBValue var_value = lhs.cmp(conn->db_pool->allocator, rhs);
+        DBValue *lhs = ctx->fetch_var(operands.op2);
+        DBValue *rhs = ctx->fetch_var(operands.op3);
+        DBValue *var_value = ctx->compare(lhs, rhs);
 
         StringView var_name = operands.op1.view();
         ctx->put_var(i, var_name, var_value);
@@ -67,12 +71,10 @@ static void execute_instruction(TypedCompiledQuery *query, UZ i, QueryExecutionC
     case IRInstructionOperator_FetchColumn: {
         Triple<String, U32, StringView> operands = operands_of_FetchColumn(&query->untyped, i);
 
-        DBValue table_val = ctx->fetch_var(operands.op2);
-        OK_ASSERT(table_val.type == Type::TYPE_TABLE);
+        DBTable *table = ctx->fetch_table(operands.op2);
 
-        DBTable *table = table_val.u.table;
         StringView column_name = operands.op3;
-        DBValue column = ctx->fetch_column(table, column_name);
+        DBValue *column = ctx->fetch_column(table, column_name);
 
         StringView var_name = operands.op1.view();
         ctx->put_var(i, var_name, column);
@@ -83,9 +85,7 @@ static void execute_instruction(TypedCompiledQuery *query, UZ i, QueryExecutionC
         Triple<String, StringView, TableSchema *> operands = operands_of_FetchTable(&query->untyped, i);
 
         DBTable *table = ctx->fetch_table(operands.op2);
-        DBValue var_value = DBValue::table(table);
-        StringView var_name = operands.op1.view();
-        ctx->put_var(i, var_name, var_value);
+        ctx->put_table(i, table);
 
         break;
     }
@@ -101,7 +101,7 @@ static void execute_instruction(TypedCompiledQuery *query, UZ i, QueryExecutionC
     }
     case IRInstructionOperator_AlterUserProperty: {
         Triple<StringView, StringView, U32> operands = operands_of_AlterUserProperty(&query->untyped, i);
-        DBValue property_value = ctx->fetch_var(operands.op3);
+        DBValue *property_value = ctx->fetch_var(operands.op3);
         ctx->alter_user_property(operands.op1, operands.op2, property_value);
         break;
     }
@@ -112,11 +112,9 @@ static void execute_instruction(TypedCompiledQuery *query, UZ i, QueryExecutionC
     case IRInstructionOperator_EmitColumn: {
         Triple<U32, U32, StringView> operands = operands_of_EmitColumn(&query->untyped, i);
 
-        DBValue table_value = ctx->fetch_var(operands.op1);
-        OK_ASSERT(table_value.type == SQL::TYPE_TABLE);
-        DBTable *table = table_value.u.table;
+        DBTable *table = ctx->fetch_table(operands.op1);
 
-        DBValue column_value = ctx->fetch_var(operands.op2);
+        DBValue *column_value = ctx->fetch_var(operands.op2);
         StringView column_name = operands.op3;
         ctx->emit_column(table, column_value, column_name);
         break;
@@ -135,70 +133,63 @@ static void execute_instruction(TypedCompiledQuery *query, UZ i, QueryExecutionC
         }
 
         DBTable *emitted_query = ctx->emit_query(operands.op2, column_types);
-        DBValue var_value = DBValue::table(emitted_query);
-        StringView var_name = operands.op1.view();
-        ctx->put_var(i, var_name, var_value);
+        ctx->put_table(i, emitted_query);
         break;
     }
     case IRInstructionOperator_ConstInt: {
         Tuple<String, S64> operands = operands_of_ConstInt(&query->untyped, i);
-        TableStream<S64> stream = TableStream<S64>::once(operands.op2);
 
         StringView var_name = operands.op1.view();
-        DBValue var_value = DBValue::integer(stream);
+        DBValue *var_value = new (ctx->allocator) ConstDBValue{operands.op2};
         ctx->put_var(i, var_name, var_value);
         break;
     }
     case IRInstructionOperator_ConstString: {
         Tuple<String, StringView> operands = operands_of_ConstString(&query->untyped, i);
-        String string_constant = operands.op2.to_string(ctx->allocator);
-        TableStream<String> stream = TableStream<String>::once(string_constant);
+        String string_constant_value = operands.op2.to_string(ctx->allocator);
+        String *string_constant = ctx->allocator->alloc<String>();
+        *string_constant = string_constant_value;
 
         StringView var_name = operands.op1.view();
-        DBValue var_value = DBValue::string(stream);
+        DBValue *var_value = new (ctx->allocator) ConstDBValue{string_constant};
         ctx->put_var(i, var_name, var_value);
         break;
     }
     case IRInstructionOperator_ConstTrue: {
         String var_name = operands_of_ConstTrue(&query->untyped, i);
-        TableStream<bool> stream = TableStream<bool>::once(true);
-        DBValue var_value = DBValue::boolean(stream);
+        DBValue *var_value = new (ctx->allocator) ConstDBValue{true};
         ctx->put_var(i, var_name.view(), var_value);
         break;
     }
     case IRInstructionOperator_ConstFalse: {
         String var_name = operands_of_ConstFalse(&query->untyped, i);
-        TableStream<bool> stream = TableStream<bool>::once(false);
-        DBValue var_value = DBValue::boolean(stream);
+        DBValue *var_value = new (ctx->allocator) ConstDBValue{false};
         ctx->put_var(i, var_name.view(), var_value);
         break;
     }
     case IRInstructionOperator_ConstNull: {
         String var_name = operands_of_ConstNull(&query->untyped, i);
-        TableStream<Null> stream = TableStream<Null>::once({});
-        DBValue var_value = DBValue::null(stream);
+        DBValue *var_value = DBValue::null();
         ctx->put_var(i, var_name.view(), var_value);
         break;
     }
     case IRInstructionOperator_InsertColumn: {
         Triple<U32, U32, StringView> operands = operands_of_InsertColumn(&query->untyped, i);
-        DBValue table_value = ctx->fetch_var(operands.op1);
-        OK_ASSERT(table_value.type == SQL::TYPE_TABLE);
 
-        DBTable *table = table_value.u.table;
-        DBValue column_value = ctx->fetch_var(operands.op2);
+        DBTable *table = ctx->fetch_table(operands.op1);
+        DBValue *column_value = ctx->fetch_var(operands.op2);
         StringView column_name = operands.op3;
 
         ctx->insert_column(table, column_name, column_value);
         break;
     }
     case IRInstructionOperator_InsertRow: {
+        // TODO(oleh): Make this instruction not carry any operands
         U32 table_ip = operands_of_InsertRow(&query->untyped, i);
-        DBValue table_value = ctx->fetch_var(table_ip);
-        OK_ASSERT(table_value.type == SQL::TYPE_TABLE);
 
-        DBTable *table = table_value.u.table;
-        ctx->insert_row(table);
+        DBTable *table = ctx->fetch_table(table_ip);
+        OK_UNUSED(table);
+        ctx->insert_row();
 
         break;
     }
@@ -209,11 +200,9 @@ static void execute_instruction(TypedCompiledQuery *query, UZ i, QueryExecutionC
     case IRInstructionOperator_UpdateColumn: {
         Triple<U32, U32, StringView> operands = operands_of_UpdateColumn(&query->untyped, i);
 
-        DBValue table_value = ctx->fetch_var(operands.op1);
-        OK_ASSERT(table_value.type == SQL::TYPE_TABLE);
-        DBTable *table = table_value.u.table;
+        DBTable *table = ctx->fetch_table(operands.op1);
 
-        DBValue column_value = ctx->fetch_var(operands.op2);
+        DBValue *column_value = ctx->fetch_var(operands.op2);
         StringView column_name = operands.op3;
         ctx->update_column(table, column_name, column_value);
         break;
@@ -225,11 +214,9 @@ static void execute_instruction(TypedCompiledQuery *query, UZ i, QueryExecutionC
     case IRInstructionOperator_DeleteTable: {
         U32 table_ip = operands_of_DeleteTable(&query->untyped, i);
 
-        DBValue table_value = ctx->fetch_var(table_ip);
-        OK_ASSERT(table_value.type == SQL::TYPE_TABLE);
-        DBTable *table = table_value.u.table;
-
+        DBTable *table = ctx->fetch_table(table_ip);
         ctx->delete_table(table);
+
         break;
     }
     case IRInstructionOperator_CreateDatabase: {
@@ -249,7 +236,7 @@ static void execute_instruction(TypedCompiledQuery *query, UZ i, QueryExecutionC
         bool deleted = false;
 
         for (UZ i = 0; i < conn->db->tables.count; ++i) {
-            if (conn->db->tables[i]->name == table_name) {
+            if (conn->db->tables[i]->name() == table_name) {
                 deleted = true;
                 conn->db->tables.remove_at(i);
                 break;
@@ -293,9 +280,95 @@ static void execute_instruction(TypedCompiledQuery *query, UZ i, QueryExecutionC
     }
 }
 
+static void run_single_node(QueryExecutionContext *ctx, QueryGraph::Node *node) {
+    switch (node->type()) {
+    case QueryGraph::Node::Type::ALTER_USER: {
+        QueryGraph::AlterUserNode *alter_node = static_cast<QueryGraph::AlterUserNode *>(node);
+
+        ok::StringView user_name = alter_node->user_name();
+
+        ok::Optional<DBUser *> user_opt = ctx->current_db->find_user(user_name);
+
+        if (!user_opt) {
+            XMDB_FAIL_FMT(ctx, "Could not find requested user with name '" OK_SV_FMT "'", OK_SV_ARG(user_name));
+        }
+
+        DBUser *user = user_opt.get();
+
+        switch (alter_node->property()) {
+        case QueryGraph::AlterUserNode::Property::PASSWORD: {
+            DBValue *password_db_value = alter_node->property_value();
+            DBTableStream password_value_stream = DBTableStream::from_value(ctx->allocator, password_db_value);
+
+            Value password_value = password_value_stream.next().get();
+            FixedString new_password = password_value.as_string();
+            user->sha256_password_digest = sha256_digest(view(&new_password));
+
+            break;
+        }
+        }
+
+        break;
+    }
+    case QueryGraph::Node::Type::READ:
+        OK_TODO_MSG("READ");
+    case QueryGraph::Node::Type::WRITE:
+        OK_TODO_MSG("WRITE");
+    case QueryGraph::Node::Type::ATOMIC: {
+        XMDB_FIXME("Atomic nodes are not atomic at all currently");
+
+        QueryGraph::AtomicNode *atomic_node = static_cast<QueryGraph::AtomicNode *>(node);
+
+        ok::Slice<QueryGraph::Node *> child_nodes = atomic_node->nodes();
+
+        for (UZ i = 0; i < child_nodes.count; ++i) {
+            QueryGraph::Node *child_node = child_nodes[i];
+            run_single_node(ctx, child_node);
+        }
+
+        break;
+    }
+    case QueryGraph::Node::Type::WRITE_COLUMN: {
+        auto *wc_node = static_cast<QueryGraph::WriteColumnNode *>(node);
+        DBTable *table = wc_node->table();
+        UZ col_idx = wc_node->idx();
+        DBValue *col_value = wc_node->value();
+        DBState *state = table->state();
+
+        TableLayout layout = table->layout();
+        ColumnLayout col = layout.columns[col_idx];
+        UZ record_size = table_record_size(layout);
+
+        DBTableStream col_stream = DBTableStream::from_value(ctx->allocator, col_value);
+
+        UZ rows_count = table->rows_count();
+
+        DBRecord record = db_record_create(ctx->allocator, layout);
+
+        for (UZ row_idx = 0; row_idx < rows_count; ++row_idx) {
+            ok::Optional<Value> val_opt = col_stream.next();
+            OK_VERIFY(val_opt);
+
+            Value val = val_opt.get();
+            fill_column(&record, layout, col_idx, val);
+            state->file.seek_to(DB_STATE_HEADER_LENGTH + record_size * row_idx + col.offset);
+
+            UZ n_written = 0;
+            ok::Optional<ok::File::WriteError> err = state->file.write(record.buffer + col.offset, col.size, &n_written);
+            OK_VERIFY(!err);
+            OK_VERIFY(n_written == col.size);
+        }
+
+        break;
+    }
+    }
+}
+
 void DBConnection::execute(TypedCompiledQuery *query, QueryResults *results) {
     results->error = {};
     results->value = {};
+
+    ok::Optional<QueryGraph::Node *> cur_node_opt{};
 
     QueryExecutionContext *ctx = db_pool->rent_empty_execution_context(db, user);
 
@@ -313,6 +386,14 @@ void DBConnection::execute(TypedCompiledQuery *query, QueryResults *results) {
 
     for (UZ i = 0; i < instructions_count; ++i) {
         execute_instruction(query, i, ctx, this);
+    }
+
+    // Run the query graph, NOW!
+    cur_node_opt = ctx->query_graph.root_node();
+    while (cur_node_opt) {
+        QueryGraph::Node *cur_node = cur_node_opt.get();
+        run_single_node(ctx, cur_node);
+        cur_node_opt = cur_node->next();
     }
 
     if (ctx->last_emitted_query.has_value()) {

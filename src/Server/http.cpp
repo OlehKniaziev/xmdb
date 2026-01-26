@@ -145,14 +145,14 @@ DECLARE_HANDLER(run_query_handler) {
         WebJsonPutTrue();
 
         if (results_table_opt.has_value()) {
-            xmdb::DBTable *results_table = results_table_opt.value;
+            xmdb::DBTable *results_table = results_table_opt.get();
 
             WebJsonPutKey(WEB_SV_LIT("column_names"));
 
             WebJsonBeginArray();
 
-            for (UZ i = 0; i < results_table->columns_count; ++i) {
-                ok::StringView column_name_sv = results_table->columns_names[i];
+            for (UZ i = 0; i < results_table->columns_count(); ++i) {
+                ok::StringView column_name_sv = results_table->columns_names()[i];
                 web_string_view column_name = {
                         .Items = (u8 *) column_name_sv.data,
                         .Count = column_name_sv.count,
@@ -167,46 +167,35 @@ DECLARE_HANDLER(run_query_handler) {
 
             WebJsonBeginArray();
 
-            xmdb::DBTableOutlet table_outlet = results_table->use();
+            xmdb::DBTableOutlet table_outlet{results_table};
 
-            for (UZ r = 0; r < results_table->rows_count; ++r) {
+            for (UZ r = 0; r < results_table->rows_count(); ++r) {
                 WebJsonPrepareArrayElement();
 
                 WebJsonBeginObject();
 
-                for (UZ i = 0; i < results_table->columns_count; ++i) {
-                    ok::StringView column_name_sv = results_table->columns_names[i];
+                for (UZ i = 0; i < results_table->columns_count(); ++i) {
+                    ok::StringView column_name_sv = results_table->columns_names()[i];
                     web_string_view column_name = {
                             .Items = (u8 *) column_name_sv.data,
                             .Count = column_name_sv.count,
                     };
-                    xmdb::DBValue *column_value = &table_outlet.values[i];
 
-                    switch (column_value->type) {
+                    xmdb::DBTableStream column_stream = table_outlet.column_stream(&connection_data.temp_arena, i);
+                    xmdb::Value value = column_stream.next().get();
+
+                    switch (value.type()) {
                     case xmdb::SQL::TYPE_INT: {
-                        xmdb::TableStream<S64> stream = column_value->u.integer;
-                        Optional<S64> i = stream.next();
-                        if (!i.has_value()) {
-                            OK_PANIC_FMT("Expected to have %zu rows in table, but streams exhausted at %zu",
-                                         results_table->rows_count, r);
-                        }
-
+                        S64 n = value.as_int();
                         WebJsonPutKey(column_name);
-                        WebJsonPutNumber(i.value);
-
+                        WebJsonPutNumber(n);
                         break;
                     }
                     case xmdb::SQL::TYPE_STRING: {
-                        xmdb::TableStream<ok::String> stream = column_value->u.string;
-                        Optional<ok::String> s = stream.next();
-                        if (!s.has_value()) {
-                            OK_PANIC_FMT("Expected to have %zu rows in table, but streams exhausted at %zu",
-                                         results_table->rows_count, r);
-                        }
-
+                        FixedString s = value.as_string();
                         web_string_view value = {
-                                .Items = (u8 *) s.value.cstr(),
-                                .Count = s.value.count(),
+                                .Items = (u8 *) s.items,
+                                .Count = s.count,
                         };
 
                         WebJsonPutKey(column_name);
@@ -215,16 +204,11 @@ DECLARE_HANDLER(run_query_handler) {
                         break;
                     }
                     case xmdb::SQL::TYPE_BOOL: {
-                        xmdb::TableStream<bool> stream = column_value->u.boolean;
-                        Optional<bool> b = stream.next();
-                        if (!b.has_value()) {
-                            OK_PANIC_FMT("Expected to have %zu rows in table, but streams exhausted at %zu",
-                                         results_table->rows_count, r);
-                        }
+                        bool b = value.as_bool();
 
                         WebJsonPutKey(column_name);
 
-                        if (b.value) {
+                        if (b) {
                             WebJsonPutTrue();
                         } else {
                             WebJsonPutFalse();
@@ -233,13 +217,6 @@ DECLARE_HANDLER(run_query_handler) {
                         break;
                     }
                     case xmdb::SQL::TYPE_NULL: {
-                        xmdb::TableStream<xmdb::Null> stream = column_value->u.null;
-                        Optional<xmdb::Null> b = stream.next();
-                        if (!b.has_value()) {
-                            OK_PANIC_FMT("Expected to have %zu rows in table, but streams exhausted at %zu",
-                                         results_table->rows_count, r);
-                        }
-
                         WebJsonPutKey(column_name);
                         WebJsonPutNull();
 

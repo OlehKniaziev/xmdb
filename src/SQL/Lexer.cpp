@@ -139,7 +139,7 @@ ok::Optional<Token> Lexer::next() {
 
         StringView ident_sv = take_while(is_valid_ident_char);
 
-        String ident = ident_sv.to_string(ok::temp_allocator);
+        String ident = ident_sv.to_string(ok::temp_allocator());
         for (UZ i = 0; i < ident.count(); ++i) {
             ident[i] = toupper(ident[i]);
         }

@@ -65,6 +65,8 @@
 
 #endif // OK_LOG
 
+#ifndef OK_STRIP_ASSERTIONS
+
 #ifndef OK_ASSERT
 #define OK_ASSERT(x) do { \
     if (!(x)) { \
@@ -73,14 +75,29 @@
     } \
 } while(0)
 #endif // OK_ASSERT
+#else
+#define OK_ASSERT(x)
+#endif // OK_DEBUG
+
+#define OK_VERIFY(x) do { \
+    if (!(x)) { \
+        OK_LOG_ERROR("%s:%d: Verification failed: %s\n", __FILE__, __LINE__, #x); \
+        __builtin_trap(); \
+    } \
+} while(0)
 
 #define OK_TODO() do { \
     OK_LOG_ERROR("%s:%d: TODO: Not implemented\n", __FILE__, __LINE__); \
     __builtin_trap(); \
 } while (0)
 
-#define OK_TODO_MSG_FMT(msg, ...) do { \
-    OK_LOG_ERROR("%s:%d: TODO: " msg "\n", __FILE__, __LINE__, __VA_ARGS__); \
+#define OK_TODO_MSG(msg) do { \
+    OK_LOG_ERROR("%s:%d: TODO: " msg "\n", __FILE__, __LINE__); \
+    __builtin_trap(); \
+} while (0)
+
+#define OK_TODO_MSG_FMT(fmt, ...) do { \
+    OK_LOG_ERROR("%s:%d: TODO: " fmt "\n", __FILE__, __LINE__, __VA_ARGS__); \
     __builtin_trap(); \
 } while (0)
 
@@ -287,8 +304,7 @@ struct Allocator {
     }
 };
 
-extern Allocator* temp_allocator;
-extern Allocator* static_allocator;
+Allocator *temp_allocator();
 
 struct FixedBufferAllocator : public Allocator {
     void* raw_alloc(UZ size) override;
@@ -899,6 +915,12 @@ struct String : public StringBase<String, char> {
 
 template <template <typename> class Self, typename T>
 struct OptionalBase {
+    static Self<T> empty() {
+        U8 buf[sizeof(Self<T>)] = {};
+        Self<T> *opt = reinterpret_cast<Self<T> *>(buf);
+        return *opt;
+    }
+
     const T& or_else(const T& other) const {
         auto* self = self_cast();
 
@@ -943,13 +965,6 @@ struct Optional : public OptionalBase<Optional, T> {
 
     Optional(ValueType value) : _has_value{true}, value{value} {}
 
-    static Optional<T> empty() {
-        U8 buf[sizeof(Optional<T>)];
-        Optional<T> *opt = reinterpret_cast<Optional<T> *>(buf);
-        opt->_has_value = false;
-        return *opt;
-    }
-
     inline bool has_value() const {
         return _has_value;
     }
@@ -974,8 +989,6 @@ struct Optional : public OptionalBase<Optional, T> {
 
     bool _has_value;
     ValueType value;
-
-    static const Optional<T> NONE;
 };
 
 template <typename T>
@@ -1019,8 +1032,6 @@ struct Optional<T*> : public OptionalBase<Optional, T*> {
     }
 
     ValueType value;
-
-    static const Optional<T> NONE;
 };
 
 static_assert(sizeof(Optional<int*>) == sizeof(int*));
@@ -1280,13 +1291,6 @@ template <typename T>
 bool operator ==(const HashPtr<T>& lhs, const HashPtr<T>& rhs) {
     return *lhs.value == *rhs.value;
 }
-
-// OPTIONAL IMPLEMENTATION
-template <typename T>
-const Optional<T> Optional<T>::NONE = Optional<T>{};
-
-template <typename T>
-const Optional<T> Optional<T*>::NONE = Optional<T*>{};
 
 // ARRAY BASE IMPLEMENTATION
 template <typename Self, typename T>
@@ -1629,13 +1633,20 @@ struct File {
     struct WriteError {};
     struct CloseError {};
     struct RemoveError {};
-
 #endif // Platform check.
 
     static Optional<OpenError> open(File* out, const char* path);
     static Optional<OpenError> open(File* out, StringView path);
 
 #if OK_UNIX
+    static File from_fd(int fd, const char *path) {
+        return File{
+            .fd = fd,
+            .offset = 0,
+            .path = path,
+        };
+    }
+
     static String error_string(Allocator*, OpenError);
     static String error_string(Allocator*, ReadError);
     static String error_string(Allocator*, WriteError);
@@ -1654,10 +1665,10 @@ struct File {
     Optional<ReadError> read(U8* buf, UZ count, UZ* n_read);
     Optional<ReadError> read_full(Allocator* a, List<U8>* out);
 
-    Optional<WriteError> write(U8 *data, UZ count);
+    Optional<WriteError> write(U8 *data, UZ count, UZ *n_written);
 
     inline Optional<WriteError> write(Slice<U8> data) {
-        return write(data.items, data.count);
+        return write(data.items, data.count, nullptr);
     }
 
     UZ size();
@@ -1699,32 +1710,20 @@ bool parse_int64(StringView, S64*);
 
 Optional<File::OpenError> create_temp_file(File* file);
 
-static inline U32 get_rand() {
-#ifndef OK_NOSTDLIB
-#if OK_UNIX
-    return (U32)rand();
-#elif OK_WINDOWS
-    U32 r = 0;
-    errno_t err = rand_s(&r);
-    OK_ASSERT(err == 0);
-    return r;
-#endif // Platform check.
-    OK_TODO();
-#endif // OK_NOSTDLIB
-}
+void seed_rand(U64);
+U32 get_rand();
 
-static inline F64 millis_timestamp() {
+static inline U64 nanos_timestamp() {
 #if OK_UNIX
     struct timespec ts;
     clock_gettime(CLOCK_REALTIME, &ts);
-    return (F64)ts.tv_sec * 1000.0 + (F64)ts.tv_nsec / 1e6;
+    return ts.tv_sec * 1'000'000'000ul + ts.tv_nsec;
 #elif OK_WINDOWS
-    LARGE_INTEGER frequency_int = {};
-    QueryPerformanceFrequency(&frequency_int);
-    F64 frequency = (F64)frequency_int.QuadPart / 1000.0;
+    LARGE_INTEGER frequency{};
+    QueryPerformanceFrequency(&frequency);
     LARGE_INTEGER counter;
     QueryPerformanceCounter(&counter);
-    return (F64)counter.QuadPart / frequency;
+    return counter.QuadPart / frequency.QuadPart * 1'000'000'000ul;
 #else
     OK_TODO();
 #endif // Platform check.
@@ -1753,11 +1752,11 @@ static inline F64 millis_timestamp() {
     }
 #endif // OK_NO_STDLIB
 
-FixedBufferAllocator _temp_allocator_impl{};
-Allocator* temp_allocator = &_temp_allocator_impl;
+static FixedBufferAllocator temp_allocator_impl{};
 
-ArenaAllocator _static_allocator_impl{};
-Allocator* static_allocator = &_static_allocator_impl;
+Allocator *temp_allocator() {
+    return &temp_allocator_impl;
+}
 
 static void _init_region(ArenaAllocator::Region* region, UZ size) {
     region->data = (U8*)OK_ALLOC_PAGE(size);
@@ -2052,7 +2051,7 @@ Optional<File::OpenError> File::open(File* out, const char* path) {
 
 Optional<File::OpenError> File::open(File* out, StringView path) {
     // FIXME: Temporary allocation in potentially multi-threaded context.
-    char* path_cstr = temp_allocator->alloc<char>(path.count + 1);
+    char* path_cstr = temp_allocator()->alloc<char>(path.count + 1);
     memcpy(path_cstr, path.data, path.count);
     path_cstr[path.count] = '\0';
     return File::open(out, path_cstr);
@@ -2249,17 +2248,26 @@ Optional<File::CloseError> File::close() const {
 #endif // Platform check.
 }
 
-Optional<File::WriteError> File::write(U8* data, UZ count) {
+Optional<File::WriteError> File::write(U8* data, UZ count, UZ *n_written) {
 #if OK_UNIX
+    OK_VERIFY(data != nullptr);
+
     S64 ret = ::write(fd, (const void*)data, count);
 
-    if (ret != -1) return {};
+    if (ret != -1) {
+        if (n_written != nullptr) {
+            *n_written = (UZ) ret;
+        }
+
+        this->seek_to(this->offset);
+        return {};
+    }
 
     switch (errno) {
     case EBADF:  return WriteError::NOT_ALLOWED;
     case ENOSPC: return WriteError::OUT_OF_SPACE;
     case EINVAL: return WriteError::BAD_DATA;
-    default:     OK_UNREACHABLE();
+    default:     OK_PANIC_FMT("Unhandled error %s", strerror(errno));
     }
 #elif OK_WINDOWS
     // We first seek to the start of the file, and then set that as the end of file,
@@ -2573,11 +2581,37 @@ bool is_alpha(char c) {
     return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z');
 }
 
+static bool _rand_seeded = false;
+
+void seed_rand(U64 seed) {
+#ifndef OK_NO_STDLIB
+    srand(seed);
+#else
+    OK_TODO();
+#endif // OK_NO_STDLIB
+}
+
+// NOTE(oleh): We should probably provide a way to generate cryptographically secure numbers and
+// leave this one for general purpose numbers.
+U32 get_rand() {
+#ifndef OK_NO_STDLIB
+    if (!_rand_seeded) {
+        U64 seed = nanos_timestamp();
+        seed_rand(seed);
+        _rand_seeded = true;
+    }
+
+    return rand();
+#else
+    OK_TODO();
+#endif // OK_NO_STDLIB
+}
+
 Optional<File::OpenError> create_temp_file(File* file) {
 #if OK_UNIX
-    U64 timestamp = millis_timestamp();
+    U64 timestamp = nanos_timestamp();
 
-    String file_path = String::alloc(temp_allocator, "/tmp/");
+    String file_path = String::alloc(temp_allocator(), "/tmp/");
     file_path.reserve(13);
 
     for (U8 i = 0; i < 8; ++i) {

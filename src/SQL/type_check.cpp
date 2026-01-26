@@ -34,13 +34,17 @@ static void error_on(TypingContext *ctx, Token token, String message) {
     ctx->error = ErrorWithSourceLocation{.message = message, .location = source_location};
 }
 
-static Type column_type_to_type_table[COLUMN_MAX] = {
-        [COLUMN_INTEGER] = TYPE_INT, [COLUMN_FLOAT] = TYPE_FLOAT, [COLUMN_DOUBLE] = TYPE_DOUBLE,
-        [COLUMN_TEXT] = TYPE_STRING, [COLUMN_IMAGE] = TYPE_IMAGE, [COLUMN_BOOLEAN] = TYPE_BOOL,
-};
-
 Type column_type_to_type(ColumnType column_type) {
-    return column_type_to_type_table[column_type];
+    switch (column_type) {
+    case ColumnType::INTEGER: return TYPE_INT;
+    case ColumnType::FLOAT:   return TYPE_FLOAT;
+    case ColumnType::DOUBLE:  return TYPE_DOUBLE;
+    case ColumnType::TEXT:    return TYPE_STRING;
+    case ColumnType::IMAGE:   return TYPE_IMAGE;
+    case ColumnType::BOOLEAN: return TYPE_BOOL;
+    }
+
+    OK_UNREACHABLE();
 }
 
 const char *type_name(Type type) {
@@ -118,7 +122,7 @@ static inline bool type_check_ir_instruction(U32 ip, CompiledQuery *ir_emitter, 
 
         for (UZ i = 0; i < table_schema->columns_types.value.count; ++i) {
             ColumnType column_type = table_schema->columns_types.value[i];
-            Type type = column_type_to_type_table[column_type];
+            Type type = column_type_to_type(column_type);
             column_types.push(type);
         }
 

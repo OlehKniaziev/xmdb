@@ -197,12 +197,12 @@ static Optional<U32> compile_expr(Expr *expr, IrContext *ctx) {
 
 static inline bool parse_type(StringView input, Token where, IrContext *ctx, ColumnType *out) {
     if (input == "int"_sv) {
-        *out = COLUMN_INTEGER;
+        *out = ColumnType::INTEGER;
         return true;
     }
 
     if (input == "text"_sv) {
-        *out = COLUMN_TEXT;
+        *out = ColumnType::TEXT;
         return true;
     }
 
@@ -618,7 +618,7 @@ static void to_string(ok::String *string, StmtGraph *g, U32 node_idx, bool type_
     auto *node = &g->nodes[node_idx];
 
     if (node->type() == StmtGraphNode::LEAF || node->type() == StmtGraphNode::STAR) {
-        auto expr_string = node->up.expr->to_string(ok::temp_allocator);
+        auto expr_string = node->up.expr->to_string(ok::temp_allocator());
         string->format_append("\"%s\";", expr_string.cstr());
         return;
     }
@@ -975,19 +975,19 @@ static inline bool compile_graph(StmtGraph *graph, IrContext *ctx) {
 }
 
 const char *stringify_op(StringView op) {
-    char *data = ok::temp_allocator->alloc<char>(op.count + 1);
+    char *data = ok::temp_allocator()->alloc<char>(op.count + 1);
     memcpy(data, op.data, op.count);
     data[op.count] = '\0';
     return data;
 }
 
 const char *stringify_op(S64 op) {
-    String s = ok::to_string(ok::temp_allocator, op);
+    String s = ok::to_string(ok::temp_allocator(), op);
     return s.cstr();
 }
 
 const char *stringify_op(TableSchema *op) {
-    String s = String::format(ok::temp_allocator, "<table schema with %zu columns>", op->columns_names.count);
+    String s = String::format(ok::temp_allocator(), "<table schema with %zu columns>", op->columns_names.count);
     return s.cstr();
 }
 
