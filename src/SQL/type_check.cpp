@@ -40,7 +40,7 @@ Type column_type_to_type(ColumnType column_type) {
     case ColumnType::FLOAT:   return TYPE_FLOAT;
     case ColumnType::DOUBLE:  return TYPE_DOUBLE;
     case ColumnType::TEXT:    return TYPE_STRING;
-    case ColumnType::IMAGE:   return TYPE_IMAGE;
+    case ColumnType::PNG:     return TYPE_PNG;
     case ColumnType::BOOLEAN: return TYPE_BOOL;
     }
 
@@ -56,7 +56,7 @@ const char *type_name(Type type) {
     case TYPE_TABLE:  return "table";
     case TYPE_FLOAT:  return "float";
     case TYPE_DOUBLE: return "double";
-    case TYPE_IMAGE:  return "image";
+    case TYPE_PNG:    return "PNG";
     }
 
     OK_UNREACHABLE();

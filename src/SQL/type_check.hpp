@@ -9,7 +9,7 @@ namespace xmdb::SQL {
 enum Type {
     TYPE_INT,
     TYPE_STRING,
-    TYPE_IMAGE,
+    TYPE_PNG,
     TYPE_BOOL,
     TYPE_NULL,
     TYPE_TABLE,

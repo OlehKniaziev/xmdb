@@ -18,7 +18,7 @@ static inline ColumnType type_to_column_type(Type type) {
     switch (type) {
     case TYPE_INT:    return ColumnType::INTEGER;
     case TYPE_STRING: return ColumnType::TEXT;
-    case TYPE_IMAGE:  return ColumnType::IMAGE;
+    case TYPE_PNG:    return ColumnType::PNG;
     case TYPE_BOOL:   return ColumnType::BOOLEAN;
     case TYPE_FLOAT:  return ColumnType::FLOAT;
     case TYPE_DOUBLE: return ColumnType::DOUBLE;

@@ -21,8 +21,8 @@ enum class ColumnType {
     FLOAT,
     DOUBLE,
     TEXT,
-    IMAGE,
     BOOLEAN,
+    PNG,
 };
 
 struct TableSchema {

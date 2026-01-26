@@ -224,7 +224,7 @@ DECLARE_HANDLER(run_query_handler) {
                     }
                     case xmdb::SQL::TYPE_FLOAT:
                     case xmdb::SQL::TYPE_DOUBLE:
-                    case xmdb::SQL::TYPE_IMAGE:  OK_TODO();
+                    case xmdb::SQL::TYPE_PNG:    OK_TODO();
                     case xmdb::SQL::TYPE_TABLE:  OK_UNREACHABLE();
                     }
                 }

@@ -206,6 +206,11 @@ static inline bool parse_type(StringView input, Token where, IrContext *ctx, Col
         return true;
     }
 
+    if (input == "PNG"_sv) {
+        *out = ColumnType::PNG;
+        return true;
+    }
+
     String error_message =
             String::format(ctx->allocator, "'" OK_SV_FMT "' is not a valid column type", OK_SV_ARG(input));
     ctx->error_on(where, error_message);

@@ -49,8 +49,8 @@ void fill_column(DBRecord *record,
 
         break;
     }
-    case SQL::TYPE_IMAGE:
-        OK_TODO_MSG("TYPE_IMAGE");
+    case SQL::TYPE_PNG:
+        OK_TODO_MSG("TYPE_PNG");
     case SQL::TYPE_NULL:
         OK_TODO_MSG("TYPE_NULL");
     case SQL::TYPE_FLOAT:

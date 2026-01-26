@@ -23,7 +23,7 @@ static TypeLayout type_layout(SQL::ColumnType type) {
     case SQL::ColumnType::DOUBLE:  return {.size = 8, .alignment = 8};
     case SQL::ColumnType::BOOLEAN: return {.size = 1, .alignment = 1};
     case SQL::ColumnType::TEXT:    return {.size = sizeof(FixedString), .alignment = 8};
-    case SQL::ColumnType::IMAGE:   OK_TODO();
+    case SQL::ColumnType::PNG:     OK_TODO_MSG("PNG");
     }
 
     OK_UNREACHABLE();
@@ -291,8 +291,8 @@ ok::Optional<Value> DBTableStream::next() {
             OK_TODO_MSG("[next] FLOAT");
         case SQL::ColumnType::DOUBLE:
             OK_TODO_MSG("[next] DOUBLE");
-        case SQL::ColumnType::IMAGE:
-            OK_TODO_MSG("[next] IMAGE");
+        case SQL::ColumnType::PNG:
+            OK_TODO_MSG("[next] PNG");
         }
 
         OK_UNREACHABLE();

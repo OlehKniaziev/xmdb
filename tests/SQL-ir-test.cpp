@@ -2,6 +2,7 @@
 #include <SQL/SQL.hpp>
 #include <SQL/ir.hpp>
 #include <SQL/type_check.hpp>
+#include <SQL/util.hpp>
 #include <gtest/gtest.h>
 
 using namespace ok::literals;
@@ -144,6 +145,25 @@ TEST(ir, drop_database) {
     IrContext ir_ctx{&arena, source};
     CompiledQuery compiled_query{};
     ASSERT_TRUE(ir_compile_query(&query.value, &ir_ctx, &compiled_query));
+
+    TypedCompiledQuery typed_query{};
+    TypingContext t_ctx{&arena, source};
+    ASSERT_TRUE(type_check_query(&compiled_query, &t_ctx, &typed_query));
+}
+
+TEST(ir, select_png_column) {
+    ok::ArenaAllocator arena{};
+    auto source = "CREATE TABLE Tab (id int, avatar PNG); SELECT avatar FROM Tab;"_sv;
+    Parser parser{&arena, source};
+
+    auto q = parser.query();
+    ASSERT_TRUE(q.has_value());
+
+    IrContext ir_ctx{&arena, source};
+    CompiledQuery compiled_query{};
+    ASSERT_TRUE(ir_compile_query(&q.value, &ir_ctx, &compiled_query)) << format_error(&arena,
+                                                                                      ir_ctx.error.get().location,
+                                                                                      ir_ctx.error.get().message.view()).cstr();
 
     TypedCompiledQuery typed_query{};
     TypingContext t_ctx{&arena, source};
