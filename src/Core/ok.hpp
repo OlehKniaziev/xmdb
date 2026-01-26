@@ -2584,17 +2584,17 @@ bool is_alpha(char c) {
 static bool _rand_seeded = false;
 
 void seed_rand(U64 seed) {
-#ifndef OK_NOSTDLIB
+#ifndef OK_NO_STDLIB
     srand(seed);
 #else
     OK_TODO();
-#endif // OK_NOSTDLIB
+#endif // OK_NO_STDLIB
 }
 
 // NOTE(oleh): We should probably provide a way to generate cryptographically secure numbers and
 // leave this one for general purpose numbers.
 U32 get_rand() {
-#ifndef OK_NOSTDLIB
+#ifndef OK_NO_STDLIB
     if (!_rand_seeded) {
         U64 seed = nanos_timestamp();
         seed_rand(seed);
@@ -2604,7 +2604,7 @@ U32 get_rand() {
     return rand();
 #else
     OK_TODO();
-#endif // OK_NOSTDLIB
+#endif // OK_NO_STDLIB
 }
 
 Optional<File::OpenError> create_temp_file(File* file) {
