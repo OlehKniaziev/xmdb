@@ -5,11 +5,6 @@
 #include "DBValue.hpp"
 
 namespace xmdb {
-// Nodes in this graph represent an action performed on either a record in a table or another node.
-//
-// For example:
-// * ReadNode(offset, size) - reads [size] bytes from the record's data at offset [offset]
-// * CompareNode(lhs, rhs) - compares nodes [lhs] and [rhs], and serves as an input to another node
 class QueryGraph {
 public:
     explicit QueryGraph(ok::Allocator *allocator) : m_allocator{allocator} {}
@@ -23,7 +18,7 @@ public:
             WRITE,
             ALTER_USER,
             ATOMIC,
-            VALUE,
+            WRITE_COLUMN,
         };
 
         Type type() const {
@@ -95,7 +90,7 @@ public:
             PASSWORD,
         };
 
-        explicit AlterUserNode(ok::StringView user_name, Property property, Node *property_value) : Node{Type::ALTER_USER}, m_user_name{user_name}, m_property{property}, m_property_value{property_value} {}
+        explicit AlterUserNode(ok::StringView user_name, Property property, DBValue *property_value) : Node{Type::ALTER_USER}, m_user_name{user_name}, m_property{property}, m_property_value{property_value} {}
 
         ok::StringView user_name() const {
             return m_user_name;
@@ -105,14 +100,14 @@ public:
             return m_property;
         }
 
-        Node *property_value() {
+        DBValue *property_value() {
             return m_property_value;
         }
 
     private:
         ok::StringView m_user_name;
         Property m_property;
-        Node *m_property_value;
+        DBValue *m_property_value;
     };
 
     class AtomicNode : public Node {
@@ -133,15 +128,29 @@ public:
         ok::List<Node *> m_nodes;
     };
 
-    class ValueNode : public Node {
+    class WriteColumnNode : public Node {
     public:
-        explicit ValueNode(DBValue *value) : Node{Type::VALUE}, m_value{value} {}
+        explicit WriteColumnNode(DBTable *table, UZ idx, DBValue *value) : Node{Type::WRITE_COLUMN},
+                                                                           m_table{table},
+                                                                           m_idx{idx},
+                                                                           m_value{value} {
+        }
+
+        DBTable *table() {
+            return m_table;
+        }
+
+        UZ idx() {
+            return m_idx;
+        }
 
         DBValue *value() {
             return m_value;
         }
 
     private:
+        DBTable *m_table;
+        UZ m_idx;
         DBValue *m_value;
     };
 
@@ -159,6 +168,10 @@ public:
 
     AtomicNode *atomic() {
         return add_generic_node<AtomicNode>(m_allocator);
+    }
+
+    WriteColumnNode *write_column(DBTable *table, UZ idx, DBValue *value) {
+        return add_generic_node<WriteColumnNode>(table, idx, value);
     }
 
     void reset();

@@ -129,6 +129,8 @@ DBTable *QueryExecutionContext::emit_query(U32 columns_count, SQL::ColumnType *c
 }
 
 void QueryExecutionContext::insert_column(DBTable *table, StringView column_name, DBValue *column_value) {
+    CHECK_WRITE(this);
+
     if (!table_to_insert) {
         table_to_insert = table;
     } else {
@@ -168,10 +170,7 @@ static void flush_buffer(QueryExecutionContext *ctx,
     BTreeIndex *table_index = table->index();
     DBState *state = table->state();
 
-    OK_VERIFY(layout.columns.count != 0);
-    ColumnLayout last_col = layout.columns[layout.columns.count - 1];
-
-    UZ record_size = last_col.offset + last_col.size;
+    UZ record_size = table_record_size(layout);
 
     UZ n_written = 0;
 
@@ -232,7 +231,7 @@ void QueryExecutionContext::commit_insert() {
 
             if (records_buffer_count >= records_buffer.count) {
                 OK_PANIC("break");
-                flush_buffer(this, table, records_buffer); // TODO!
+                flush_buffer(this, table, records_buffer);
                 records_buffer_count = 0;
             } else {
                 records_buffer[records_buffer_count] = record;
@@ -286,28 +285,38 @@ void QueryExecutionContext::update_column(DBTable *table, StringView column_name
 }
 
 void QueryExecutionContext::commit_update() {
-#if 0
     CHECK_WRITE(this);
 
     DBTable *table = table_to_update.get();
     StringView *columns_to_update_names = columns_to_update.get_items<StringView>();
-    DBValue *columns_to_update_values = columns_to_update.get_items<DBValue>();
+    DBValue **columns_to_update_values = columns_to_update.get_items<DBValue *>();
 
-    for (UZ i = 0; i < columns_to_update.count; ++i) {
-        StringView column_name = columns_to_update_names[i];
-        for (UZ c = 0; c < table->columns_count(); ++c) {
-            if (table->columns_names()[c] != column_name) continue;
-            DBValue new_value = columns_to_update_values[i];
-            table->columns_values()[c] = new_value;
-            break;
+    if (table->flags() & DBTable::F_PERSIST) {
+        Slice<StringView> column_names = table->columns_names();
+
+        for (UZ uc = 0; uc < columns_to_update.count; ++uc) {
+            StringView column_name = columns_to_update_names[uc];
+            UZ idx = column_names.find_index(column_name);
+            OK_ASSERT(idx != (U64) -1);
+
+            query_graph.write_column(table, idx, columns_to_update_values[uc]);
+        }
+    } else {
+        Slice<DBValue *> values = table->proxy_column_values();
+
+        for (UZ i = 0; i < columns_to_update.count; ++i) {
+            StringView column_name = columns_to_update_names[i];
+            for (UZ c = 0; c < table->columns_count(); ++c) {
+                if (table->columns_names()[c] != column_name) continue;
+                DBValue *new_value = columns_to_update_values[i];
+                values[c] = new_value;
+                break;
+            }
         }
     }
 
     columns_to_update.count = 0;
     table_to_update = {};
-#else
-    OK_TODO();
-#endif // 0
 }
 
 void QueryExecutionContext::delete_table(DBTable *table) {
@@ -351,8 +360,7 @@ void QueryExecutionContext::alter_user_property(StringView user_name, StringView
             XMDB_FAIL_FMT(this, "expected user password to be of type string, got type '%s' instead",
                      SQL::type_name(value->type()));
 
-        QueryGraph::ValueNode *value_node = new (allocator) QueryGraph::ValueNode{value};
-        auto *alter_node = new (allocator) QueryGraph::AlterUserNode{user_name, QueryGraph::AlterUserNode::Property::PASSWORD, value_node};
+        auto *alter_node = new (allocator) QueryGraph::AlterUserNode{user_name, QueryGraph::AlterUserNode::Property::PASSWORD, value};
         atomic_node->add(alter_node);
     } else {
         XMDB_FAIL_FMT(this, "user '" OK_SV_FMT "' does not have property '" OK_SV_FMT "'", OK_SV_ARG(user_name),

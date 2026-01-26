@@ -1,5 +1,7 @@
 #include "DBConnection.hpp"
 #include "Logger.hpp"
+#include "DBRecord.hpp"
+#include "constants.hpp"
 
 #include <SQL/ir.hpp>
 #include <csetjmp>
@@ -278,25 +280,6 @@ static void execute_instruction(TypedCompiledQuery *query, UZ i, QueryExecutionC
     }
 }
 
-static DBValue *eval_node(QueryExecutionContext *ctx, QueryGraph::Node *node) {
-    OK_UNUSED(ctx);
-
-    switch (node->type()) {
-    case QueryGraph::Node::Type::VALUE: {
-        QueryGraph::ValueNode *value_node = static_cast<QueryGraph::ValueNode *>(node);
-        return value_node->value();
-    }
-    case QueryGraph::Node::Type::ATOMIC:
-        OK_TODO();
-    case QueryGraph::Node::Type::READ:
-    case QueryGraph::Node::Type::WRITE:
-    case QueryGraph::Node::Type::ALTER_USER:
-        OK_UNREACHABLE();
-    }
-
-    OK_UNREACHABLE();
-}
-
 static void run_single_node(QueryExecutionContext *ctx, QueryGraph::Node *node) {
     switch (node->type()) {
     case QueryGraph::Node::Type::ALTER_USER: {
@@ -314,8 +297,7 @@ static void run_single_node(QueryExecutionContext *ctx, QueryGraph::Node *node) 
 
         switch (alter_node->property()) {
         case QueryGraph::AlterUserNode::Property::PASSWORD: {
-            QueryGraph::Node *password_db_node = alter_node->property_value();
-            DBValue *password_db_value = eval_node(ctx, password_db_node);
+            DBValue *password_db_value = alter_node->property_value();
             DBTableStream password_value_stream = DBTableStream::from_value(ctx->allocator, password_db_value);
 
             Value password_value = password_value_stream.next().get();
@@ -333,7 +315,7 @@ static void run_single_node(QueryExecutionContext *ctx, QueryGraph::Node *node) 
     case QueryGraph::Node::Type::WRITE:
         OK_TODO_MSG("WRITE");
     case QueryGraph::Node::Type::ATOMIC: {
-        XMDB_FIXME("This is not atomic at all bruh");
+        XMDB_FIXME("Atomic nodes are not atomic at all currently");
 
         QueryGraph::AtomicNode *atomic_node = static_cast<QueryGraph::AtomicNode *>(node);
 
@@ -346,10 +328,40 @@ static void run_single_node(QueryExecutionContext *ctx, QueryGraph::Node *node) 
 
         break;
     }
-    case QueryGraph::Node::Type::VALUE:
-        OK_UNREACHABLE();
-    }
+    case QueryGraph::Node::Type::WRITE_COLUMN: {
+        auto *wc_node = static_cast<QueryGraph::WriteColumnNode *>(node);
+        DBTable *table = wc_node->table();
+        UZ col_idx = wc_node->idx();
+        DBValue *col_value = wc_node->value();
+        DBState *state = table->state();
 
+        TableLayout layout = table->layout();
+        ColumnLayout col = layout.columns[col_idx];
+        UZ record_size = table_record_size(layout);
+
+        DBTableStream col_stream = DBTableStream::from_value(ctx->allocator, col_value);
+
+        UZ rows_count = table->rows_count();
+
+        DBRecord record = db_record_create(ctx->allocator, layout);
+
+        for (UZ row_idx = 0; row_idx < rows_count; ++row_idx) {
+            ok::Optional<Value> val_opt = col_stream.next();
+            OK_VERIFY(val_opt);
+
+            Value val = val_opt.get();
+            fill_column(&record, layout, col_idx, val);
+            state->file.seek_to(DB_STATE_HEADER_LENGTH + record_size * row_idx + col.offset);
+
+            UZ n_written = 0;
+            ok::Optional<ok::File::WriteError> err = state->file.write(record.buffer + col.offset, col.size, &n_written);
+            OK_VERIFY(!err);
+            OK_VERIFY(n_written == col.size);
+        }
+
+        break;
+    }
+    }
 }
 
 void DBConnection::execute(TypedCompiledQuery *query, QueryResults *results) {

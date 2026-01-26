@@ -252,9 +252,7 @@ ok::Optional<Value> DBTableStream::next() {
         TableLayout layout = table->layout();
         ColumnLayout target_column = layout.columns[col->column_index];
 
-        OK_ASSERT(layout.columns.count > 0);
-        ColumnLayout last = layout.columns[layout.columns.count - 1];
-        UZ record_size = last.offset + last.size;
+        UZ record_size = table_record_size(layout);
 
         state->file.seek_to(DB_STATE_HEADER_LENGTH + col->current_record * record_size + target_column.offset);
 

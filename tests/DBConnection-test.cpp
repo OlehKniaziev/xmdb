@@ -123,7 +123,6 @@ TEST(DBConnection, execute_create_insert_and_select_on_table_with_one_row) {
     ASSERT_FALSE(column2_value.next());
 }
 
-#if 0
 TEST(DBConnection, execute_create_insert_update_and_select_on_table_with_one_row) {
     ok::ArenaAllocator arena{};
     StringView source = R"sql(CREATE TABLE MyTable (
@@ -169,7 +168,7 @@ TEST(DBConnection, execute_create_insert_update_and_select_on_table_with_one_row
 
     ASSERT_TRUE(val1);
     ASSERT_EQ(val1.get().type(), SQL::TYPE_INT);
-    ASSERT_EQ(val1.get().as_int(), 1);
+    ASSERT_EQ(val1.get().as_int(), 2);
 
     ASSERT_FALSE(column1_stream.next());
 
@@ -184,7 +183,6 @@ TEST(DBConnection, execute_create_insert_update_and_select_on_table_with_one_row
 
     ASSERT_FALSE(column2_stream.next());
 }
-#endif // 0
 
 TEST(DBConnection, execute_create_insert_delete_and_select_on_table_with_one_row) {
     ok::ArenaAllocator arena{};
