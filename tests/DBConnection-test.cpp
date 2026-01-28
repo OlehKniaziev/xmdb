@@ -50,6 +50,34 @@ TEST(DBConnection, execute_create_and_select_on_empty_table) {
     ASSERT_EQ(results_table->columns_types()[1], SQL::ColumnType::TEXT);
 }
 
+TEST(DBConnection, select_empty_png_column) {
+    ok::ArenaAllocator arena{};
+    StringView source = R"sql(CREATE TABLE MyTable (
+        id int,
+        img PNG
+    );
+    SELECT img FROM MyTable;)sql"_sv;
+
+    String error{};
+
+    QueryResults query_results{};
+
+    DBUser admin = DBUser::admin();
+    DBPool db_pool{&arena};
+    DBDescriptor *default_db = db_pool.get_db("default"_sv);
+    DBConnection db_conn{&db_pool, default_db, &admin};
+
+    bool ok = compile_and_execute_source(&arena, &db_conn, source, &query_results, &error);
+
+    ASSERT_TRUE(ok) << error.cstr();
+
+    ASSERT_FALSE(query_results.error.has_value());
+    ASSERT_TRUE(query_results.value.has_value());
+
+    DBTable *results_table = query_results.value.value;
+    ASSERT_EQ(results_table->columns_count(), 1);
+}
+
 struct MallocAllocator : public ok::ArenaAllocator {
     void *raw_alloc(UZ size) override {
         return calloc(1, size);

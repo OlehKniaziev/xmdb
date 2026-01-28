@@ -2,6 +2,7 @@
 #include "FixedString.hpp"
 #include "new.hpp"
 #include "Logger.hpp"
+#include "Png.hpp"
 #include "constants.hpp"
 
 using namespace ok::literals;
@@ -23,7 +24,7 @@ static TypeLayout type_layout(SQL::ColumnType type) {
     case SQL::ColumnType::DOUBLE:  return {.size = 8, .alignment = 8};
     case SQL::ColumnType::BOOLEAN: return {.size = 1, .alignment = 1};
     case SQL::ColumnType::TEXT:    return {.size = sizeof(FixedString), .alignment = 8};
-    case SQL::ColumnType::PNG:     OK_TODO_MSG("PNG");
+    case SQL::ColumnType::PNG:     return {.size = sizeof(PngHeader), .alignment = 8};
     }
 
     OK_UNREACHABLE();
