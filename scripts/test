@@ -22,6 +22,7 @@ def main() -> None:
     argparser = argparse.ArgumentParser(prog="test", description="Run all XMDB tests")
     argparser.add_argument("-d", "--builddir", default="./build")
     argparser.add_argument("-f", "--fail-on-snap-mismatch", action="store_true")
+    argparser.add_argument("-t", "--timeout", default=3, type=int)
     args = argparser.parse_args()
 
     build_dir = args.builddir
@@ -35,7 +36,7 @@ def main() -> None:
         snap_file_name = f"./{snap_test_relative}"
         snap_script = "../tests/snap.py"
         snap_cmd = f"{snap_script} -f" if args.fail_on_snap_mismatch else snap_script
-        cmd(f"cd build && {snap_cmd} -d ../tests/snaps {snap_file_name}", shell=True)
+        cmd(f"cd build && {snap_cmd} -d ../tests/snaps {snap_file_name}", shell=True, timeout=args.timeout)
 
     cmd(f"cd {build_dir} && ctest", shell=True)
 

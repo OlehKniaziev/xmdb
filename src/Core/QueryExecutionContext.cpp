@@ -1,8 +1,8 @@
 #include "QueryExecutionContext.hpp"
 #include "new.hpp"
 #include "Logger.hpp"
-#include "DBRecord.hpp"
 #include "constants.hpp"
+#include "Png.hpp"
 
 using namespace ok::literals;
 
@@ -193,6 +193,123 @@ static void flush_buffer(QueryExecutionContext *ctx,
     OK_VERIFY(db_state_sync(state));
 }
 
+void QueryExecutionContext::fill_column(DBRecord *record,
+                                        DBTable *table,
+                                        UZ column_index,
+                                        Value column_value) {
+    TableLayout table_layout = table->layout();
+
+    OK_VERIFY(column_index < table_layout.columns.count);
+
+    ColumnLayout column_layout = table_layout.columns[column_index];
+    OK_ASSERT(column_layout.index == column_index);
+
+    OK_VERIFY(column_layout.offset + column_layout.size <= record->buffer_size);
+
+    switch (column_value.type()) {
+    case Value::Type::INT: {
+        S64 i = column_value.as_int();
+        OK_VERIFY(sizeof(i) == column_layout.size);
+
+        UZ o = column_layout.offset;
+
+        for (SZ bit_offset = 56; bit_offset >= 0; bit_offset -= 8) {
+            U8 b = ((U64) i >> bit_offset) & 0xFF;
+            record->buffer[o] = b;
+            ++o;
+        }
+
+        if (column_index == table_layout.primary_key_index) {
+            record->primary_key_value = (U64)i;
+        }
+
+        break;
+    }
+    case Value::Type::BOOL: {
+        bool b = column_value.as_bool();
+        OK_VERIFY(sizeof(b) == 1);
+        OK_VERIFY(sizeof(b) == column_layout.size);
+
+        record->buffer[column_layout.offset] = b;
+        break;
+    }
+    case Value::Type::STRING: {
+        FixedString fs = column_value.as_string();
+
+        OK_VERIFY(sizeof(fs) == column_layout.size);
+
+        memcpy(&record->buffer[column_layout.offset], reinterpret_cast<U8 *>(&fs), sizeof(fs));
+
+        break;
+    }
+    case Value::Type::IMAGE_CHUNK: {
+        ImageChunk *input_chunk = column_value.as_chunk();
+
+        if (input_chunk->x != 0) OK_TODO_MSG("Non-zero chunk x");
+        if (input_chunk->y != 0) OK_TODO_MSG("Non-zero chunk y");
+
+        if (input_chunk->data.count > MAX_DISK_IMAGE_CHUNK_DATA_SIZE) OK_TODO_MSG("Image too big");
+
+        ok::Slice<ColumnAttribute> attrs = table->column_attributes();
+        ColumnAttribute attr = attrs[column_index];
+
+        OK_ASSERT(attr.flags & ColumnAttribute::F_IMAGE);
+
+        ImageColumnState *image_state = &attr.u.image_state;
+
+        U64 new_chunk_index = image_state->header.chunks_count;
+
+        DiskImageChunk chunk = {
+            .x = input_chunk->x,
+            .y = input_chunk->y,
+            .width = input_chunk->width,
+            .height = input_chunk->height,
+        };
+
+        image_state->file.seek_to(IMAGE_COLUMN_STATE_HEADER_SIZE + MAX_DISK_IMAGE_CHUNK_SIZE * new_chunk_index);
+
+        UZ n_written = 0;
+        // @Perf I'm not sure if it's better to do 2 writes of header and data or memcpy potentially 64MiB pixel data.
+        // Need to benchmark this or choose the strategy dynamically.
+        ok::Optional<ok::File::WriteError> err = image_state->file.write(reinterpret_cast<U8 *>(&chunk), sizeof(chunk), &n_written);
+        OK_VERIFY(!err);
+        OK_VERIFY(n_written == sizeof(chunk));
+
+        err = image_state->file.write(input_chunk->data.items, input_chunk->data.count, &n_written);
+        OK_VERIFY(!err);
+        OK_VERIFY(n_written == input_chunk->data.count);
+
+        if (input_chunk->data.count < MAX_DISK_IMAGE_CHUNK_DATA_SIZE) {
+            image_state->file.truncate(IMAGE_COLUMN_STATE_HEADER_SIZE + MAX_DISK_IMAGE_CHUNK_DATA_SIZE * (new_chunk_index + 1));
+        }
+
+        ++image_state->header.chunks_count;
+
+        OK_VERIFY(image_state_sync(image_state));
+
+        OK_VERIFY(table->columns_types()[column_index] == SQL::ColumnType::PNG);
+
+        Png png = {
+            .header = {
+                .width = input_chunk->width,
+                .height = input_chunk->height,
+            },
+            .format = input_chunk->format,
+            .indices = {
+                .count = 1,
+                .items = {(U32) new_chunk_index},
+            },
+        };
+
+        OK_VERIFY(sizeof(png) == column_layout.size);
+
+        memcpy(&record->buffer[column_layout.offset], &png, sizeof(png));
+
+        break;
+    }
+    }
+}
+
 void QueryExecutionContext::commit_insert() {
     CHECK_WRITE(this);
 
@@ -226,7 +343,7 @@ void QueryExecutionContext::commit_insert() {
                 DBValue *column_db_value = column_values[row_index];
                 ok::Optional<Value> column_value = poll(allocator, column_db_value);
                 OK_VERIFY(column_value);
-                fill_column(&record, table_layout, column_index, column_value.get());
+                fill_column(&record, table, column_index, column_value.get());
             }
 
             if (records_buffer_count >= records_buffer.count) {

@@ -57,6 +57,7 @@ struct TableSchema {
     INSTR_VAR_2(Gt, U32, U32)                                                                                          \
     INSTR_VAR_2(FetchColumn, U32, StringView)                                                                          \
     INSTR_VAR_2(FetchTable, StringView, TableSchema *)                                                                 \
+    INSTR_VAR_2(RGB, S64, StringView)                                   \
     INSTR_3(EmitColumn, U32, U32, StringView)                                                                          \
     INSTR_VAR_1(EmitQuery, U32)                                                                                        \
     INSTR_1(UseDatabase, StringView)                                                                                   \

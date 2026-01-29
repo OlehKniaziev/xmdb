@@ -34,6 +34,7 @@ struct Expr {
         BINARY_OP,
         SELECT,
         STAR,
+        CALL,
     };
 
     static Expr* alloc_true(ok::Allocator* allocator, Token token) {
@@ -148,6 +149,23 @@ struct SelectExpr : public Expr {
     Expr* table;
 };
 
+struct CallExpr : public Expr {
+    static CallExpr *alloc(ok::Allocator *allocator,
+                           Token token,
+                           Expr *fn,
+                           ok::Slice<Expr *> args) {
+        auto *expr = allocator->alloc<CallExpr>();
+        expr->type = CALL;
+        expr->token = token;
+        expr->fn = fn;
+        expr->args = args;
+        return expr;
+    }
+
+    Expr *fn;
+    ok::Slice<Expr *> args;
+};
+
 struct ExprStmt : public Stmt {
     static ExprStmt* alloc(ok::Allocator* allocator, Token token, Expr* expr) {
         auto* stmt = allocator->alloc<ExprStmt>();
@@ -173,19 +191,19 @@ struct UseStmt : public Stmt {
 };
 
 struct InsertStmt : public Stmt {
-    static InsertStmt* alloc(ok::Allocator* allocator, Token token, Expr* table, ok::Slice<ok::String> columns,
+    static InsertStmt* alloc(ok::Allocator* allocator, Token token, ok::StringView table_name, ok::Slice<ok::String> columns,
                                 ok::Slice<Expr*> values, ok::Slice<uint32_t> values_counts) {
         auto* stmt = allocator->alloc<InsertStmt>();
         stmt->type = INSERT;
         stmt->token = token;
-        stmt->table = table;
+        stmt->table_name = table_name.to_string(allocator);
         stmt->columns = columns;
         stmt->values = values;
         stmt->values_counts = values_counts;
         return stmt;
     }
 
-    Expr* table;
+    ok::String table_name;
     ok::Slice<ok::String> columns;
     ok::Slice<Expr*> values;
     ok::Slice<uint32_t> values_counts;

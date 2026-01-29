@@ -9,12 +9,6 @@ using namespace ok::literals;
 using namespace xmdb;
 using namespace xmdb::SQL;
 
-bool eq(ok::StringView lhs, ok::StringView rhs) {
-    if (lhs.count != rhs.count) return false;
-    for (UZ i = 0; i < lhs.count; ++i) if (lhs[i] != rhs[i]) return false;
-    return true;
-}
-
 TEST(DBConnection, execute_create_and_select_on_empty_table) {
     ok::ArenaAllocator arena{};
     StringView source = R"sql(CREATE TABLE MyTable (
@@ -56,6 +50,7 @@ TEST(DBConnection, select_empty_png_column) {
         id int,
         img PNG
     );
+    INSERT INTO MyTable(id, img) VALUES (1, RGB(2, 2, "abcdabcdabcdabcd"));
     SELECT img FROM MyTable;)sql"_sv;
 
     String error{};
@@ -76,6 +71,14 @@ TEST(DBConnection, select_empty_png_column) {
 
     DBTable *results_table = query_results.value.value;
     ASSERT_EQ(results_table->columns_count(), 1);
+
+    DBTableOutlet outlet{results_table};
+    DBTableStream stream = outlet.column_stream(&arena, 0);
+
+    ok::Optional<Value> val = stream.next();
+    ASSERT_TRUE(val.has_value());
+
+    ASSERT_EQ(val.get().type(), Value::Type::IMAGE_CHUNK);
 }
 
 struct MallocAllocator : public ok::ArenaAllocator {
@@ -132,7 +135,7 @@ TEST(DBConnection, execute_create_insert_and_select_on_table_with_one_row) {
     ok::Optional<Value> next_value = column1_value.next();
 
     ASSERT_TRUE(next_value);
-    ASSERT_EQ(next_value.get().type(), SQL::TYPE_INT);
+    ASSERT_EQ(next_value.get().type(), Value::Type::INT);
     ASSERT_EQ(next_value.get().as_int(), 1);
 
     ASSERT_FALSE(column1_value.next());
@@ -142,7 +145,7 @@ TEST(DBConnection, execute_create_insert_and_select_on_table_with_one_row) {
     next_value = column2_value.next();
 
     ASSERT_TRUE(next_value);
-    ASSERT_EQ(next_value.get().type(), SQL::TYPE_STRING);
+    ASSERT_EQ(next_value.get().type(), Value::Type::STRING);
 
     FixedString val_fs = next_value.get().as_string();
     ok::StringView val = view(&val_fs);
@@ -195,7 +198,7 @@ TEST(DBConnection, execute_create_insert_update_and_select_on_table_with_one_row
     ok::Optional<Value> val1 = column1_stream.next();
 
     ASSERT_TRUE(val1);
-    ASSERT_EQ(val1.get().type(), SQL::TYPE_INT);
+    ASSERT_EQ(val1.get().type(), Value::Type::INT);
     ASSERT_EQ(val1.get().as_int(), 2);
 
     ASSERT_FALSE(column1_stream.next());
@@ -206,7 +209,7 @@ TEST(DBConnection, execute_create_insert_update_and_select_on_table_with_one_row
 
     FixedString val2_fs = val2.get().as_string();
 
-    ASSERT_EQ(val2.get().type(), SQL::TYPE_STRING);
+    ASSERT_EQ(val2.get().type(), Value::Type::STRING);
     ASSERT_EQ(view(&val2_fs), "2"_sv);
 
     ASSERT_FALSE(column2_stream.next());
@@ -308,7 +311,7 @@ TEST(DBConnection, create_new_db_and_execute_create_insert_and_select_on_table_w
 
     ASSERT_TRUE(val1);
 
-    ASSERT_EQ(val1.get().type(), SQL::TYPE_INT);
+    ASSERT_EQ(val1.get().type(), Value::Type::INT);
     ASSERT_EQ(val1.get().as_int(), 1);
 
     ASSERT_FALSE(column1_stream.next());
@@ -317,7 +320,7 @@ TEST(DBConnection, create_new_db_and_execute_create_insert_and_select_on_table_w
 
     FixedString val2_fs = val2.get().as_string();
 
-    ASSERT_EQ(val2.get().type(), SQL::TYPE_STRING);
+    ASSERT_EQ(val2.get().type(), Value::Type::STRING);
     ASSERT_EQ(view(&val2_fs), "1"_sv);
 
     ASSERT_FALSE(column2_stream.next());

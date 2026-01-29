@@ -24,7 +24,7 @@ static TypeLayout type_layout(SQL::ColumnType type) {
     case SQL::ColumnType::DOUBLE:  return {.size = 8, .alignment = 8};
     case SQL::ColumnType::BOOLEAN: return {.size = 1, .alignment = 1};
     case SQL::ColumnType::TEXT:    return {.size = sizeof(FixedString), .alignment = 8};
-    case SQL::ColumnType::PNG:     return {.size = sizeof(PngHeader), .alignment = 8};
+    case SQL::ColumnType::PNG:     return {.size = sizeof(Png), .alignment = 8};
     }
 
     OK_UNREACHABLE();
@@ -105,12 +105,31 @@ DBTable::DBTable(ok::Allocator *allocator,
     if (flags & F_EPHEMERAL) {
         OK_ASSERT(flags & F_PERSIST);
     }
+
+    m_column_attributes = allocator->alloc<ColumnAttribute>(m_columns_count);
+
+    for (UZ i = 0; i < m_columns_count; ++i) {
+        ColumnAttribute attribute{};
+
+        SQL::Type ty = SQL::column_type_to_type(m_columns_types[i]);
+
+        if (is_image(ty)) {
+            attribute.flags |= ColumnAttribute::F_IMAGE;
+        }
+
+        m_column_attributes[i] = attribute;
+    }
 }
 
 struct StreamPair {
     DBTableStream lhs;
     DBTableStream rhs;
 };
+
+constexpr bool chunk_images = false;
+constexpr U32 chunk_width = 256;
+constexpr U32 chunk_height = 256;
+constexpr U64 chunk_size = chunk_width * chunk_height;
 
 DBTableStream DBTableStream::from_value(ok::Allocator *allocator, DBValue *value) {
     switch (value->kind()) {
@@ -205,6 +224,43 @@ DBTableStream DBTableStream::from_value(ok::Allocator *allocator, DBValue *value
             };
         }
     }
+    case DBValue::Kind::IMAGE_DATA: {
+        auto *image_value = static_cast<ImageDataDBValue *>(value);
+
+        if (chunk_images) OK_TODO_MSG("Image chunking");
+
+        struct State {
+            ok::Allocator *allocator;
+            ImageDataDBValue *img;
+            UZ times;
+        };
+
+        auto *state = allocator->alloc<State>();
+        state->allocator = allocator;
+        state->img = image_value;
+        state->times = 0;
+
+        return DBTableStream{
+            allocator,
+            [](void *arg) -> ok::Optional<Value> {
+                auto *state = static_cast<State *>(arg);
+
+                if (state->times > 0) return ok::Optional<Value>::empty();
+
+                ImageDataDBValue *img = state->img;
+                ++state->times;
+
+                return Value::image_chunk(state->allocator,
+                                          0,
+                                          0,
+                                          img->width(),
+                                          img->height(),
+                                          img->data(),
+                                          img->format());
+            },
+            state,
+        };
+    }
     }
 
     OK_UNREACHABLE();
@@ -286,14 +342,50 @@ ok::Optional<Value> DBTableStream::next() {
             memcpy(&result, col->buffer, sizeof(FixedString));
             return Value::string(m_allocator, result);
         }
+        case SQL::ColumnType::PNG: {
+            Png *png = reinterpret_cast<Png *>(col->buffer);
+            OK_VERIFY(png->indices.count == 1);
+
+            U8 index = png->indices.items[0];
+
+            ok::Slice<ColumnAttribute> attrs = table->column_attributes();
+            ColumnAttribute attr = attrs[col->column_index];
+
+            OK_ASSERT(attr.flags & ColumnAttribute::F_IMAGE);
+
+            ImageColumnState image_state = attr.u.image_state;
+
+            image_state.file.seek_to(IMAGE_COLUMN_STATE_HEADER_SIZE + MAX_DISK_IMAGE_CHUNK_SIZE * index);
+
+            UZ n_read = 0;
+            UZ chunk_size = MAX_DISK_IMAGE_CHUNK_SIZE;
+            U8 *chunk_buffer = m_allocator->alloc<U8>(chunk_size);
+            ok::Optional<ok::File::ReadError> err = image_state.file.read(chunk_buffer, chunk_size, &n_read);
+            OK_VERIFY(!err);
+            OK_VERIFY(n_read == chunk_size);
+
+            DiskImageChunk *disk_chunk = reinterpret_cast<DiskImageChunk *>(chunk_buffer);
+            OK_ASSERT(disk_chunk->width == png->header.width);
+            OK_ASSERT(disk_chunk->height == png->header.height);
+
+            U8 pixel_size = format_pixel_size_in_bytes(png->format);
+
+            ok::Slice<U8> pixel_data = {disk_chunk->pixel_data, disk_chunk->width * disk_chunk->height * pixel_size};
+
+            return Value::image_chunk(m_allocator,
+                                      disk_chunk->x,
+                                      disk_chunk->y,
+                                      disk_chunk->width,
+                                      disk_chunk->height,
+                                      pixel_data,
+                                      png->format);
+        }
         case SQL::ColumnType::BOOLEAN:
             OK_TODO_MSG("[next] BOOL");
         case SQL::ColumnType::FLOAT:
             OK_TODO_MSG("[next] FLOAT");
         case SQL::ColumnType::DOUBLE:
             OK_TODO_MSG("[next] DOUBLE");
-        case SQL::ColumnType::PNG:
-            OK_TODO_MSG("[next] PNG");
         }
 
         OK_UNREACHABLE();

@@ -4,6 +4,7 @@
 #include "constants.hpp"
 
 #include <SQL/ir.hpp>
+#include <base64.h>
 #include <csetjmp>
 
 namespace xmdb {
@@ -22,6 +23,7 @@ static inline ColumnType type_to_column_type(Type type) {
     case TYPE_BOOL:   return ColumnType::BOOLEAN;
     case TYPE_FLOAT:  return ColumnType::FLOAT;
     case TYPE_DOUBLE: return ColumnType::DOUBLE;
+    case TYPE_IMAGE:
     case TYPE_NULL:
     case TYPE_TABLE:  OK_PANIC("Unsupported type to column type conversion");
     }
@@ -277,6 +279,33 @@ static void execute_instruction(TypedCompiledQuery *query, UZ i, QueryExecutionC
         OK_ASSERT(deleted);
         break;
     }
+    case IRInstructionOperator_RGB: {
+        Triple<ok::String, S64, ok::StringView> operands = operands_of_RGB(&query->untyped, i);
+
+        U32 w = (U64)operands.op2 >> 32;
+        U32 h = (U64)operands.op2 & ~(U32)0;
+
+        ok::StringView input = operands.op3;
+        UZ output_count = (input.count >> 2) * 3;
+        U8 *output = ctx->allocator->alloc<U8>(output_count);
+
+        web_string_view web_input = {
+            .Items = (u8 *)input.data,
+            .Count = input.count,
+        };
+
+        OK_VERIFY(WebBase64Decode(web_input, output, &output_count));
+
+        ok::Slice<U8> data = {output, output_count};
+
+        auto *value = new (ctx->allocator) ImageDataDBValue{w, h, data, PixelFormat::RGB};
+
+        ok::StringView var_name = operands.op1.view();
+
+        ctx->put_var(i, var_name, value);
+
+        break;
+    }
     }
 }
 
@@ -350,7 +379,7 @@ static void run_single_node(QueryExecutionContext *ctx, QueryGraph::Node *node) 
             OK_VERIFY(val_opt);
 
             Value val = val_opt.get();
-            fill_column(&record, layout, col_idx, val);
+            ctx->fill_column(&record, table, col_idx, val);
             state->file.seek_to(DB_STATE_HEADER_LENGTH + record_size * row_idx + col.offset);
 
             UZ n_written = 0;

@@ -17,7 +17,9 @@ add_library(LibCore
   SDFile.cpp
   DBRecord.cpp
   FixedString.cpp
-  DBState.cpp
+  state.cpp
+  image.cpp
 )
 
 set_property(TARGET LibCore PROPERTY POSITION_INDEPENDENT_CODE 1)
+target_link_libraries(LibCore PUBLIC libweb)

@@ -1,20 +1,16 @@
 #pragma once
 
-namespace xmdb {
-enum class PngFormat {
-    RGB,
-    RGBA,
-};
+#include "image.hpp"
 
+namespace xmdb {
 struct PngHeader {
     U32 width;
     U32 height;
-    FixedString filepath;
 };
 
 struct Png {
     PngHeader header;
-    PngFormat format;
-    U8 *pixels;
+    PixelFormat format;
+    ChunkIndices indices;
 };
 } // namespace xmdb

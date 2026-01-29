@@ -10,7 +10,5 @@ struct DBRecord {
     U64 primary_key_value;
 };
 
-void fill_column(DBRecord *, TableLayout, UZ, Value);
-
 DBRecord db_record_create(ok::Allocator *, TableLayout);
 } // namespace xmdb

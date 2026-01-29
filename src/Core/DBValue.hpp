@@ -3,6 +3,7 @@
 #include <SQL/type_check.hpp>
 
 #include "ColumnLayout.hpp"
+#include "image.hpp"
 
 namespace xmdb {
 class DBValue {
@@ -13,6 +14,7 @@ public:
         CONSTANT,
         NONE,
         CONCAT,
+        IMAGE_DATA,
     };
 
     DBValue() = delete;
@@ -156,5 +158,32 @@ public:
     ConcatDBValue(DBValue *lhs, DBValue *rhs) : PairDBValue{lhs->type(), Kind::CONCAT, lhs, rhs} {
         OK_ASSERT(lhs->is_compatible_with(rhs));
     }
+};
+
+class ImageDataDBValue : public DBValue {
+public:
+    ImageDataDBValue(U64 width, U64 height, ok::Slice<U8> data, PixelFormat format) : DBValue{SQL::TYPE_IMAGE, Kind::IMAGE_DATA}, m_width{width}, m_height{height}, m_data{data}, m_format{format} {}
+
+    U64 width() {
+        return m_width;
+    }
+
+    U64 height() {
+        return m_height;
+    }
+
+    ok::Slice<U8> data() {
+        return m_data;
+    }
+
+    PixelFormat format() {
+        return m_format;
+    }
+
+private:
+    U64 m_width;
+    U64 m_height;
+    ok::Slice<U8> m_data;
+    PixelFormat m_format;
 };
 } // namespace xmdb

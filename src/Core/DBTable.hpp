@@ -5,9 +5,23 @@
 #include "ColumnLayout.hpp"
 #include "ok.hpp"
 #include "Value.hpp"
-#include "DBState.hpp"
+#include "state.hpp"
 
 namespace xmdb {
+struct ColumnAttribute {
+    enum {
+        F_IMAGE = 1 << 0,
+    };
+
+    using Flags = U8;
+
+    Flags flags;
+
+    union {
+        ImageColumnState image_state;
+    } u;
+};
+
 class DBTable {
 public:
     using Flags = U16;
@@ -101,6 +115,10 @@ public:
         m_state = state;
     }
 
+    ok::Slice<ColumnAttribute> column_attributes() {
+        return {m_column_attributes, m_columns_count};
+    }
+
 private:
     ok::StringView m_name;
     U16 m_flags;
@@ -109,6 +127,7 @@ private:
     SQL::ColumnType *m_columns_types;
     TableLayout m_layout;
     DBValue **m_proxy_columns_values;
+    ColumnAttribute *m_column_attributes;
     UZ m_proxy_rows_count;
     BTreeIndex m_index;
     DBState m_state;

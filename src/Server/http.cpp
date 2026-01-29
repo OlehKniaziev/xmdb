@@ -185,13 +185,13 @@ DECLARE_HANDLER(run_query_handler) {
                     xmdb::Value value = column_stream.next().get();
 
                     switch (value.type()) {
-                    case xmdb::SQL::TYPE_INT: {
+                    case Value::Type::INT: {
                         S64 n = value.as_int();
                         WebJsonPutKey(column_name);
                         WebJsonPutNumber(n);
                         break;
                     }
-                    case xmdb::SQL::TYPE_STRING: {
+                    case Value::Type::STRING: {
                         FixedString s = value.as_string();
                         web_string_view value = {
                                 .Items = (u8 *) s.items,
@@ -203,7 +203,7 @@ DECLARE_HANDLER(run_query_handler) {
 
                         break;
                     }
-                    case xmdb::SQL::TYPE_BOOL: {
+                    case Value::Type::BOOL: {
                         bool b = value.as_bool();
 
                         WebJsonPutKey(column_name);
@@ -216,16 +216,8 @@ DECLARE_HANDLER(run_query_handler) {
 
                         break;
                     }
-                    case xmdb::SQL::TYPE_NULL: {
-                        WebJsonPutKey(column_name);
-                        WebJsonPutNull();
-
-                        break;
-                    }
-                    case xmdb::SQL::TYPE_FLOAT:
-                    case xmdb::SQL::TYPE_DOUBLE:
-                    case xmdb::SQL::TYPE_PNG:    OK_TODO();
-                    case xmdb::SQL::TYPE_TABLE:  OK_UNREACHABLE();
+                    case Value::Type::IMAGE_CHUNK:
+                        OK_TODO_MSG("IMAGE_CHUNK");
                     }
                 }
 

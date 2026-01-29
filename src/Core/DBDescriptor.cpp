@@ -86,6 +86,27 @@ DBTable *DBDescriptor::create_new_table(ok::Allocator *allocator,
         }
 
         table->set_state(db_state);
+
+        ok::Slice<ColumnAttribute> attrs = table->column_attributes();
+
+        for (UZ col_idx = 0; col_idx < columns_count; ++col_idx) {
+            ColumnAttribute *attr = &attrs[col_idx];
+            if (attr->flags & ColumnAttribute::F_IMAGE) {
+                ok::Slice<ok::StringView> column_names = table->columns_names();
+                ok::StringView column_name = column_names[col_idx];
+
+                ok::String column_file_name = ok::String::format(ok::temp_allocator(), OK_SV_FMT "-" OK_SV_FMT ".idb", OK_SV_ARG(name), OK_SV_ARG(column_name));
+
+                ok::File image_file{};
+                if (!create_file_based_on_table_flags(flags, column_file_name, &image_file)) {
+                    return nullptr;
+                }
+
+                if (!image_state_create(image_file, &attr->u.image_state)) {
+                    return nullptr;
+                }
+            }
+        }
     }
 
     tables.push(table);
