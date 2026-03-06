@@ -280,7 +280,9 @@ void QueryExecutionContext::fill_column(DBRecord *record,
         OK_VERIFY(n_written == input_chunk->data.count);
 
         if (input_chunk->data.count < MAX_DISK_IMAGE_CHUNK_DATA_SIZE) {
-            image_state->file.truncate(IMAGE_COLUMN_STATE_HEADER_SIZE + MAX_DISK_IMAGE_CHUNK_DATA_SIZE * (new_chunk_index + 1));
+            ok::Optional<ok::File::IOError> err =
+                image_state->file.truncate(IMAGE_COLUMN_STATE_HEADER_SIZE + MAX_DISK_IMAGE_CHUNK_SIZE * (new_chunk_index + 1));
+            OK_VERIFY(!err);
         }
 
         ++image_state->header.chunks_count;

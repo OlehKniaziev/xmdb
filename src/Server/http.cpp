@@ -252,6 +252,8 @@ void run_http_server(U16 port) {
     web_http_server_config config{
         // TODO(oleh): Make this configurable for user.
         .NumThreads = 1,
+        .UseHttps = false,
+        .HttpsProvider = nullptr,
     };
     WebHttpServerInit(&server, &config);
 
