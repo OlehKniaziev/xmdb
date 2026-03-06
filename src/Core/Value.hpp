@@ -45,7 +45,7 @@ public:
         chunk->width = width;
         chunk->height = height;
         chunk->data = data;
-        chunk->format = format;
+        chunk->pixel_format = format;
         return Value{Type::IMAGE_CHUNK, reinterpret_cast<void *>(chunk)};
     }
 

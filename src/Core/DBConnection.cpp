@@ -286,19 +286,24 @@ static void execute_instruction(TypedCompiledQuery *query, UZ i, QueryExecutionC
         U32 h = (U64)operands.op2 & ~(U32)0;
 
         ok::StringView input = operands.op3;
-        UZ output_count = (input.count >> 2) * 3;
-        U8 *output = ctx->allocator->alloc<U8>(output_count);
 
-        web_string_view web_input = {
-            .Items = (u8 *)input.data,
-            .Count = input.count,
-        };
+        ok::Optional<ok::Slice<U8>> input_data_opt = from_hex_string(ctx->allocator, input);
 
-        OK_VERIFY(WebBase64Decode(web_input, output, &output_count));
+        if (!input_data_opt.has_value()) {
+            XMDB_FAIL(ctx,
+                      "Failed to parse the 'data' argument as a valid hex string");
+        }
 
-        ok::Slice<U8> data = {output, output_count};
+        ok::Slice<U8> input_data = input_data_opt.get();
+        UZ expected_data_count = w * h * format_pixel_size_in_bytes(PixelFormat::RGB);
+        if (input_data.count != expected_data_count) {
+            XMDB_FAIL_FMT(ctx,
+                          "Expected the 'data' argument to be of length %zu (width * height * pixel size), got %zu bytes instead",
+                          expected_data_count,
+                          input_data.count);
+        }
 
-        auto *value = new (ctx->allocator) ImageDataDBValue{w, h, data, PixelFormat::RGB};
+        auto *value = new (ctx->allocator) ImageDataDBValue{w, h, input_data, PixelFormat::RGB};
 
         ok::StringView var_name = operands.op1.view();
 

@@ -44,4 +44,37 @@ ok::String to_hex_string(ok::Allocator *allocator, ok::Slice<U8> bytes) {
     }
     return s;
 }
+
+ok::Optional<ok::Slice<U8>> from_hex_string(ok::Allocator *allocator, ok::StringView hex) {
+    UZ buffer_count = hex.count / 2;
+    U8 *buffer = allocator->alloc<U8>(buffer_count);
+
+    for (SZ i = 0; i < (SZ) hex.count - 1; i += 2) {
+        U8 c1 = tolower(hex[i]);
+        U8 c2 = tolower(hex[i + 1]);
+        U8 cs[] = {c1, c2};
+
+        U8 b = 0;
+
+        for (UZ ci = 0; ci < sizeof(cs) / sizeof(cs[0]); ++ci) {
+            U8 c = cs[ci];
+            U8 start = 0;
+
+            if (c >= '0' && c <= '9') {
+                start = '0';
+            } else if (c >= 'a' && c <= 'f') {
+                start = 'a';
+            } else {
+                return {};
+            }
+
+            b <<= 4;
+            b |= c - start;
+        }
+
+        buffer[i / 2] = b;
+    }
+
+    return ok::Slice<U8>{buffer, buffer_count};
+}
 } // namespace xmdb

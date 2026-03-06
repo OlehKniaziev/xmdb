@@ -15,7 +15,7 @@ struct ImageChunk {
     U32 width;
     U32 height;
     ok::Slice<U8> data;
-    PixelFormat format;
+    PixelFormat pixel_format;
 };
 
 struct DiskImageChunk {

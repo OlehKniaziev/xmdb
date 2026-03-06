@@ -18,4 +18,5 @@ struct ErrorWithSourceLocation {
 };
 
 ok::String to_hex_string(ok::Allocator *, ok::Slice<U8>);
+ok::Optional<ok::Slice<U8>> from_hex_string(ok::Allocator *, ok::StringView);
 } // namespace xmdb

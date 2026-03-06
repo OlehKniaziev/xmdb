@@ -45,13 +45,14 @@ TEST(DBConnection, execute_create_and_select_on_empty_table) {
 }
 
 TEST(DBConnection, select_empty_png_column) {
+#define PIXEL_DATA "abcdabcdabcdabcdabababab"
     ok::ArenaAllocator arena{};
-    StringView source = R"sql(CREATE TABLE MyTable (
-        id int,
-        img PNG
-    );
-    INSERT INTO MyTable(id, img) VALUES (1, RGB(2, 2, "abcdabcdabcdabcd"));
-    SELECT img FROM MyTable;)sql"_sv;
+    StringView source = "CREATE TABLE MyTable ("
+        "id int,"
+        "img PNG"
+    ");"
+    "INSERT INTO MyTable(id, img) VALUES (1, RGB(2, 2, \"" PIXEL_DATA "\"));"
+    "SELECT img FROM MyTable;"_sv;
 
     String error{};
 
@@ -75,10 +76,29 @@ TEST(DBConnection, select_empty_png_column) {
     DBTableOutlet outlet{results_table};
     DBTableStream stream = outlet.column_stream(&arena, 0);
 
-    ok::Optional<Value> val = stream.next();
-    ASSERT_TRUE(val.has_value());
+    ok::Optional<Value> val_opt = stream.next();
+    ASSERT_TRUE(val_opt.has_value());
 
-    ASSERT_EQ(val.get().type(), Value::Type::IMAGE_CHUNK);
+    Value val = val_opt.get();
+
+    ASSERT_EQ(val.type(), Value::Type::IMAGE_CHUNK);
+
+    ImageChunk *image_chunk = val.as_chunk();
+
+    ASSERT_EQ(image_chunk->x, 0);
+    ASSERT_EQ(image_chunk->y, 0);
+    ASSERT_EQ(image_chunk->width, 2);
+    ASSERT_EQ(image_chunk->height, 2);
+    ASSERT_EQ(image_chunk->pixel_format, PixelFormat::RGB);
+
+    ok::Slice<U8> expected_pixel_data = from_hex_string(&arena, ok::StringView{PIXEL_DATA}).get();
+
+    ASSERT_EQ(expected_pixel_data.count, image_chunk->data.count);
+
+    for (UZ pi = 0; pi < image_chunk->data.count; ++pi) {
+        U8 px = image_chunk->data[pi];
+        ASSERT_EQ(px, expected_pixel_data[pi]);
+    }
 }
 
 struct MallocAllocator : public ok::ArenaAllocator {

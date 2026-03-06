@@ -275,6 +275,9 @@ void QueryExecutionContext::fill_column(DBRecord *record,
         OK_VERIFY(!err);
         OK_VERIFY(n_written == sizeof(chunk));
 
+        // NOTE(oleh): Need to seek manually here, since the 'write' method seeks back to the original offset.
+        image_state->file.seek_to(image_state->file.offset + sizeof(chunk));
+
         err = image_state->file.write(input_chunk->data.items, input_chunk->data.count, &n_written);
         OK_VERIFY(!err);
         OK_VERIFY(n_written == input_chunk->data.count);
@@ -296,7 +299,7 @@ void QueryExecutionContext::fill_column(DBRecord *record,
                 .width = input_chunk->width,
                 .height = input_chunk->height,
             },
-            .format = input_chunk->format,
+            .format = input_chunk->pixel_format,
             .indices = {
                 .count = 1,
                 .items = {(U32) new_chunk_index},
