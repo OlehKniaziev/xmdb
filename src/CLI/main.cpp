@@ -129,7 +129,7 @@ int main(int argc, char **argv) {
 
         if (response.Status != HTTP_STATUS_OK) {
             const char *http_reason = WebHttpGetResponseStatusReason(response.Status);
-            printf("Query request to the server failed with status '%s':" WEB_SV_FMT "\n", http_reason, WEB_SV_ARG(response.Body));
+            printf("Query request to the server failed with status '%s': " WEB_SV_FMT "\n", http_reason, WEB_SV_ARG(response.Body));
             continue;
         }
 
