@@ -28,25 +28,28 @@ DECLARE_HANDLER(connect_handler) {
     }
 
     web_json_object json_obj = json.Object;
-    web_string_view username, password, db_name;
+    web_string_view username, password_hash_hex, db_name;
 
     if (!WebJsonObjectGetStringView(&json_obj, WEB_SV_LIT("username"), &username)) {
         FAIL(BAD_REQUEST, "'username' field not present");
     }
-    if (!WebJsonObjectGetStringView(&json_obj, WEB_SV_LIT("password_hash"), &password)) {
+    if (!WebJsonObjectGetStringView(&json_obj, WEB_SV_LIT("password_hash"), &password_hash_hex)) {
         FAIL(BAD_REQUEST, "'password_hash' field not present");
     }
     if (!WebJsonObjectGetStringView(&json_obj, WEB_SV_LIT("db_name"), &db_name)) {
         FAIL(BAD_REQUEST, "'db_name' field not present");
     }
 
-    // FIXME(oleh): This code *should* be uncommented, but the JS shit Base64 API uses another
-    // scheme of encoding, which we currently don't support.
-    // uz password_hash_length = XMDB_PASSWORD_HASH_LENGTH;
-    // U8 password_hash[password_hash_length];
-    // if (!WebBase64Decode(password_hash_base64, password_hash, &password_hash_length)) {
-    //     return HTTP_STATUS_BAD_REQUEST;
-    // }
+    WebArenaAllocator ctx_arena{&ctx->Arena};
+
+    ok::StringView password_hash_hex_sv = {(const char *) password_hash_hex.Items, password_hash_hex.Count};
+
+    ok::Optional<ok::Slice<U8>> password_hash_opt = xmdb::from_hex_string(&ctx_arena, password_hash_hex_sv);
+    if (!password_hash_opt.has_value()) {
+        FAIL(BAD_REQUEST, "'password_hash' field is not a valid hex string");
+    }
+
+    ok::Slice<U8> password_hash = password_hash_opt.get();
 
     ok::StringView db_name_sv{(const char *) db_name.Items, db_name.Count};
     xmdb::DBDescriptor *requested_db = nullptr;
@@ -72,16 +75,14 @@ DECLARE_HANDLER(connect_handler) {
 
     DBUser *user = user_opt.value;
 
-    if (password.Count != user->sha256_password_digest.bytes.get_count()) {
+    if (password_hash.count != user->sha256_password_digest.bytes.get_count()) {
         FAIL(BAD_REQUEST, "invalid password digest size");
     }
 
     // FIXME(oleh): Replace this password hash check against the password by a check againts
     // a computed hash.
     for (UZ j = 0; j < user->sha256_password_digest.bytes.get_count(); ++j) {
-        if (user->sha256_password_digest.bytes[j] == 0) break;
-
-        if (password.Items[j] != user->sha256_password_digest.bytes[j]) {
+        if (password_hash.items[j] != user->sha256_password_digest.bytes[j]) {
             FAIL(BAD_REQUEST, "provided password digest is incorrect");
         }
     }
