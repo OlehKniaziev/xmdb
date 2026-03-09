@@ -58,11 +58,11 @@ int main(int argc, char **argv) {
                             port,
                             request,
                             &response)) {
-        xmdb::dief("Failed to send an http response");
+        xmdb::dief("Failed to send the HTTP connection request");
     }
 
     if (response.Status != HTTP_STATUS_OK) {
-        xmdb::dief("HTTP request to the server returned status '%s', body '%s'",
+        xmdb::dief("Connection request to the server returned status '%s': %s",
                    WebHttpGetResponseStatusReason(response.Status),
                    response.Body);
     }
@@ -116,19 +116,19 @@ int main(int argc, char **argv) {
                                 port,
                                 request,
                                 &response)) {
-            ok::println("Failed to send a request to the server");
+            ok::println("Failed to send a query request to the server");
             continue;
         }
 
         if (response.Status != HTTP_STATUS_OK) {
             const char *http_reason = WebHttpGetResponseStatusReason(response.Status);
-            printf("Failed to fetch: %s\n", http_reason);
+            printf("Query request to the server failed with status '%s':" WEB_SV_FMT "\n", http_reason, WEB_SV_ARG(response.Body));
             continue;
         }
 
         web_json_value json;
         if (!WebJsonParse(&arena, response.Body, &json) || json.Type != JSON_OBJECT) {
-            ok::println("ERROR: Got an invalid JSON response from the server");
+            ok::println("ERROR: Invalid JSON response from the server");
             continue;
         }
 
