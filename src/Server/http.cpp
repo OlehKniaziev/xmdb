@@ -12,6 +12,17 @@
 namespace xmdb::server {
 #define DECLARE_HANDLER(name) web_http_response_status name(web_http_response_context *ctx)
 
+#define FAIL(status, reason) do { \
+    WebJsonBegin(&ctx->Arena);\
+    WebJsonBeginObject(); \
+    WebJsonPutKey(WEB_SV_LIT("error")); \
+    WebJsonPutString(WEB_SV_LIT(reason)); \
+    WebJsonEndObject(); \
+    web_string_view resp = WebJsonEnd(); \
+    WebHttpResponseWrite(ctx, resp); \
+    return HTTP_STATUS_##status; \
+    } while (false)
+
 DECLARE_HANDLER(connect_handler) {
     if (ctx->Request.Method != HTTP_POST) {
         return HTTP_STATUS_METHOD_NOT_ALLOWED;
@@ -19,20 +30,20 @@ DECLARE_HANDLER(connect_handler) {
 
     web_json_value json{};
     if (!WebHttpContextParseJsonBody(ctx, &json) || json.Type != JSON_OBJECT) {
-        return HTTP_STATUS_BAD_REQUEST;
+        FAIL(BAD_REQUEST, "request is not a valid JSON object");
     }
 
     web_json_object json_obj = json.Object;
     web_string_view username, password, db_name;
 
     if (!WebJsonObjectGetStringView(&json_obj, WEB_SV_LIT("username"), &username)) {
-        return HTTP_STATUS_BAD_REQUEST;
+        FAIL(BAD_REQUEST, "'username' field not present");
     }
     if (!WebJsonObjectGetStringView(&json_obj, WEB_SV_LIT("password_hash"), &password)) {
-        return HTTP_STATUS_BAD_REQUEST;
+        FAIL(BAD_REQUEST, "'password_hash' field not present");
     }
     if (!WebJsonObjectGetStringView(&json_obj, WEB_SV_LIT("db_name"), &db_name)) {
-        return HTTP_STATUS_BAD_REQUEST;
+        FAIL(BAD_REQUEST, "'db_name' field not present");
     }
 
     // FIXME(oleh): This code *should* be uncommented, but the JS shit Base64 API uses another
@@ -54,7 +65,7 @@ DECLARE_HANDLER(connect_handler) {
     }
 
     if (requested_db == nullptr) {
-        return HTTP_STATUS_NOT_FOUND;
+        FAIL(NOT_FOUND, "requested database not found");
     }
 
     ok::StringView username_sv = {(const char *) username.Items, username.Count};
@@ -62,13 +73,13 @@ DECLARE_HANDLER(connect_handler) {
     Optional<DBUser *> user_opt = requested_db->find_user(username_sv);
 
     if (!user_opt.has_value()) {
-        return HTTP_STATUS_NOT_FOUND;
+        FAIL(NOT_FOUND, "requested user not found");
     }
 
     DBUser *user = user_opt.value;
 
     if (password.Count != user->sha256_password_digest.bytes.get_count()) {
-        return HTTP_STATUS_BAD_REQUEST;
+        FAIL(BAD_REQUEST, "invalid password digest size");
     }
 
     // FIXME(oleh): Replace this password hash check against the password by a check againts
@@ -77,7 +88,7 @@ DECLARE_HANDLER(connect_handler) {
         if (user->sha256_password_digest.bytes[j] == 0) break;
 
         if (password.Items[j] != user->sha256_password_digest.bytes[j]) {
-            return HTTP_STATUS_BAD_REQUEST;
+            FAIL(BAD_REQUEST, "provided password digest is incorrect");
         }
     }
 
