@@ -2,6 +2,7 @@
 
 #include <Core/ok.hpp>
 #include <Core/util.hpp>
+#include <Core/hash.hpp>
 
 #include <http.h>
 
@@ -15,15 +16,21 @@ int main(int argc, char **argv) {
     const char *port_cstr = args[1];
     const char *db_name = args[2];
     const char *username = args[3];
-    const char *password_hash = args[4];
+    const char *password = args[4];
 
     S64 port;
     if (!ok::parse_int64(ok::StringView{port_cstr}, &port)) {
         xmdb::dief("Invalid port number '%s'", port_cstr);
     }
 
+    xmdb::SHA256Digest password_hash = xmdb::sha256_digest(ok::StringView{password});
+
     web_arena arena;
     WebArenaInit(&arena, 1024 * 1024);
+
+    xmdb::WebArenaAllocator arena_adapter{&arena};
+
+    ok::String password_hash_hex = xmdb::to_hex_string(&arena_adapter, password_hash.bytes.slice());
 
     WebJsonBegin(&arena);
 
@@ -36,7 +43,7 @@ int main(int argc, char **argv) {
     WebJsonPutString(WEB_SV_LIT(username));
 
     WebJsonPutKey(WEB_SV_LIT("password_hash"));
-    WebJsonPutString(WEB_SV_LIT(password_hash));
+    WebJsonPutString(WEB_SV_LIT(password_hash_hex.cstr()));
 
     WebJsonEndObject();
 
