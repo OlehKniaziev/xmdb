@@ -63,7 +63,7 @@ ok::Optional<ok::Slice<U8>> from_hex_string(ok::Allocator *allocator, ok::String
             if (c >= '0' && c <= '9') {
                 start = '0';
             } else if (c >= 'a' && c <= 'f') {
-                start = 'a';
+                start = 'a' - 10;
             } else {
                 return {};
             }
