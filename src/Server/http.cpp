@@ -99,12 +99,8 @@ DECLARE_HANDLER(run_query_handler) {
     }
 
     web_json_value json;
-    if (!WebHttpContextParseJsonBody(ctx, &json)) {
-        return HTTP_STATUS_BAD_REQUEST;
-    }
-
-    if (json.Type != JSON_OBJECT) {
-        return HTTP_STATUS_BAD_REQUEST;
+    if (!WebHttpContextParseJsonBody(ctx, &json) || json.Type != JSON_OBJECT) {
+        FAIL(BAD_REQUEST, "request body is not a valid JSON object");
     }
 
     web_json_object json_obj = json.Object;
@@ -112,23 +108,23 @@ DECLARE_HANDLER(run_query_handler) {
     F64 connection_id_f64;
     web_string_view query;
     if (!WebJsonObjectGetNumber(&json_obj, WEB_SV_LIT("connection_id"), &connection_id_f64)) {
-        return HTTP_STATUS_BAD_REQUEST;
+        FAIL(BAD_REQUEST, "'connection_id' field not present in the request body");
     }
     if (!WebJsonObjectGetStringView(&json_obj, WEB_SV_LIT("query"), &query)) {
-        return HTTP_STATUS_BAD_REQUEST;
+        FAIL(BAD_REQUEST, "'query' field not present in the request body");
     }
 
     F64 integral;
     ConnectionId connection_id;
     if (connection_id_f64 < 0.0 || modf(connection_id_f64, &integral) != 0.0) {
-        return HTTP_STATUS_BAD_REQUEST;
+        FAIL(BAD_REQUEST, "'connection_id' field should be integral");
     }
 
     connection_id = (ConnectionId) connection_id_f64;
 
     Optional<ConnectionData> connection_data_opt = get_connection_data(connection_id);
     if (!connection_data_opt.has_value()) {
-        return HTTP_STATUS_NOT_FOUND;
+        FAIL(BAD_REQUEST, "connection with requested id was not found");
     }
 
     ConnectionData connection_data = connection_data_opt.value;
