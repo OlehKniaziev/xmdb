@@ -61,6 +61,12 @@ int main(int argc, char **argv) {
         xmdb::dief("Failed to send an http response");
     }
 
+    if (response.Status != HTTP_STATUS_OK) {
+        xmdb::dief("HTTP request to the server returned status '%s', body '%s'",
+                   WebHttpGetResponseStatusReason(response.Status),
+                   response.Body);
+    }
+
     S64 connection_id;
     ok::StringView connection_id_sv = {(const char *)response.Body.Items, response.Body.Count};
     OK_ASSERT(ok::parse_int64(connection_id_sv, &connection_id));
