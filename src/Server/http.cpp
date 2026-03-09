@@ -13,13 +13,7 @@ namespace xmdb::server {
 #define DECLARE_HANDLER(name) web_http_response_status name(web_http_response_context *ctx)
 
 #define FAIL(status, reason) do { \
-    WebJsonBegin(&ctx->Arena);\
-    WebJsonBeginObject(); \
-    WebJsonPutKey(WEB_SV_LIT("error")); \
-    WebJsonPutString(WEB_SV_LIT(reason)); \
-    WebJsonEndObject(); \
-    web_string_view resp = WebJsonEnd(); \
-    WebHttpResponseWrite(ctx, resp); \
+    WebHttpResponseWrite(ctx, WEB_SV_LIT(reason)); \
     return HTTP_STATUS_##status; \
     } while (false)
 
