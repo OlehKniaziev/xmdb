@@ -186,10 +186,11 @@ DECLARE_HANDLER(run_query_handler) {
                     xmdb::DBTableStream column_stream = table_outlet.column_stream(&connection_data.temp_arena, i);
                     xmdb::Value value = column_stream.next().get();
 
+                    WebJsonPutKey(column_name);
+
                     switch (value.type()) {
                     case Value::Type::INT: {
                         S64 n = value.as_int();
-                        WebJsonPutKey(column_name);
                         WebJsonPutNumber(n);
                         break;
                     }
@@ -200,15 +201,12 @@ DECLARE_HANDLER(run_query_handler) {
                                 .Count = s.count,
                         };
 
-                        WebJsonPutKey(column_name);
                         WebJsonPutString(value);
 
                         break;
                     }
                     case Value::Type::BOOL: {
                         bool b = value.as_bool();
-
-                        WebJsonPutKey(column_name);
 
                         if (b) {
                             WebJsonPutTrue();
@@ -218,8 +216,32 @@ DECLARE_HANDLER(run_query_handler) {
 
                         break;
                     }
-                    case Value::Type::IMAGE_CHUNK:
-                        OK_TODO_MSG("IMAGE_CHUNK");
+                    case Value::Type::IMAGE_CHUNK: {
+                        ImageChunk *chunk = value.as_chunk();
+
+                        WebJsonBeginObject();
+
+                        WebJsonPutKey(WEB_SV_LIT("x"));
+                        WebJsonPutNumber(chunk->x);
+
+                        WebJsonPutKey(WEB_SV_LIT("y"));
+                        WebJsonPutNumber(chunk->y);
+
+                        WebJsonPutKey(WEB_SV_LIT("width"));
+                        WebJsonPutNumber(chunk->width);
+
+                        WebJsonPutKey(WEB_SV_LIT("height"));
+                        WebJsonPutNumber(chunk->height);
+
+                        ok::String pixel_data_hex = xmdb::to_hex_string(&connection_data.temp_arena, chunk->data);
+
+                        WebJsonPutKey(WEB_SV_LIT("pixel_data"));
+                        WebJsonPutString((web_string_view){.Items = (u8 *) pixel_data_hex.cstr(), .Count = pixel_data_hex.count()});
+
+                        WebJsonEndObject();
+
+                        break;
+                    }
                     }
                 }
 
