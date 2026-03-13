@@ -21,7 +21,7 @@ int main(int argc, char **argv) {
 
     switch (config.protocol) {
     case Protocol::HTTP: {
-        log::info("Starting the server on port %u\n", config.port);
+        log::info("Starting the server on port %u", config.port);
         run_http_server(config.port);
         break;
     }

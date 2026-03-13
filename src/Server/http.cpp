@@ -165,6 +165,23 @@ DECLARE_HANDLER(run_query_handler) {
 
             WebJsonEndArray();
 
+            WebJsonPutKey(WEB_SV_LIT("column_types"));
+
+            WebJsonBeginArray();
+
+            for (UZ i = 0; i < results_table->columns_count(); ++i) {
+                xmdb::SQL::ColumnType column_type = results_table->columns_types()[i];
+                const char *column_type_str = xmdb::SQL::column_type_to_string(column_type);
+                web_string_view column_type_sv = {
+                    .Items = (u8 *) column_type_str,
+                    .Count = strlen(column_type_str),
+                };
+                WebJsonPrepareArrayElement();
+                WebJsonPutString(column_type_sv);
+            }
+
+            WebJsonEndArray();
+
             WebJsonPutKey(WEB_SV_LIT("rows"));
 
             WebJsonBeginArray();
@@ -233,10 +250,10 @@ DECLARE_HANDLER(run_query_handler) {
                         WebJsonPutKey(WEB_SV_LIT("height"));
                         WebJsonPutNumber(chunk->height);
 
-                        ok::String pixel_data_hex = xmdb::to_hex_string(&connection_data.temp_arena, chunk->data);
+                        ok::String data_hex = xmdb::to_hex_string(&connection_data.temp_arena, chunk->data);
 
-                        WebJsonPutKey(WEB_SV_LIT("pixel_data"));
-                        WebJsonPutString((web_string_view){.Items = (u8 *) pixel_data_hex.cstr(), .Count = pixel_data_hex.count()});
+                        WebJsonPutKey(WEB_SV_LIT("data"));
+                        WebJsonPutString((web_string_view){.Items = (u8 *) data_hex.cstr(), .Count = data_hex.count()});
 
                         WebJsonEndObject();
 

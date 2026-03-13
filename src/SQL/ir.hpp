@@ -16,14 +16,22 @@ using ok::Table;
 
 namespace xmdb::SQL {
 
+#define XMDB_ENUM_COLUMN_TYPES \
+    X(INTEGER) \
+    X(FLOAT) \
+    X(DOUBLE) \
+    X(TEXT) \
+    X(BOOLEAN) \
+    X(PNG)
+
 enum class ColumnType {
-    INTEGER,
-    FLOAT,
-    DOUBLE,
-    TEXT,
-    BOOLEAN,
-    PNG,
+#define X(type) type,
+XMDB_ENUM_COLUMN_TYPES
+#undef X
 };
+
+const char *column_type_to_string(ColumnType);
+ok::Optional<ColumnType> parse_column_type(ok::StringView);
 
 struct TableSchema {
     static TableSchema untyped(Allocator *a) {

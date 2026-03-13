@@ -6,6 +6,25 @@
 using namespace ok::literals;
 
 namespace xmdb::SQL {
+const char *column_type_to_string_table[] = {
+    #define X(type) [static_cast<UZ>(ColumnType::type)] = #type,
+        XMDB_ENUM_COLUMN_TYPES
+    #undef X
+};
+
+const char *column_type_to_string(ColumnType column_type) {
+    UZ index = static_cast<UZ>(column_type);
+    return column_type_to_string_table[index];
+}
+
+ok::Optional<ColumnType> parse_column_type(ok::StringView input) {
+    #define X(type) if (input == ok::StringView{#type}) { return ColumnType::type; }
+    XMDB_ENUM_COLUMN_TYPES
+    #undef X
+
+    return {};
+}
+
 template<typename T>
 struct IRContractAdder {};
 

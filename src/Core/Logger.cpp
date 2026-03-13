@@ -5,6 +5,7 @@ void FileLogger::log(LogLevel lvl, const char *fmt, va_list args) {
     if (log_level > lvl) return;
 
     switch (lvl) {
+    case LogLevel::DEBUG: fprintf(file, "[DEBUG] "); break;
     case LogLevel::INFO:  fprintf(file, "[INFO] "); break;
     case LogLevel::WARN:  fprintf(file, "[WARN] "); break;
     case LogLevel::ERROR: fprintf(file, "[ERROR] "); break;
@@ -56,6 +57,10 @@ namespace log {
 
 void log(LogLevel lvl, const char *fmt, ...) {
     LOG(lvl);
+}
+
+void debug(const char *fmt, ...) {
+    LOG(LogLevel::DEBUG);
 }
 
 void info(const char *fmt, ...) {
