@@ -12,6 +12,7 @@ add_compile_options(-Wall -Wextra -Werror -g -O0)
 add_subdirectory(third_party)
 
 add_subdirectory(src/Core)
+add_subdirectory(src/ArgParser)
 add_subdirectory(src/SQL)
 add_subdirectory(src/Server)
 add_subdirectory(src/CLI)

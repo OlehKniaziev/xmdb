@@ -43,5 +43,22 @@ struct WebArenaAllocator : public ok::Allocator {
 
     web_arena *impl;
 };
+
+struct MallocAllocator : public ok::Allocator {
+    void *raw_alloc(UZ size) override {
+        return calloc(1, size);
+    }
+
+    void raw_dealloc(void *ptr, UZ size) override {
+        (void) size;
+        free(ptr);
+    }
+
+    void *raw_resize(void *ptr, UZ old_size, UZ new_size) override {
+        (void) old_size;
+        return realloc(ptr, new_size);
+    }
+};
+
 #endif // !OK_NO_STDLIB
 } // namespace xmdb
