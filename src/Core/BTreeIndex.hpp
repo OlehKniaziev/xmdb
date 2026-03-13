@@ -22,6 +22,8 @@ struct BTreeIndex {
 
     U64 node_count();
 
+    U64 total_kv_count();
+
     bool reset();
 
     void *pImpl;

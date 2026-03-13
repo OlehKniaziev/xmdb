@@ -10,6 +10,7 @@ struct DiskHeader {
         auto *header = allocator->alloc<DiskHeader>();
         header->magic = BTREE_HEADER_MAGIC;
         header->version = BTREE_HEADER_VERSION;
+        header->kv_count = 0;
         header->index_nodes_count = 0;
         header->payload_length = 0;
         return header;
@@ -18,6 +19,7 @@ struct DiskHeader {
     U64 magic;
     U16 version;
     U64 index_nodes_count;
+    U64 kv_count;
     U64 payload_length;
     U64 height;
 };
@@ -261,6 +263,14 @@ struct BTreeState {
         OK_VERIFY(n_written == BTREE_PAGE_SIZE);
     }
 
+    void save_header_to_disk() {
+        state_file.seek_start();
+        UZ n_written = 0;
+        auto write_err = state_file.write(reinterpret_cast<U8 *>(header), BTREE_HEADER_LENGTH, &n_written);
+        if (write_err) OK_TODO();
+        OK_VERIFY(n_written == BTREE_HEADER_LENGTH);
+    }
+
     void split_child(Node *parent, Node *full_child, U64 full_child_index) {
         OK_ASSERT(!parent->is_full());
         OK_ASSERT(full_child->is_full());
@@ -326,6 +336,9 @@ struct BTreeState {
         } else {
             insert_non_full(root, key);
         }
+
+        ++header->kv_count;
+        save_header_to_disk();
     }
 
     void insert_non_full(Node *node, U64 key) {
@@ -439,6 +452,11 @@ U64 BTreeIndex::height() {
 U64 BTreeIndex::node_count() {
     auto *impl = static_cast<BTreeState *>(pImpl);
     return impl->header->index_nodes_count;
+}
+
+U64 BTreeIndex::total_kv_count() {
+    auto *impl = static_cast<BTreeState *>(pImpl);
+    return impl->header->kv_count;
 }
 
 bool BTreeIndex::reset() {

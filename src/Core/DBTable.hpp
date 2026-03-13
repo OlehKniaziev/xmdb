@@ -68,7 +68,7 @@ public:
             return m_proxy_rows_count;
         } else {
             OK_ASSERT(m_flags & F_PERSIST);
-            return m_index.node_count();
+            return m_index.total_kv_count();
         }
     }
 

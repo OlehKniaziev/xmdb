@@ -346,6 +346,55 @@ TEST(DBConnection, create_new_db_and_execute_create_insert_and_select_on_table_w
     ASSERT_FALSE(column2_stream.next());
 }
 
+TEST(DBConnection, insert_and_select_multiple_rows) {
+    ok::ArenaAllocator arena{};
+    StringView source = R"sql(
+    CREATE TABLE TAB(id int);
+    INSERT INTO TAB(id) VALUES (1), (2), (3);
+    SELECT id FROM TAB;)sql"_sv;
+
+    String error{};
+
+    QueryResults query_results{};
+
+    DBUser admin = DBUser::admin();
+    DBPool db_pool{&arena};
+    DBDescriptor *default_db = db_pool.get_db("default"_sv);
+    DBConnection db_conn{&db_pool, default_db, &admin};
+
+    bool ok = compile_and_execute_source(&arena, &db_conn, source, &query_results, &error);
+
+    ASSERT_TRUE(ok);
+
+    DBTable *results_table = query_results.value.get();
+    DBTableOutlet outlet{results_table};
+
+    DBTableStream stream = outlet.column_stream(&arena, 0);
+
+    Optional<Value> val_opt = stream.next();
+    ASSERT_TRUE(val_opt.has_value());
+
+    Value val = val_opt.get();
+    ASSERT_EQ(val.type(), Value::Type::INT);
+    ASSERT_EQ(val.as_int(), 1);
+
+    val_opt = stream.next();
+    ASSERT_TRUE(val_opt.has_value());
+
+    val = val_opt.get();
+    ASSERT_EQ(val.type(), Value::Type::INT);
+    ASSERT_EQ(val.as_int(), 2);
+
+    val_opt = stream.next();
+    ASSERT_TRUE(val_opt.has_value());
+
+    val = val_opt.get();
+    ASSERT_EQ(val.type(), Value::Type::INT);
+    ASSERT_EQ(val.as_int(), 3);
+
+    ASSERT_FALSE(stream.next());
+}
+
 TEST(DBConnection, create_and_drop_empty_table) {
     ok::ArenaAllocator arena{};
     StringView source = R"sql(

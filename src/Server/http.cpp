@@ -156,8 +156,8 @@ DECLARE_HANDLER(run_query_handler) {
             for (UZ i = 0; i < results_table->columns_count(); ++i) {
                 ok::StringView column_name_sv = results_table->columns_names()[i];
                 web_string_view column_name = {
-                        .Items = (u8 *) column_name_sv.data,
-                        .Count = column_name_sv.count,
+                    .Items = (u8 *) column_name_sv.data,
+                    .Count = column_name_sv.count,
                 };
                 WebJsonPrepareArrayElement();
                 WebJsonPutString(column_name);
@@ -187,6 +187,11 @@ DECLARE_HANDLER(run_query_handler) {
             WebJsonBeginArray();
 
             xmdb::DBTableOutlet table_outlet{results_table};
+            xmdb::DBTableStream *column_streams_ptr = connection_data.temp_arena.alloc<xmdb::DBTableStream>(results_table->columns_count());
+            ok::Slice<xmdb::DBTableStream> column_streams = {column_streams_ptr, results_table->columns_count()};
+            for (UZ i = 0; i < results_table->columns_count(); ++i) {
+                column_streams[i] = table_outlet.column_stream(&connection_data.temp_arena, i);
+            }
 
             for (UZ r = 0; r < results_table->rows_count(); ++r) {
                 WebJsonPrepareArrayElement();
@@ -196,12 +201,12 @@ DECLARE_HANDLER(run_query_handler) {
                 for (UZ i = 0; i < results_table->columns_count(); ++i) {
                     ok::StringView column_name_sv = results_table->columns_names()[i];
                     web_string_view column_name = {
-                            .Items = (u8 *) column_name_sv.data,
-                            .Count = column_name_sv.count,
+                        .Items = (u8 *) column_name_sv.data,
+                        .Count = column_name_sv.count,
                     };
 
-                    xmdb::DBTableStream column_stream = table_outlet.column_stream(&connection_data.temp_arena, i);
-                    xmdb::Value value = column_stream.next().get();
+                    xmdb::DBTableStream *column_stream = &column_streams[i];
+                    xmdb::Value value = column_stream->next().get();
 
                     WebJsonPutKey(column_name);
 
@@ -214,8 +219,8 @@ DECLARE_HANDLER(run_query_handler) {
                     case Value::Type::STRING: {
                         FixedString s = value.as_string();
                         web_string_view value = {
-                                .Items = (u8 *) s.items,
-                                .Count = s.count,
+                            .Items = (u8 *) s.items,
+                            .Count = s.count,
                         };
 
                         WebJsonPutString(value);
@@ -272,8 +277,8 @@ DECLARE_HANDLER(run_query_handler) {
         WebJsonPutFalse();
 
         web_string_view error_message = {
-                .Items = (u8 *) error.cstr(),
-                .Count = error.count(),
+            .Items = (u8 *) error.cstr(),
+            .Count = error.count(),
         };
         WebJsonPutKey(WEB_SV_LIT("error_message"));
         WebJsonPutString(error_message);

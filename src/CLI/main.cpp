@@ -68,6 +68,8 @@ int main(int argc, char **argv) {
         xmdb::dief("Invalid port number '%s'", port_cstr);
     }
 
+    xmdb::set_log_level(xmdb::LogLevel::DEBUG);
+
     xmdb::SHA256Digest password_hash = xmdb::sha256_digest(ok::StringView{password});
 
     web_arena arena;
@@ -114,9 +116,9 @@ int main(int argc, char **argv) {
     }
 
     if (response.Status != HTTP_STATUS_OK) {
-        xmdb::dief("Connection request to the server returned status '%s': %s",
+        xmdb::dief("Connection request to the server returned status '%s': " WEB_SV_FMT,
                    WebHttpGetResponseStatusReason(response.Status),
-                   response.Body);
+                   WEB_SV_ARG(response.Body));
     }
 
     S64 connection_id;
@@ -172,6 +174,9 @@ int main(int argc, char **argv) {
             ok::println("Failed to send a query request to the server");
             continue;
         }
+
+        xmdb::log::debug("/run-query endpoint response body: " WEB_SV_FMT,
+                         WEB_SV_ARG(response.Body));
 
         if (response.Status != HTTP_STATUS_OK) {
             const char *http_reason = WebHttpGetResponseStatusReason(response.Status);

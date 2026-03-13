@@ -99,7 +99,7 @@ DBTable *QueryExecutionContext::emit_query(U32 columns_count, SQL::ColumnType *c
     XMDB_FIXME("This *should* also be added to the query graph, since we want every operation to preserve it's order as in the source code");
 
     const StringView *columns_names_ptr = emitted_columns.get_items<StringView>();
-    DBValue ** const columns_values_ptr = emitted_columns.get_items<DBValue *>();
+    DBValue **const columns_values_ptr = emitted_columns.get_items<DBValue *>();
     DBTable **tables = emitted_columns.get_items<DBTable *>();
 
     StringView *columns_names = allocator->alloc<StringView>(columns_count);
