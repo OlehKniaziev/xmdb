@@ -18,10 +18,11 @@ static inline ColumnType type_to_column_type(Type type) {
     switch (type) {
     case TYPE_INT:    return ColumnType::INTEGER;
     case TYPE_STRING: return ColumnType::TEXT;
-    case TYPE_IMAGE:  return ColumnType::IMAGE;
+    case TYPE_PNG:    return ColumnType::PNG;
     case TYPE_BOOL:   return ColumnType::BOOLEAN;
     case TYPE_FLOAT:  return ColumnType::FLOAT;
     case TYPE_DOUBLE: return ColumnType::DOUBLE;
+    case TYPE_IMAGE:
     case TYPE_NULL:
     case TYPE_TABLE:  OK_PANIC("Unsupported type to column type conversion");
     }
@@ -277,6 +278,38 @@ static void execute_instruction(TypedCompiledQuery *query, UZ i, QueryExecutionC
         OK_ASSERT(deleted);
         break;
     }
+    case IRInstructionOperator_RGB: {
+        Triple<ok::String, S64, ok::StringView> operands = operands_of_RGB(&query->untyped, i);
+
+        U32 w = (U64)operands.op2 >> 32;
+        U32 h = (U64)operands.op2 & ~(U32)0;
+
+        ok::StringView input = operands.op3;
+
+        ok::Optional<ok::Slice<U8>> input_data_opt = from_hex_string(ctx->allocator, input);
+
+        if (!input_data_opt.has_value()) {
+            XMDB_FAIL(ctx,
+                      "Failed to parse the 'data' argument as a valid hex string");
+        }
+
+        ok::Slice<U8> input_data = input_data_opt.get();
+        UZ expected_data_count = w * h * format_pixel_size_in_bytes(PixelFormat::RGB);
+        if (input_data.count != expected_data_count) {
+            XMDB_FAIL_FMT(ctx,
+                          "Expected the 'data' argument to be of length %zu (width * height * pixel size), got %zu bytes instead",
+                          expected_data_count,
+                          input_data.count);
+        }
+
+        auto *value = new (ctx->allocator) ImageDataDBValue{w, h, input_data, PixelFormat::RGB};
+
+        ok::StringView var_name = operands.op1.view();
+
+        ctx->put_var(i, var_name, value);
+
+        break;
+    }
     }
 }
 
@@ -350,7 +383,7 @@ static void run_single_node(QueryExecutionContext *ctx, QueryGraph::Node *node) 
             OK_VERIFY(val_opt);
 
             Value val = val_opt.get();
-            fill_column(&record, layout, col_idx, val);
+            ctx->fill_column(&record, table, col_idx, val);
             state->file.seek_to(DB_STATE_HEADER_LENGTH + record_size * row_idx + col.offset);
 
             UZ n_written = 0;

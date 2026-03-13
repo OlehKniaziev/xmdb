@@ -6,6 +6,25 @@
 using namespace ok::literals;
 
 namespace xmdb::SQL {
+const char *column_type_to_string_table[] = {
+    #define X(type) [static_cast<UZ>(ColumnType::type)] = #type,
+        XMDB_ENUM_COLUMN_TYPES
+    #undef X
+};
+
+const char *column_type_to_string(ColumnType column_type) {
+    UZ index = static_cast<UZ>(column_type);
+    return column_type_to_string_table[index];
+}
+
+ok::Optional<ColumnType> parse_column_type(ok::StringView input) {
+    #define X(type) if (input == ok::StringView{#type}) { return ColumnType::type; }
+    XMDB_ENUM_COLUMN_TYPES
+    #undef X
+
+    return {};
+}
+
 template<typename T>
 struct IRContractAdder {};
 
@@ -189,10 +208,64 @@ static Optional<U32> compile_expr(Expr *expr, IrContext *ctx) {
         auto *ident = static_cast<IdentifierExpr *>(expr);
         return compile_ident(ident, ctx);
     }
+    case Expr::CALL: {
+        auto *call = static_cast<CallExpr *>(expr);
+        OK_VERIFY(call->fn->type == Expr::IDENT);
+
+        constexpr UZ RGB_ARITY = 3;
+
+        ok::String fn_name = static_cast<IdentifierExpr *>(call->fn)->value;
+        if (fn_name == "RGB"_sv) {
+            if (call->args.count != RGB_ARITY) {
+                ok::String message = ok::String::format(ctx->allocator, "arity mismatch: expected %zu args, got %zu instead", RGB_ARITY, call->args.count);
+                ctx->error_on(call->token, message);
+                return {};
+            }
+
+            Expr *we = call->args[0];
+            Expr *he = call->args[1];
+            Expr *de = call->args[2];
+
+            if (we->type != Expr::INTEGER_LIT) {
+                ok::String message = ok::String::format(ctx->allocator, "expected the 'width' argument to be of type 'INT'");
+                ctx->error_on(we->token, message);
+                return {};
+            }
+
+            if (he->type != Expr::INTEGER_LIT) {
+                ok::String message = ok::String::format(ctx->allocator, "expected the 'height' argument to be of type 'INT'");
+                ctx->error_on(he->token, message);
+                return {};
+            }
+
+            if (de->type != Expr::STRING_LIT) {
+                ok::String message = ok::String::format(ctx->allocator, "expected the 'data' argument to be of type 'STRING'");
+                ctx->error_on(de->token, message);
+                return {};
+            }
+
+            S64 w = static_cast<IntegerExpr *>(we)->value;
+            S64 h = static_cast<IntegerExpr *>(he)->value;
+            U32 u32_max = ~(U32)0;
+            OK_VERIFY(w <= u32_max);
+            OK_VERIFY(h <= u32_max);
+            S64 wh = (S64)(((U64)w << 32) | ((U64)h & u32_max));
+
+            ok::StringView data = static_cast<StringExpr *>(de)->value.view();
+
+            return emit_RGB(e, expr->token, wh, data);
+        } else {
+            ok::String message = ok::String::format(ctx->allocator, "unknown built-in function '%s'", fn_name.cstr());
+            ctx->error_on(call->fn->token, message);
+            return {};
+        }
+    }
+    case Expr::STAR:
     case Expr::BINARY_OP:
     case Expr::SELECT:    OK_UNREACHABLE();
-    default:              OK_UNREACHABLE();
     }
+
+    OK_UNREACHABLE();
 }
 
 static inline bool parse_type(StringView input, Token where, IrContext *ctx, ColumnType *out) {
@@ -203,6 +276,11 @@ static inline bool parse_type(StringView input, Token where, IrContext *ctx, Col
 
     if (input == "text"_sv) {
         *out = ColumnType::TEXT;
+        return true;
+    }
+
+    if (input == "PNG"_sv) {
+        *out = ColumnType::PNG;
         return true;
     }
 
@@ -349,6 +427,7 @@ struct StmtGraphNode {
         LEAF,
 
         STAR,
+
     };
 
     static StmtGraphNode expr(Type type, Expr *value, Slice<U32> edges) {
@@ -443,6 +522,7 @@ static U32 expr_to_node(StmtGraph *g, Expr *expr) {
     case Expr::TRUE_LIT:
     case Expr::FALSE_LIT:
     case Expr::NULL_LIT:
+    case Expr::CALL:
     case Expr::IDENT:       {
         node_type = StmtGraphNode::LEAF;
         break;
@@ -483,7 +563,7 @@ static U32 expr_to_node(StmtGraph *g, Expr *expr) {
 
         UZ edges_count = select->exprs.count + 1;
 
-        auto *edges_ptr = g->allocator->alloc<U32>(select->exprs.count + 1);
+        auto *edges_ptr = g->allocator->alloc<U32>(edges_count);
 
         UZ i;
         for (i = 0; i < select->exprs.count; ++i) {
@@ -525,7 +605,10 @@ static StmtGraph build_insert_stmt_graph(Allocator *allocator, InsertStmt *stmt)
     edges.items = edges_ptr;
     edges.count = edges_count;
 
-    edges[0] = expr_to_node(&graph, stmt->table);
+    // FIXME(oleh): This token is totally wrong here.
+    Expr *table_expr = IdentifierExpr::alloc(allocator, stmt->token, stmt->table_name.view());
+
+    edges[0] = expr_to_node(&graph, table_expr);
 
     for (UZ i = 0; i < stmt->values.count; ++i) {
         Expr *value = stmt->values[i];
@@ -1113,4 +1196,4 @@ bool ir_compile_query(Query *q, IrContext *ctx, CompiledQuery *out_query) {
 
     return true;
 }
-}; // namespace xmdb::SQL
+} // namespace xmdb::SQL

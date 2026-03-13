@@ -1,6 +1,10 @@
 #pragma once
 
-#include "DBState.hpp"
+#include "state.hpp"
+
+#define KiB(x) (1024ull * (x))
+#define MiB(x) (1024ull * KiB(x))
+#define GiB(x) (1024ull * MiB(x))
 
 namespace xmdb {
 constexpr U64 BTREE_PAGE_SIZE = 4096;

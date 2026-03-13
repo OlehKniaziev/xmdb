@@ -30,6 +30,7 @@ struct Parser {
     bool try_expect(Token::Type);
     Optional<Token> expect(Token::Type);
 
+    Optional<Token> get_cur_token();
     Optional<Token> get_cur_token_or_signal_eof();
 
     void set_token_mismatch(Token, ok::Slice<Token::Type>);

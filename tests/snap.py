@@ -8,10 +8,11 @@ import json
 fail_on_mismatch = False
 
 def main() -> None:
-    argparser = argparse.ArgumentParser(prog="stiff", description="Run some snapshot tests")
+    argparser = argparse.ArgumentParser(prog="snap", description="Run some snapshot tests")
     argparser.add_argument("executable")
     argparser.add_argument("-d", "--dir")
     argparser.add_argument("-f", "--fail-on-mismatch", action="store_true")
+    argparser.add_argument("-p", "--paginate-diff", action="store_false")
     args = argparser.parse_args()
 
     if args.dir is None:
@@ -68,6 +69,9 @@ def record_snapshot(executable: str) -> None:
     }
     return snapshot
 
+def print_diff(expected: str, actual: str) -> None:
+    subprocess.run(["diff", f"<(echo {expected})", f"<(echo {actual})"])
+
 def report_snapshot_diff(expected: dict, actual: dict) -> (bool, bool):
     failed = False
 
@@ -76,11 +80,13 @@ def report_snapshot_diff(expected: dict, actual: dict) -> (bool, bool):
         failed = True
 
     if expected["stdout"] != actual["stdout"]:
-        print(f"Expected stdout: {expected["stdout"]}\n\nActual stdout: {actual["stdout"]}\n")
+        print("Actual stdout differs from expected")
+        print_diff(expected["stdout"], actual["stdout"])
         failed = True
 
     if expected["stderr"] != actual["stderr"]:
-        print(f"Expected stderr: {expected["stderr"]}\n\nActual stderr: {actual["stderr"]}\n")
+        printf("Actual stderr differs from expected")
+        print_diff(expected["stderr"], actual["stderr"])
         failed = True
 
     if failed:

@@ -20,6 +20,8 @@ static inline bool find_column(TypedTableSchema schema, StringView name, Type *t
 static inline bool types_are_equal(Type lhs, Type rhs) {
     if (lhs == TYPE_NULL || rhs == TYPE_NULL) return true;
 
+    if (is_image(lhs) && is_image(rhs)) return true;
+
     if (lhs != rhs) return false;
 
     if (lhs == TYPE_TABLE) {
@@ -40,11 +42,15 @@ Type column_type_to_type(ColumnType column_type) {
     case ColumnType::FLOAT:   return TYPE_FLOAT;
     case ColumnType::DOUBLE:  return TYPE_DOUBLE;
     case ColumnType::TEXT:    return TYPE_STRING;
-    case ColumnType::IMAGE:   return TYPE_IMAGE;
+    case ColumnType::PNG:     return TYPE_PNG;
     case ColumnType::BOOLEAN: return TYPE_BOOL;
     }
 
     OK_UNREACHABLE();
+}
+
+bool is_image(Type ty) {
+    return ty == TYPE_PNG || ty == TYPE_IMAGE;
 }
 
 const char *type_name(Type type) {
@@ -56,6 +62,7 @@ const char *type_name(Type type) {
     case TYPE_TABLE:  return "table";
     case TYPE_FLOAT:  return "float";
     case TYPE_DOUBLE: return "double";
+    case TYPE_PNG:    return "PNG";
     case TYPE_IMAGE:  return "image";
     }
 
@@ -110,6 +117,10 @@ static inline bool type_check_ir_instruction(U32 ip, CompiledQuery *ir_emitter, 
     }
     case IRInstructionOperator_ConstNull: {
         ctx->ir_instruction_types.put(ip, TYPE_NULL);
+        return true;
+    }
+    case IRInstructionOperator_RGB: {
+        ctx->ir_instruction_types.put(ip, TYPE_IMAGE);
         return true;
     }
     case IRInstructionOperator_FetchTable: {

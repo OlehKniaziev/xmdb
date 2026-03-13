@@ -15,6 +15,8 @@ add_subdirectory(src/Core)
 add_subdirectory(src/SQL)
 add_subdirectory(src/Server)
 add_subdirectory(src/CLI)
+# TODO(oleh): Build this only if in developer mode.
+add_subdirectory(src/IR)
 
 include(FetchContent)
 FetchContent_Declare(

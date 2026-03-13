@@ -1,6 +1,6 @@
 /** The code in this file is distributed under the following license:
 
-    Copyright 2025 Oleh Kniaziev
+    Copyright 2026 Oleh Kniaziev
 
     Redistribution and use in source and binary forms, with or without modification, are permitted
     provided that the following conditions are met:
@@ -1580,7 +1580,7 @@ bool Set<T>::has(const T& elem) const {
 // Filesystem API
 struct File {
 #if OK_UNIX
-    enum class OpenError {
+    enum class IOError {
         ACCESS_DENIED,
         INVALID_PATH,
         IS_DIRECTORY,
@@ -1593,41 +1593,30 @@ struct File {
         IS_SOCKET,
         FILE_TOO_BIG,
         READONLY_FILE,
-    };
-
-    enum class ReadError {
         IO,
-    };
-
-    enum class WriteError {
         NOT_ALLOWED,
-        OUT_OF_SPACE,
         BAD_DATA,
-    };
-
-    enum class CloseError {
         BAD_FILE_DESCRIPTOR,
         INTERRUPTED_BY_SIGNAL,
-        IO,
-        NOT_ENOUGH_SPACE,
+        CURRENTLY_IN_USE,
+        READONLY_FS,
+        DOES_NOT_EXIST,
     };
 
-    enum class RemoveError {
-        ACCESS_DENIED,
-        CURRENTLY_IN_USE,
-        IO,
-        PATH_TOO_LONG,
-        DOES_NOT_EXIST,
-        KERNEL_OUT_OF_MEMORY,
-        READ_ONLY_FS,
-    };
+    using OpenError = IOError;
+    using ReadError = IOError;
+    using WriteError = IOError;
+    using CloseError = IOError;
+    using RemoveError = IOError;
 #elif OK_WINDOWS
+    using IOError = DWORD;
     using OpenError = DWORD;
     using ReadError = DWORD;
     using WriteError = DWORD;
     using CloseError = DWORD;
     using RemoveError = DWORD;
 #else
+    struct IOError {};
     struct OpenError {};
     struct ReadError {};
     struct WriteError {};
@@ -1647,9 +1636,7 @@ struct File {
         };
     }
 
-    static String error_string(Allocator*, OpenError);
-    static String error_string(Allocator*, ReadError);
-    static String error_string(Allocator*, WriteError);
+    static String error_string(Allocator*, IOError);
 #elif OK_WINDOWS
     static String error_string(Allocator*, DWORD);
 #endif // Platform check.
@@ -1681,6 +1668,8 @@ struct File {
     Optional<CloseError> close() const;
 
     Optional<RemoveError> remove();
+
+    Optional<IOError> truncate(UZ);
 
 #if OK_UNIX
     int fd;
@@ -2060,36 +2049,26 @@ Optional<File::OpenError> File::open(File* out, StringView path) {
 #if OK_UNIX
 String File::error_string(Allocator* allocator, File::OpenError error) {
     switch (error) {
-    case File::OpenError::ACCESS_DENIED:                    return String::alloc(allocator, "access denied");
-    case File::OpenError::INVALID_PATH:                     return String::alloc(allocator, "invalid file path");
-    case File::OpenError::IS_DIRECTORY:                     return String::alloc(allocator, "file is a directory");
-    case File::OpenError::TOO_MANY_SYMLINKS:                return String::alloc(allocator, "too many symlinks");
-    case File::OpenError::PROCESS_OPEN_FILES_LIMIT_REACHED: return String::alloc(allocator, "process open files limit has been reached");
-    case File::OpenError::SYSTEM_OPEN_FILES_LIMIT_REACHED:  return String::alloc(allocator, "system open files limit has been reached");
-    case File::OpenError::PATH_TOO_LONG:                    return String::alloc(allocator, "file path is too long");
-    case File::OpenError::KERNEL_OUT_OF_MEMORY:             return String::alloc(allocator, "kernel out of memory");
-    case File::OpenError::OUT_OF_SPACE:                     return String::alloc(allocator, "disk out of space");
-    case File::OpenError::IS_SOCKET:                        return String::alloc(allocator, "file is a socket");
-    case File::OpenError::FILE_TOO_BIG:                     return String::alloc(allocator, "file is too big");
-    case File::OpenError::READONLY_FILE:                    return String::alloc(allocator, "file is readonly");
-    }
-
-    OK_UNREACHABLE();
-}
-
-String File::error_string(Allocator* allocator, File::ReadError error) {
-    switch (error) {
-    case File::ReadError::IO: return String::alloc(allocator, "I/O error");
-    }
-
-    OK_UNREACHABLE();
-}
-
-String File::error_string(Allocator* allocator, File::WriteError error) {
-    switch (error) {
-    case WriteError::NOT_ALLOWED:  return String::alloc(allocator, "operation not allowed");
-    case WriteError::OUT_OF_SPACE: return String::alloc(allocator, "out of space");
-    case WriteError::BAD_DATA:     return String::alloc(allocator, "bad data");
+    case IOError::ACCESS_DENIED:                    return String::alloc(allocator, "access denied");
+    case IOError::INVALID_PATH:                     return String::alloc(allocator, "invalid file path");
+    case IOError::IS_DIRECTORY:                     return String::alloc(allocator, "file is a directory");
+    case IOError::TOO_MANY_SYMLINKS:                return String::alloc(allocator, "too many symlinks");
+    case IOError::PROCESS_OPEN_FILES_LIMIT_REACHED: return String::alloc(allocator, "process open files limit has been reached");
+    case IOError::SYSTEM_OPEN_FILES_LIMIT_REACHED:  return String::alloc(allocator, "system open files limit has been reached");
+    case IOError::PATH_TOO_LONG:                    return String::alloc(allocator, "file path is too long");
+    case IOError::KERNEL_OUT_OF_MEMORY:             return String::alloc(allocator, "kernel out of memory");
+    case IOError::OUT_OF_SPACE:                     return String::alloc(allocator, "disk out of space");
+    case IOError::IS_SOCKET:                        return String::alloc(allocator, "file is a socket");
+    case IOError::FILE_TOO_BIG:                     return String::alloc(allocator, "file is too big");
+    case IOError::READONLY_FILE:                    return String::alloc(allocator, "file is readonly");
+    case IOError::IO:                               return String::alloc(allocator, "I/O error");
+    case IOError::NOT_ALLOWED:                      return String::alloc(allocator, "operation not allowed");
+    case IOError::BAD_DATA:                         return String::alloc(allocator, "bad data");
+    case IOError::BAD_FILE_DESCRIPTOR:              return String::alloc(allocator, "bad file descriptor");
+    case IOError::INTERRUPTED_BY_SIGNAL:            return String::alloc(allocator, "interrupted by signal");
+    case IOError::CURRENTLY_IN_USE:                 return String::alloc(allocator, "currently in use");
+    case IOError::READONLY_FS:                      return String::alloc(allocator, "readonly file system");
+    case IOError::DOES_NOT_EXIST:                   return String::alloc(allocator, "does not exist");
     }
 
     OK_UNREACHABLE();
@@ -2216,7 +2195,7 @@ Optional<File::RemoveError> File::remove() {
     case ENOTDIR:
     case ENOENT:       return RemoveError::DOES_NOT_EXIST;
     case ENOMEM:       return RemoveError::KERNEL_OUT_OF_MEMORY;
-    case EROFS:        return RemoveError::READ_ONLY_FS;
+    case EROFS:        return RemoveError::READONLY_FS;
     default: OK_UNREACHABLE();
     }
 #elif OK_WINDOWS
@@ -2236,7 +2215,7 @@ Optional<File::CloseError> File::close() const {
     case EINTR:  return CloseError::INTERRUPTED_BY_SIGNAL;
     case EIO:    return CloseError::IO;
     case ENOSPC:
-    case EDQUOT: return CloseError::NOT_ENOUGH_SPACE;
+    case EDQUOT: return CloseError::OUT_OF_SPACE;
     default: OK_UNREACHABLE();
     }
 #elif OK_WINDOWS
@@ -2289,6 +2268,32 @@ Optional<File::WriteError> File::write(U8* data, UZ count, UZ *n_written) {
 #else
     OK_TODO();
 #endif // Platform check.
+}
+
+Optional<File::IOError> File::truncate(UZ size) {
+#if OK_UNIX
+    int status = ::ftruncate(fd, size);
+    if (status == 0) return {};
+
+    switch (errno) {
+    case EACCES:  return IOError::ACCESS_DENIED;
+    case EFBIG:   return IOError::FILE_TOO_BIG;
+    case EINTR:   return IOError::INTERRUPTED_BY_SIGNAL;
+    case EIO:     return IOError::IO;
+    case EISDIR:  return IOError::IS_DIRECTORY;
+    case EPERM:   return IOError::NOT_ALLOWED;
+    case EROFS:   return IOError::READONLY_FS;
+    case ETXTBSY: return IOError::CURRENTLY_IN_USE;
+    case EBADF:   return IOError::BAD_FILE_DESCRIPTOR;
+    case EINVAL:  return IOError::NOT_ALLOWED;
+    default: OK_PANIC_FMT("Unhandled error %s", strerror(errno));
+    }
+
+    OK_UNREACHABLE();
+#else
+    OK_UNUSED(size);
+    OK_TODO();
+#endif // OK_UNIX
 }
 
 // SUBPROCESS API IMPLEMENTATION

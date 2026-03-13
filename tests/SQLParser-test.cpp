@@ -5,6 +5,10 @@
 using namespace xmdb::SQL;
 using namespace ok::literals;
 
+static const char *err(Parser p) {
+    return format_error(ok::temp_allocator(), p.error.get().location, p.error.get().message.view()).cstr();
+}
+
 TEST(SQLParser, primary_expression) {
     ok::ArenaAllocator arena{};
     auto source = R"(some_very_nice_expression 999 "a string literal!" TRUE FALSE NULL *)"_sv;
@@ -12,34 +16,34 @@ TEST(SQLParser, primary_expression) {
 
     auto ident = parser.expression();
     ASSERT_TRUE(ident.has_value());
-    EXPECT_EQ(ident.value->type, Expr::IDENT);
-    EXPECT_EQ(static_cast<IdentifierExpr*>(ident.value)->value, "some_very_nice_expression"_sv);
+    ASSERT_EQ(ident.value->type, Expr::IDENT);
+    ASSERT_EQ(static_cast<IdentifierExpr*>(ident.value)->value, "some_very_nice_expression"_sv);
 
     auto integer = parser.expression();
     ASSERT_TRUE(integer.has_value());
-    EXPECT_EQ(integer.value->type, Expr::INTEGER_LIT);
-    EXPECT_EQ(static_cast<IntegerExpr*>(integer.value)->value, 999);
+    ASSERT_EQ(integer.value->type, Expr::INTEGER_LIT);
+    ASSERT_EQ(static_cast<IntegerExpr*>(integer.value)->value, 999);
 
     auto string = parser.expression();
     ASSERT_TRUE(string.has_value());
-    EXPECT_EQ(string.value->type, Expr::STRING_LIT);
-    EXPECT_EQ(static_cast<StringExpr*>(string.value)->value, "a string literal!"_sv);
+    ASSERT_EQ(string.value->type, Expr::STRING_LIT);
+    ASSERT_EQ(static_cast<StringExpr*>(string.value)->value, "a string literal!"_sv);
 
     auto true_expr = parser.expression();
     ASSERT_TRUE(true_expr.has_value());
-    EXPECT_EQ(true_expr.value->type, Expr::TRUE_LIT);
+    ASSERT_EQ(true_expr.value->type, Expr::TRUE_LIT);
 
     auto false_expr = parser.expression();
     ASSERT_TRUE(false_expr.has_value());
-    EXPECT_EQ(false_expr.value->type, Expr::FALSE_LIT);
+    ASSERT_EQ(false_expr.value->type, Expr::FALSE_LIT);
 
     auto null_expr = parser.expression();
     ASSERT_TRUE(null_expr.has_value());
-    EXPECT_EQ(null_expr.value->type, Expr::NULL_LIT);
+    ASSERT_EQ(null_expr.value->type, Expr::NULL_LIT);
 
     auto star_expr = parser.expression();
     ASSERT_TRUE(star_expr.has_value());
-    EXPECT_EQ(star_expr.value->type, Expr::STAR);
+    ASSERT_EQ(star_expr.value->type, Expr::STAR);
 }
 
 TEST(SQLParser, binary_expression) {
@@ -53,8 +57,8 @@ TEST(SQLParser, binary_expression) {
 
     auto gt_bin = static_cast<BinaryOpExpr*>(gt.value);
     ASSERT_EQ(gt_bin->kind, BinaryOpExpr::Kind::GT);
-    EXPECT_EQ(gt_bin->lhs->type, Expr::INTEGER_LIT);
-    EXPECT_EQ(gt_bin->rhs->type, Expr::INTEGER_LIT);
+    ASSERT_EQ(gt_bin->lhs->type, Expr::INTEGER_LIT);
+    ASSERT_EQ(gt_bin->rhs->type, Expr::INTEGER_LIT);
 
     auto lt = parser.expression();
     ASSERT_TRUE(lt.has_value());
@@ -62,8 +66,8 @@ TEST(SQLParser, binary_expression) {
 
     auto lt_bin = static_cast<BinaryOpExpr*>(lt.value);
     ASSERT_EQ(lt_bin->kind, BinaryOpExpr::Kind::LT);
-    EXPECT_EQ(lt_bin->lhs->type, Expr::INTEGER_LIT);
-    EXPECT_EQ(lt_bin->rhs->type, Expr::IDENT);
+    ASSERT_EQ(lt_bin->lhs->type, Expr::INTEGER_LIT);
+    ASSERT_EQ(lt_bin->rhs->type, Expr::IDENT);
 
     auto eq = parser.expression();
     ASSERT_TRUE(eq.has_value());
@@ -71,8 +75,8 @@ TEST(SQLParser, binary_expression) {
 
     auto eq_bin = static_cast<BinaryOpExpr*>(eq.value);
     ASSERT_EQ(eq_bin->kind, BinaryOpExpr::Kind::EQ);
-    EXPECT_EQ(eq_bin->lhs->type, Expr::INTEGER_LIT);
-    EXPECT_EQ(eq_bin->rhs->type, Expr::STRING_LIT);
+    ASSERT_EQ(eq_bin->lhs->type, Expr::INTEGER_LIT);
+    ASSERT_EQ(eq_bin->rhs->type, Expr::STRING_LIT);
 
     auto eq_eq = parser.expression();
     ASSERT_TRUE(eq_eq.has_value());
@@ -80,13 +84,13 @@ TEST(SQLParser, binary_expression) {
 
     auto eq_eq_bin = static_cast<BinaryOpExpr*>(eq_eq.value);
     ASSERT_EQ(eq_eq_bin->kind, BinaryOpExpr::Kind::EQ);
-    EXPECT_EQ(eq_eq_bin->lhs->type, Expr::INTEGER_LIT);
-    EXPECT_EQ(eq_eq_bin->rhs->type, Expr::BINARY_OP);
+    ASSERT_EQ(eq_eq_bin->lhs->type, Expr::INTEGER_LIT);
+    ASSERT_EQ(eq_eq_bin->rhs->type, Expr::BINARY_OP);
 
     auto eq_eq_rhs = static_cast<BinaryOpExpr*>(eq_eq_bin->rhs);
     ASSERT_EQ(eq_eq_rhs->kind, BinaryOpExpr::Kind::EQ);
-    EXPECT_EQ(eq_eq_rhs->lhs->type, Expr::INTEGER_LIT);
-    EXPECT_EQ(eq_eq_rhs->rhs->type, Expr::INTEGER_LIT);
+    ASSERT_EQ(eq_eq_rhs->lhs->type, Expr::INTEGER_LIT);
+    ASSERT_EQ(eq_eq_rhs->rhs->type, Expr::INTEGER_LIT);
 }
 
 TEST(SQLParser, select_expr) {
@@ -100,11 +104,11 @@ TEST(SQLParser, select_expr) {
 
     auto select_expr = static_cast<SelectExpr*>(select.value);
 
-    EXPECT_EQ(select_expr->exprs.count, 2);
-    EXPECT_EQ(select_expr->exprs[0]->type, Expr::IDENT);
-    EXPECT_EQ(select_expr->exprs[1]->type, Expr::IDENT);
+    ASSERT_EQ(select_expr->exprs.count, 2);
+    ASSERT_EQ(select_expr->exprs[0]->type, Expr::IDENT);
+    ASSERT_EQ(select_expr->exprs[1]->type, Expr::IDENT);
 
-    EXPECT_EQ(select_expr->table->type, Expr::IDENT);
+    ASSERT_EQ(select_expr->table->type, Expr::IDENT);
 }
 
 TEST(SQLParser, select_star_expr) {
@@ -118,10 +122,10 @@ TEST(SQLParser, select_star_expr) {
 
     auto select_expr = static_cast<SelectExpr*>(select.value);
 
-    EXPECT_EQ(select_expr->exprs.count, 1);
-    EXPECT_EQ(select_expr->exprs[0]->type, Expr::STAR);
+    ASSERT_EQ(select_expr->exprs.count, 1);
+    ASSERT_EQ(select_expr->exprs[0]->type, Expr::STAR);
 
-    EXPECT_EQ(select_expr->table->type, Expr::IDENT);
+    ASSERT_EQ(select_expr->table->type, Expr::IDENT);
 }
 
 TEST(SQLParser, use_stmt) {
@@ -130,9 +134,9 @@ TEST(SQLParser, use_stmt) {
     Parser parser{&arena, source};
 
     auto use_stmt = parser.use_stmt();
-    EXPECT_TRUE(use_stmt.has_value());
+    ASSERT_TRUE(use_stmt.has_value());
 
-    EXPECT_EQ(use_stmt.value->database, "some_database"_sv);
+    ASSERT_EQ(use_stmt.value->database, "some_database"_sv);
 }
 
 TEST(SQLParser, insert_stmt) {
@@ -141,23 +145,22 @@ TEST(SQLParser, insert_stmt) {
     Parser parser{&arena, source};
 
     auto insert_stmt = parser.insert_stmt();
-    EXPECT_TRUE(insert_stmt.has_value());
+    ASSERT_TRUE(insert_stmt.has_value()) << format_error(&arena, parser.error.get().location, parser.error.get().message.view()).cstr();
 
-    EXPECT_EQ(insert_stmt.value->table->type, Expr::IDENT);
-    EXPECT_EQ(static_cast<IdentifierExpr*>(insert_stmt.value->table)->value, "Users"_sv);
+    ASSERT_EQ(insert_stmt.value->table_name, "Users"_sv);
 
-    EXPECT_EQ(insert_stmt.value->columns.count, 2);
-    EXPECT_EQ(insert_stmt.value->columns[0], "name"_sv);
-    EXPECT_EQ(insert_stmt.value->columns[1], "age"_sv);
+    ASSERT_EQ(insert_stmt.value->columns.count, 2);
+    ASSERT_EQ(insert_stmt.value->columns[0], "name"_sv);
+    ASSERT_EQ(insert_stmt.value->columns[1], "age"_sv);
 
-    EXPECT_EQ(insert_stmt.value->values.count, 2);
+    ASSERT_EQ(insert_stmt.value->values.count, 2);
 
     auto values = insert_stmt.value->values.cast<IdentifierExpr*>();
-    EXPECT_EQ(values[0]->value, "oleh"_sv);
-    EXPECT_EQ(values[1]->value, "some_age"_sv);
+    ASSERT_EQ(values[0]->value, "oleh"_sv);
+    ASSERT_EQ(values[1]->value, "some_age"_sv);
 
-    EXPECT_EQ(insert_stmt.value->values_counts.count, 1);
-    EXPECT_EQ(insert_stmt.value->values_counts[0], 2);
+    ASSERT_EQ(insert_stmt.value->values_counts.count, 1);
+    ASSERT_EQ(insert_stmt.value->values_counts[0], 2);
 }
 
 TEST(SQLParser, update_stmt_with_filter) {
@@ -168,19 +171,19 @@ TEST(SQLParser, update_stmt_with_filter) {
     auto update_stmt = parser.update_stmt();
     ASSERT_TRUE(update_stmt.has_value());
 
-    EXPECT_EQ(update_stmt.value->table->type, Expr::IDENT);
-    EXPECT_EQ(static_cast<IdentifierExpr*>(update_stmt.value->table)->value, "Users"_sv);
+    ASSERT_EQ(update_stmt.value->table->type, Expr::IDENT);
+    ASSERT_EQ(static_cast<IdentifierExpr*>(update_stmt.value->table)->value, "Users"_sv);
 
-    EXPECT_EQ(update_stmt.value->columns.count, 1);
-    EXPECT_EQ(update_stmt.value->columns[0], "age"_sv);
+    ASSERT_EQ(update_stmt.value->columns.count, 1);
+    ASSERT_EQ(update_stmt.value->columns[0], "age"_sv);
 
-    EXPECT_EQ(update_stmt.value->values.count, 1);
+    ASSERT_EQ(update_stmt.value->values.count, 1);
 
     auto values = update_stmt.value->values.cast<IdentifierExpr*>();
-    EXPECT_EQ(values[0]->value, "some_age"_sv);
+    ASSERT_EQ(values[0]->value, "some_age"_sv);
 
     ASSERT_TRUE(update_stmt.value->filter.has_value());
-    EXPECT_EQ(update_stmt.value->filter.value->type, Expr::TRUE_LIT);
+    ASSERT_EQ(update_stmt.value->filter.value->type, Expr::TRUE_LIT);
 }
 
 TEST(SQLParser, update_stmt_without_filter) {
@@ -191,18 +194,18 @@ TEST(SQLParser, update_stmt_without_filter) {
     auto update_stmt = parser.update_stmt();
     ASSERT_TRUE(update_stmt.has_value());
 
-    EXPECT_EQ(update_stmt.value->table->type, Expr::IDENT);
-    EXPECT_EQ(static_cast<IdentifierExpr*>(update_stmt.value->table)->value, "Users"_sv);
+    ASSERT_EQ(update_stmt.value->table->type, Expr::IDENT);
+    ASSERT_EQ(static_cast<IdentifierExpr*>(update_stmt.value->table)->value, "Users"_sv);
 
-    EXPECT_EQ(update_stmt.value->columns.count, 1);
-    EXPECT_EQ(update_stmt.value->columns[0], "age"_sv);
+    ASSERT_EQ(update_stmt.value->columns.count, 1);
+    ASSERT_EQ(update_stmt.value->columns[0], "age"_sv);
 
-    EXPECT_EQ(update_stmt.value->values.count, 1);
+    ASSERT_EQ(update_stmt.value->values.count, 1);
 
     auto values = update_stmt.value->values.cast<IdentifierExpr*>();
-    EXPECT_EQ(values[0]->value, "some_age"_sv);
+    ASSERT_EQ(values[0]->value, "some_age"_sv);
 
-    EXPECT_FALSE(update_stmt.value->filter.has_value());
+    ASSERT_FALSE(update_stmt.value->filter.has_value());
 }
 
 TEST(SQLParser, delete_stmt_with_filter) {
@@ -229,10 +232,10 @@ TEST(SQLParser, delete_stmt_without_filter) {
     auto delete_stmt = parser.delete_stmt();
     ASSERT_TRUE(delete_stmt.has_value());
 
-    EXPECT_EQ(delete_stmt.value->table->type, Expr::IDENT);
-    EXPECT_EQ(static_cast<IdentifierExpr*>(delete_stmt.value->table)->value, "Users"_sv);
+    ASSERT_EQ(delete_stmt.value->table->type, Expr::IDENT);
+    ASSERT_EQ(static_cast<IdentifierExpr*>(delete_stmt.value->table)->value, "Users"_sv);
 
-    EXPECT_FALSE(delete_stmt.value->filter.has_value());
+    ASSERT_FALSE(delete_stmt.value->filter.has_value());
 }
 
 TEST(SQLParser, drop_database_stmt) {
@@ -243,8 +246,8 @@ TEST(SQLParser, drop_database_stmt) {
     auto drop_stmt = parser.drop_stmt();
     ASSERT_TRUE(drop_stmt.has_value());
 
-    EXPECT_EQ(drop_stmt.value->target, DropStmt::Target::DATABASE);
-    EXPECT_EQ(drop_stmt.value->name, "MyDb"_sv);
+    ASSERT_EQ(drop_stmt.value->target, DropStmt::Target::DATABASE);
+    ASSERT_EQ(drop_stmt.value->name, "MyDb"_sv);
 }
 
 TEST(SQLParser, drop_table_stmt) {
@@ -255,8 +258,8 @@ TEST(SQLParser, drop_table_stmt) {
     auto drop_stmt = parser.drop_stmt();
     ASSERT_TRUE(drop_stmt.has_value());
 
-    EXPECT_EQ(drop_stmt.value->target, DropStmt::Target::TABLE);
-    EXPECT_EQ(drop_stmt.value->name, "MyTable"_sv);
+    ASSERT_EQ(drop_stmt.value->target, DropStmt::Target::TABLE);
+    ASSERT_EQ(drop_stmt.value->name, "MyTable"_sv);
 }
 
 TEST(SQLParser, create_database_stmt) {
@@ -267,8 +270,8 @@ TEST(SQLParser, create_database_stmt) {
     auto create_stmt = parser.create_stmt();
     ASSERT_TRUE(create_stmt.has_value());
 
-    EXPECT_EQ(create_stmt.value->target, CreateStmt::Target::DATABASE);
-    EXPECT_EQ(create_stmt.value->name, "MyDb"_sv);
+    ASSERT_EQ(create_stmt.value->target, CreateStmt::Target::DATABASE);
+    ASSERT_EQ(create_stmt.value->name, "MyDb"_sv);
 }
 
 TEST(SQLParser, create_table_stmt) {
@@ -282,19 +285,19 @@ TEST(SQLParser, create_table_stmt) {
     auto create_stmt = parser.create_stmt();
     ASSERT_TRUE(create_stmt.has_value());
 
-    EXPECT_EQ(create_stmt.value->target, CreateStmt::Target::TABLE);
-    EXPECT_EQ(create_stmt.value->name, "MyTable"_sv);
+    ASSERT_EQ(create_stmt.value->target, CreateStmt::Target::TABLE);
+    ASSERT_EQ(create_stmt.value->name, "MyTable"_sv);
 
     auto create_table = static_cast<CreateTableStmt*>(create_stmt.value);
 
     ASSERT_EQ(create_table->column_names.count, create_table->column_types.count);
-    EXPECT_EQ(create_table->column_names.count, 2);
+    ASSERT_EQ(create_table->column_names.count, 2);
 
-    EXPECT_EQ(create_table->column_names[0], "column1"_sv);
-    EXPECT_EQ(create_table->column_names[1], "column2"_sv);
+    ASSERT_EQ(create_table->column_names[0], "column1"_sv);
+    ASSERT_EQ(create_table->column_names[1], "column2"_sv);
 
-    EXPECT_EQ(create_table->column_types[0], "int"_sv);
-    EXPECT_EQ(create_table->column_types[1], "text"_sv);
+    ASSERT_EQ(create_table->column_types[0], "int"_sv);
+    ASSERT_EQ(create_table->column_types[1], "text"_sv);
 }
 
 TEST(SQLParser, create_user_stmt) {
@@ -305,8 +308,8 @@ TEST(SQLParser, create_user_stmt) {
     auto create_stmt = parser.create_stmt();
     ASSERT_TRUE(create_stmt.has_value());
 
-    EXPECT_EQ(create_stmt.value->target, CreateStmt::Target::USER);
-    EXPECT_EQ(create_stmt.value->name, "usr"_sv);
+    ASSERT_EQ(create_stmt.value->target, CreateStmt::Target::USER);
+    ASSERT_EQ(create_stmt.value->name, "usr"_sv);
 }
 
 TEST(SQLParser, set_clause) {
@@ -317,12 +320,12 @@ TEST(SQLParser, set_clause) {
     auto clause = parser.set_clause();
     ASSERT_TRUE(clause.has_value());
 
-    EXPECT_EQ(clause.value.name, "foo"_sv);
-    EXPECT_EQ(clause.value.value->type, Expr::Type::IDENT);
+    ASSERT_EQ(clause.value.name, "foo"_sv);
+    ASSERT_EQ(clause.value.value->type, Expr::Type::IDENT);
 
     auto ident = static_cast<IdentifierExpr *>(clause.value.value);
 
-    EXPECT_EQ(ident->value, "bar"_sv);
+    ASSERT_EQ(ident->value, "bar"_sv);
 }
 
 TEST(SQLParser, alter_user_stmt) {
@@ -335,23 +338,44 @@ TEST(SQLParser, alter_user_stmt) {
 
     auto alter = static_cast<AlterStmt *>(alter_stmt.value);
 
-    EXPECT_EQ(alter->target, AlterStmt::Target::USER);
+    ASSERT_EQ(alter->target, AlterStmt::Target::USER);
 
     auto alter_user = static_cast<AlterUserStmt *>(alter);
 
-    EXPECT_EQ(alter_user->user_name, "foo"_sv);
-    EXPECT_EQ(alter_user->set_clauses.count, 2);
+    ASSERT_EQ(alter_user->user_name, "foo"_sv);
+    ASSERT_EQ(alter_user->set_clauses.count, 2);
 
     auto first_clause = alter_user->set_clauses[0];
     auto second_clause = alter_user->set_clauses[1];
 
-    EXPECT_EQ(first_clause.name, "name"_sv);
-    EXPECT_EQ(first_clause.value->type, Expr::STRING_LIT);
-    EXPECT_EQ(static_cast<StringExpr *>(first_clause.value)->value, "bar"_sv);
+    ASSERT_EQ(first_clause.name, "name"_sv);
+    ASSERT_EQ(first_clause.value->type, Expr::STRING_LIT);
+    ASSERT_EQ(static_cast<StringExpr *>(first_clause.value)->value, "bar"_sv);
 
-    EXPECT_EQ(second_clause.name, "password"_sv);
-    EXPECT_EQ(second_clause.value->type, Expr::STRING_LIT);
-    EXPECT_EQ(static_cast<StringExpr *>(second_clause.value)->value, "***"_sv);
+    ASSERT_EQ(second_clause.name, "password"_sv);
+    ASSERT_EQ(second_clause.value->type, Expr::STRING_LIT);
+    ASSERT_EQ(static_cast<StringExpr *>(second_clause.value)->value, "***"_sv);
+}
+
+TEST(SQLParser, call_expr) {
+    ok::ArenaAllocator arena{};
+    auto source = "some_func(arg1, 1337)"_sv;
+    Parser parser{&arena, source};
+
+    auto call_expr = parser.expression();
+    ASSERT_TRUE(call_expr) << err(parser);
+
+    auto *call = static_cast<CallExpr *>(call_expr.get());
+    ASSERT_EQ(call->fn->type, Expr::IDENT);
+    ASSERT_EQ(static_cast<IdentifierExpr *>(call->fn)->value, "some_func"_sv);
+
+    ASSERT_EQ(call->args.count, 2);
+
+    ASSERT_EQ(call->args[0]->type, Expr::IDENT);
+    ASSERT_EQ(static_cast<IdentifierExpr *>(call->args[0])->value, "arg1"_sv);
+
+    ASSERT_EQ(call->args[1]->type, Expr::INTEGER_LIT);
+    ASSERT_EQ(static_cast<IntegerExpr *>(call->args[1])->value, 1337);
 }
 
 TEST(SQLParser, query) {
@@ -378,18 +402,18 @@ TEST(SQLParser, eof_error) {
     auto source = ""_sv;
     Parser parser{&arena, source};
 
-    EXPECT_TRUE(parser.is_eof());
+    ASSERT_TRUE(parser.is_eof());
 
     auto expr = parser.expression();
-    EXPECT_FALSE(expr.has_value());
+    ASSERT_FALSE(expr.has_value());
 
-    EXPECT_TRUE(parser.error.has_value());
+    ASSERT_TRUE(parser.error.has_value());
 
     auto error = parser.error.value;
-    EXPECT_EQ(error.message, "unexpected EOF"_sv);
+    ASSERT_EQ(error.message, "unexpected EOF"_sv);
 
     auto expected_location = xmdb::SourceLocation{1, 1, 0};
-    EXPECT_EQ(error.location, expected_location);
+    ASSERT_EQ(error.location, expected_location);
 }
 
 TEST(SQLParser, token_mismatch_error) {
@@ -398,12 +422,12 @@ TEST(SQLParser, token_mismatch_error) {
     Parser parser{&arena, source};
 
     auto opt_stmt = parser.delete_stmt();
-    EXPECT_FALSE(opt_stmt.has_value());
-    EXPECT_TRUE(parser.error.has_value());
+    ASSERT_FALSE(opt_stmt.has_value());
+    ASSERT_TRUE(parser.error.has_value());
 
     auto error = parser.error.value;
-    EXPECT_EQ(error.message, "expected a token of type DELETE, but got identifier instead"_sv);
+    ASSERT_EQ(error.message, "expected a token of type DELETE, but got identifier instead"_sv);
 
     auto expected_location = xmdb::SourceLocation{1, 1, (uint32_t) strlen("not_select")};
-    EXPECT_EQ(error.location, expected_location);
+    ASSERT_EQ(error.location, expected_location);
 }

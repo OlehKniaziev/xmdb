@@ -4,10 +4,11 @@
 
 namespace xmdb {
 enum class LogLevel {
-    NONE,
+    DEBUG,
     INFO,
     WARN,
     ERROR,
+    NONE,
 };
 
 struct Logger {
@@ -35,6 +36,7 @@ void set_logger(Logger *);
 namespace log {
 void log(LogLevel, const char *, ...) OK_ATTRIBUTE_PRINTF(2, 3);
 
+void debug(const char *fmt, ...) OK_ATTRIBUTE_PRINTF(1, 2);
 void info(const char *fmt, ...) OK_ATTRIBUTE_PRINTF(1, 2);
 void warn(const char *fmt, ...) OK_ATTRIBUTE_PRINTF(1, 2);
 void error(const char *fmt, ...) OK_ATTRIBUTE_PRINTF(1, 2);

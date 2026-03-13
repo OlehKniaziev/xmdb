@@ -1,6 +1,8 @@
 #include "ast.hpp"
 #include <Core/ok.hpp>
 
+using namespace ok::literals;
+
 namespace xmdb::SQL {
 U64 Expr::ok_hash_value() const {
     U64 hash = (U64) type << 32;
@@ -33,6 +35,18 @@ U64 Expr::ok_hash_value() const {
 
         for (UZ i = 0; i < this_select->exprs.count; ++i) {
             hash ^= this_select->exprs[i]->ok_hash_value();
+        }
+
+        return hash;
+    }
+    case Expr::CALL: {
+        auto *call = static_cast<const CallExpr *>(this);
+
+        hash ^= call->fn->ok_hash_value();
+
+        for (UZ i = 0; i < call->args.count; ++i) {
+            Expr *arg = call->args[i];
+            hash ^= arg->ok_hash_value();
         }
 
         return hash;
@@ -104,6 +118,32 @@ ok::String Expr::to_string(ok::Allocator *allocator) const {
     case Expr::IDENT: {
         auto *ident = static_cast<const IdentifierExpr *>(this);
         return ident->value.copy(allocator);
+    }
+    case Expr::CALL: {
+        auto *call = static_cast<const CallExpr *>(this);
+        ok::String fn_string = call->fn->to_string(ok::temp_allocator());
+        ok::String result = ok::String::format(allocator, "%s(", fn_string.cstr());
+
+        if (call->args.count == 0) {
+            goto end;
+        }
+
+        for (SZ i = 0; i < (SZ) call->args.count - 1; ++i) {
+            Expr *arg = call->args[i];
+            ok::String arg_string = arg->to_string(ok::temp_allocator());
+            result.append(arg_string);
+            result.append(", "_sv);
+        }
+
+        {
+            Expr *last_arg = call->args[call->args.count - 1];
+            ok::String arg_string = last_arg->to_string(ok::temp_allocator());
+            result.append(arg_string);
+        }
+
+    end:
+        result.push(')');
+        return result;
     }
     case Expr::TRUE_LIT:  return ok::String::alloc(allocator, "TRUE");
     case Expr::FALSE_LIT: return ok::String::alloc(allocator, "FALSE");

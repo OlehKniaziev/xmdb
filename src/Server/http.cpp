@@ -12,6 +12,11 @@
 namespace xmdb::server {
 #define DECLARE_HANDLER(name) web_http_response_status name(web_http_response_context *ctx)
 
+#define FAIL(status, reason) do { \
+    WebHttpResponseWrite(ctx, WEB_SV_LIT(reason)); \
+    return HTTP_STATUS_##status; \
+    } while (false)
+
 DECLARE_HANDLER(connect_handler) {
     if (ctx->Request.Method != HTTP_POST) {
         return HTTP_STATUS_METHOD_NOT_ALLOWED;
@@ -19,29 +24,32 @@ DECLARE_HANDLER(connect_handler) {
 
     web_json_value json{};
     if (!WebHttpContextParseJsonBody(ctx, &json) || json.Type != JSON_OBJECT) {
-        return HTTP_STATUS_BAD_REQUEST;
+        FAIL(BAD_REQUEST, "request is not a valid JSON object");
     }
 
     web_json_object json_obj = json.Object;
-    web_string_view username, password, db_name;
+    web_string_view username, password_hash_hex, db_name;
 
     if (!WebJsonObjectGetStringView(&json_obj, WEB_SV_LIT("username"), &username)) {
-        return HTTP_STATUS_BAD_REQUEST;
+        FAIL(BAD_REQUEST, "'username' field not present");
     }
-    if (!WebJsonObjectGetStringView(&json_obj, WEB_SV_LIT("password_hash"), &password)) {
-        return HTTP_STATUS_BAD_REQUEST;
+    if (!WebJsonObjectGetStringView(&json_obj, WEB_SV_LIT("password_hash"), &password_hash_hex)) {
+        FAIL(BAD_REQUEST, "'password_hash' field not present");
     }
     if (!WebJsonObjectGetStringView(&json_obj, WEB_SV_LIT("db_name"), &db_name)) {
-        return HTTP_STATUS_BAD_REQUEST;
+        FAIL(BAD_REQUEST, "'db_name' field not present");
     }
 
-    // FIXME(oleh): This code *should* be uncommented, but the JS shit Base64 API uses another
-    // scheme of encoding, which we currently don't support.
-    // uz password_hash_length = XMDB_PASSWORD_HASH_LENGTH;
-    // U8 password_hash[password_hash_length];
-    // if (!WebBase64Decode(password_hash_base64, password_hash, &password_hash_length)) {
-    //     return HTTP_STATUS_BAD_REQUEST;
-    // }
+    WebArenaAllocator ctx_arena{&ctx->Arena};
+
+    ok::StringView password_hash_hex_sv = {(const char *) password_hash_hex.Items, password_hash_hex.Count};
+
+    ok::Optional<ok::Slice<U8>> password_hash_opt = xmdb::from_hex_string(&ctx_arena, password_hash_hex_sv);
+    if (!password_hash_opt.has_value()) {
+        FAIL(BAD_REQUEST, "'password_hash' field is not a valid hex string");
+    }
+
+    ok::Slice<U8> password_hash = password_hash_opt.get();
 
     ok::StringView db_name_sv{(const char *) db_name.Items, db_name.Count};
     xmdb::DBDescriptor *requested_db = nullptr;
@@ -54,7 +62,7 @@ DECLARE_HANDLER(connect_handler) {
     }
 
     if (requested_db == nullptr) {
-        return HTTP_STATUS_NOT_FOUND;
+        FAIL(NOT_FOUND, "requested database not found");
     }
 
     ok::StringView username_sv = {(const char *) username.Items, username.Count};
@@ -62,22 +70,20 @@ DECLARE_HANDLER(connect_handler) {
     Optional<DBUser *> user_opt = requested_db->find_user(username_sv);
 
     if (!user_opt.has_value()) {
-        return HTTP_STATUS_NOT_FOUND;
+        FAIL(NOT_FOUND, "requested user not found");
     }
 
     DBUser *user = user_opt.value;
 
-    if (password.Count != user->sha256_password_digest.bytes.get_count()) {
-        return HTTP_STATUS_BAD_REQUEST;
+    if (password_hash.count != user->sha256_password_digest.bytes.get_count()) {
+        FAIL(BAD_REQUEST, "invalid password digest size");
     }
 
     // FIXME(oleh): Replace this password hash check against the password by a check againts
     // a computed hash.
     for (UZ j = 0; j < user->sha256_password_digest.bytes.get_count(); ++j) {
-        if (user->sha256_password_digest.bytes[j] == 0) break;
-
-        if (password.Items[j] != user->sha256_password_digest.bytes[j]) {
-            return HTTP_STATUS_BAD_REQUEST;
+        if (password_hash.items[j] != user->sha256_password_digest.bytes[j]) {
+            FAIL(BAD_REQUEST, "provided password digest is incorrect");
         }
     }
 
@@ -93,12 +99,8 @@ DECLARE_HANDLER(run_query_handler) {
     }
 
     web_json_value json;
-    if (!WebHttpContextParseJsonBody(ctx, &json)) {
-        return HTTP_STATUS_BAD_REQUEST;
-    }
-
-    if (json.Type != JSON_OBJECT) {
-        return HTTP_STATUS_BAD_REQUEST;
+    if (!WebHttpContextParseJsonBody(ctx, &json) || json.Type != JSON_OBJECT) {
+        FAIL(BAD_REQUEST, "request body is not a valid JSON object");
     }
 
     web_json_object json_obj = json.Object;
@@ -106,23 +108,23 @@ DECLARE_HANDLER(run_query_handler) {
     F64 connection_id_f64;
     web_string_view query;
     if (!WebJsonObjectGetNumber(&json_obj, WEB_SV_LIT("connection_id"), &connection_id_f64)) {
-        return HTTP_STATUS_BAD_REQUEST;
+        FAIL(BAD_REQUEST, "'connection_id' field not present in the request body");
     }
     if (!WebJsonObjectGetStringView(&json_obj, WEB_SV_LIT("query"), &query)) {
-        return HTTP_STATUS_BAD_REQUEST;
+        FAIL(BAD_REQUEST, "'query' field not present in the request body");
     }
 
     F64 integral;
     ConnectionId connection_id;
     if (connection_id_f64 < 0.0 || modf(connection_id_f64, &integral) != 0.0) {
-        return HTTP_STATUS_BAD_REQUEST;
+        FAIL(BAD_REQUEST, "'connection_id' field should be integral");
     }
 
     connection_id = (ConnectionId) connection_id_f64;
 
     Optional<ConnectionData> connection_data_opt = get_connection_data(connection_id);
     if (!connection_data_opt.has_value()) {
-        return HTTP_STATUS_NOT_FOUND;
+        FAIL(BAD_REQUEST, "connection with requested id was not found");
     }
 
     ConnectionData connection_data = connection_data_opt.value;
@@ -163,6 +165,23 @@ DECLARE_HANDLER(run_query_handler) {
 
             WebJsonEndArray();
 
+            WebJsonPutKey(WEB_SV_LIT("column_types"));
+
+            WebJsonBeginArray();
+
+            for (UZ i = 0; i < results_table->columns_count(); ++i) {
+                xmdb::SQL::ColumnType column_type = results_table->columns_types()[i];
+                const char *column_type_str = xmdb::SQL::column_type_to_string(column_type);
+                web_string_view column_type_sv = {
+                    .Items = (u8 *) column_type_str,
+                    .Count = strlen(column_type_str),
+                };
+                WebJsonPrepareArrayElement();
+                WebJsonPutString(column_type_sv);
+            }
+
+            WebJsonEndArray();
+
             WebJsonPutKey(WEB_SV_LIT("rows"));
 
             WebJsonBeginArray();
@@ -184,29 +203,27 @@ DECLARE_HANDLER(run_query_handler) {
                     xmdb::DBTableStream column_stream = table_outlet.column_stream(&connection_data.temp_arena, i);
                     xmdb::Value value = column_stream.next().get();
 
+                    WebJsonPutKey(column_name);
+
                     switch (value.type()) {
-                    case xmdb::SQL::TYPE_INT: {
+                    case Value::Type::INT: {
                         S64 n = value.as_int();
-                        WebJsonPutKey(column_name);
                         WebJsonPutNumber(n);
                         break;
                     }
-                    case xmdb::SQL::TYPE_STRING: {
+                    case Value::Type::STRING: {
                         FixedString s = value.as_string();
                         web_string_view value = {
                                 .Items = (u8 *) s.items,
                                 .Count = s.count,
                         };
 
-                        WebJsonPutKey(column_name);
                         WebJsonPutString(value);
 
                         break;
                     }
-                    case xmdb::SQL::TYPE_BOOL: {
+                    case Value::Type::BOOL: {
                         bool b = value.as_bool();
-
-                        WebJsonPutKey(column_name);
 
                         if (b) {
                             WebJsonPutTrue();
@@ -216,16 +233,32 @@ DECLARE_HANDLER(run_query_handler) {
 
                         break;
                     }
-                    case xmdb::SQL::TYPE_NULL: {
-                        WebJsonPutKey(column_name);
-                        WebJsonPutNull();
+                    case Value::Type::IMAGE_CHUNK: {
+                        ImageChunk *chunk = value.as_chunk();
+
+                        WebJsonBeginObject();
+
+                        WebJsonPutKey(WEB_SV_LIT("x"));
+                        WebJsonPutNumber(chunk->x);
+
+                        WebJsonPutKey(WEB_SV_LIT("y"));
+                        WebJsonPutNumber(chunk->y);
+
+                        WebJsonPutKey(WEB_SV_LIT("width"));
+                        WebJsonPutNumber(chunk->width);
+
+                        WebJsonPutKey(WEB_SV_LIT("height"));
+                        WebJsonPutNumber(chunk->height);
+
+                        ok::String data_hex = xmdb::to_hex_string(&connection_data.temp_arena, chunk->data);
+
+                        WebJsonPutKey(WEB_SV_LIT("data"));
+                        WebJsonPutString((web_string_view){.Items = (u8 *) data_hex.cstr(), .Count = data_hex.count()});
+
+                        WebJsonEndObject();
 
                         break;
                     }
-                    case xmdb::SQL::TYPE_FLOAT:
-                    case xmdb::SQL::TYPE_DOUBLE:
-                    case xmdb::SQL::TYPE_IMAGE:  OK_TODO();
-                    case xmdb::SQL::TYPE_TABLE:  OK_UNREACHABLE();
                     }
                 }
 
@@ -260,6 +293,8 @@ void run_http_server(U16 port) {
     web_http_server_config config{
         // TODO(oleh): Make this configurable for user.
         .NumThreads = 1,
+        .UseHttps = false,
+        .HttpsProvider = nullptr,
     };
     WebHttpServerInit(&server, &config);
 

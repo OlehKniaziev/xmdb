@@ -131,8 +131,7 @@ Optional<InsertStmt *> Parser::insert_stmt() {
     TRY(insert_token);
     TRY(expect(Token::KW_INTO));
 
-    auto table_expr = expression();
-    TRY(table_expr);
+    auto table_name = expect(Token::IDENT);
 
     TRY(expect(Token::L_PAREN));
 
@@ -175,7 +174,7 @@ Optional<InsertStmt *> Parser::insert_stmt() {
 
     TRY(expect(Token::SEMICOLON));
 
-    return InsertStmt::alloc(arena, insert_token.value, table_expr.value, columns.slice(), values.slice(),
+    return InsertStmt::alloc(arena, insert_token.value, table_name.value.data, columns.slice(), values.slice(),
                              values_counts.slice());
 }
 
@@ -377,7 +376,7 @@ Optional<Expr *> Parser::expression() {
     auto lhs = parse_expression_prim(this);
     TRY(lhs);
 
-    auto token = get_cur_token_or_signal_eof();
+    auto token = get_cur_token();
 
     if (!token.has_value()) return lhs;
 
@@ -402,6 +401,33 @@ Optional<Expr *> Parser::expression() {
         TRY(rhs);
 
         return BinaryOpExpr::alloc(arena, token.value, BinaryOpExpr::Kind::GT, lhs.value, rhs.value);
+    }
+    case Token::L_PAREN: {
+        ++pos;
+
+        ok::List<Expr *> args = ok::List<Expr *>::alloc(arena);
+
+        while (true) {
+            auto r_paren = get_cur_token_or_signal_eof();
+            TRY(r_paren);
+
+            if (r_paren.get().type == Token::R_PAREN) {
+                ++pos;
+                return CallExpr::alloc(arena, token.value, lhs.value, args.slice());
+            }
+
+            auto expr = expression();
+            TRY(expr);
+
+            args.push(expr.get());
+
+            auto maybe_comma = get_cur_token_or_signal_eof();
+            TRY(maybe_comma);
+
+            if (maybe_comma.get().type == Token::COMMA) {
+                ++pos;
+            }
+        }
     }
     default: return lhs;
     }
@@ -445,13 +471,19 @@ Optional<Token> Parser::expect(Token::Type token_type) {
     return {};
 }
 
-Optional<Token> Parser::get_cur_token_or_signal_eof() {
+Optional<Token> Parser::get_cur_token() {
     if (is_eof()) {
-        set_eof();
         return {};
     }
-
     return tokens[pos];
+}
+
+Optional<Token> Parser::get_cur_token_or_signal_eof() {
+    auto token = get_cur_token();
+    if (!token) {
+        set_eof();
+    }
+    return token;
 }
 
 void Parser::set_token_mismatch(Token got, ok::Slice<Token::Type> expected) {

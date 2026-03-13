@@ -9,12 +9,6 @@ using namespace ok::literals;
 using namespace xmdb;
 using namespace xmdb::SQL;
 
-bool eq(ok::StringView lhs, ok::StringView rhs) {
-    if (lhs.count != rhs.count) return false;
-    for (UZ i = 0; i < lhs.count; ++i) if (lhs[i] != rhs[i]) return false;
-    return true;
-}
-
 TEST(DBConnection, execute_create_and_select_on_empty_table) {
     ok::ArenaAllocator arena{};
     StringView source = R"sql(CREATE TABLE MyTable (
@@ -48,6 +42,63 @@ TEST(DBConnection, execute_create_and_select_on_empty_table) {
 
     ASSERT_EQ(results_table->columns_types()[0], SQL::ColumnType::INTEGER);
     ASSERT_EQ(results_table->columns_types()[1], SQL::ColumnType::TEXT);
+}
+
+TEST(DBConnection, select_empty_png_column) {
+#define PIXEL_DATA "abcdabcdabcdabcdabababab"
+    ok::ArenaAllocator arena{};
+    StringView source = "CREATE TABLE MyTable ("
+        "id int,"
+        "img PNG"
+    ");"
+    "INSERT INTO MyTable(id, img) VALUES (1, RGB(2, 2, \"" PIXEL_DATA "\"));"
+    "SELECT img FROM MyTable;"_sv;
+
+    String error{};
+
+    QueryResults query_results{};
+
+    DBUser admin = DBUser::admin();
+    DBPool db_pool{&arena};
+    DBDescriptor *default_db = db_pool.get_db("default"_sv);
+    DBConnection db_conn{&db_pool, default_db, &admin};
+
+    bool ok = compile_and_execute_source(&arena, &db_conn, source, &query_results, &error);
+
+    ASSERT_TRUE(ok) << error.cstr();
+
+    ASSERT_FALSE(query_results.error.has_value());
+    ASSERT_TRUE(query_results.value.has_value());
+
+    DBTable *results_table = query_results.value.value;
+    ASSERT_EQ(results_table->columns_count(), 1);
+
+    DBTableOutlet outlet{results_table};
+    DBTableStream stream = outlet.column_stream(&arena, 0);
+
+    ok::Optional<Value> val_opt = stream.next();
+    ASSERT_TRUE(val_opt.has_value());
+
+    Value val = val_opt.get();
+
+    ASSERT_EQ(val.type(), Value::Type::IMAGE_CHUNK);
+
+    ImageChunk *image_chunk = val.as_chunk();
+
+    ASSERT_EQ(image_chunk->x, 0);
+    ASSERT_EQ(image_chunk->y, 0);
+    ASSERT_EQ(image_chunk->width, 2);
+    ASSERT_EQ(image_chunk->height, 2);
+    ASSERT_EQ(image_chunk->pixel_format, PixelFormat::RGB);
+
+    ok::Slice<U8> expected_pixel_data = from_hex_string(&arena, ok::StringView{PIXEL_DATA}).get();
+
+    ASSERT_EQ(expected_pixel_data.count, image_chunk->data.count);
+
+    for (UZ pi = 0; pi < image_chunk->data.count; ++pi) {
+        U8 px = image_chunk->data[pi];
+        ASSERT_EQ(px, expected_pixel_data[pi]);
+    }
 }
 
 struct MallocAllocator : public ok::ArenaAllocator {
@@ -104,7 +155,7 @@ TEST(DBConnection, execute_create_insert_and_select_on_table_with_one_row) {
     ok::Optional<Value> next_value = column1_value.next();
 
     ASSERT_TRUE(next_value);
-    ASSERT_EQ(next_value.get().type(), SQL::TYPE_INT);
+    ASSERT_EQ(next_value.get().type(), Value::Type::INT);
     ASSERT_EQ(next_value.get().as_int(), 1);
 
     ASSERT_FALSE(column1_value.next());
@@ -114,7 +165,7 @@ TEST(DBConnection, execute_create_insert_and_select_on_table_with_one_row) {
     next_value = column2_value.next();
 
     ASSERT_TRUE(next_value);
-    ASSERT_EQ(next_value.get().type(), SQL::TYPE_STRING);
+    ASSERT_EQ(next_value.get().type(), Value::Type::STRING);
 
     FixedString val_fs = next_value.get().as_string();
     ok::StringView val = view(&val_fs);
@@ -167,7 +218,7 @@ TEST(DBConnection, execute_create_insert_update_and_select_on_table_with_one_row
     ok::Optional<Value> val1 = column1_stream.next();
 
     ASSERT_TRUE(val1);
-    ASSERT_EQ(val1.get().type(), SQL::TYPE_INT);
+    ASSERT_EQ(val1.get().type(), Value::Type::INT);
     ASSERT_EQ(val1.get().as_int(), 2);
 
     ASSERT_FALSE(column1_stream.next());
@@ -178,7 +229,7 @@ TEST(DBConnection, execute_create_insert_update_and_select_on_table_with_one_row
 
     FixedString val2_fs = val2.get().as_string();
 
-    ASSERT_EQ(val2.get().type(), SQL::TYPE_STRING);
+    ASSERT_EQ(val2.get().type(), Value::Type::STRING);
     ASSERT_EQ(view(&val2_fs), "2"_sv);
 
     ASSERT_FALSE(column2_stream.next());
@@ -280,7 +331,7 @@ TEST(DBConnection, create_new_db_and_execute_create_insert_and_select_on_table_w
 
     ASSERT_TRUE(val1);
 
-    ASSERT_EQ(val1.get().type(), SQL::TYPE_INT);
+    ASSERT_EQ(val1.get().type(), Value::Type::INT);
     ASSERT_EQ(val1.get().as_int(), 1);
 
     ASSERT_FALSE(column1_stream.next());
@@ -289,7 +340,7 @@ TEST(DBConnection, create_new_db_and_execute_create_insert_and_select_on_table_w
 
     FixedString val2_fs = val2.get().as_string();
 
-    ASSERT_EQ(val2.get().type(), SQL::TYPE_STRING);
+    ASSERT_EQ(val2.get().type(), Value::Type::STRING);
     ASSERT_EQ(view(&val2_fs), "1"_sv);
 
     ASSERT_FALSE(column2_stream.next());

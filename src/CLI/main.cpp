@@ -2,8 +2,54 @@
 
 #include <Core/ok.hpp>
 #include <Core/util.hpp>
+#include <Core/hash.hpp>
+#include <Core/Result.hpp>
+#include <Core/image.hpp>
+#include <Core/Logger.hpp>
+#include <SQL/ir.hpp>
 
 #include <http.h>
+
+static xmdb::Result<xmdb::ImageChunk, ok::String> parse_image_chunk_from_json_object(ok::Allocator *allocator,
+                                                                                     web_json_object object) {
+    U32 x, y, width, height;
+    if (!WebJsonObjectGetU32(&object, WEB_SV_LIT("x"), &x)) {
+        return ok::String::format(allocator, "the image chunk JSON object is missing the 'x' field");
+    }
+    if (!WebJsonObjectGetU32(&object, WEB_SV_LIT("y"), &y)) {
+        return ok::String::format(allocator, "the image chunk JSON object is missing the 'y' field");
+    }
+    if (!WebJsonObjectGetU32(&object, WEB_SV_LIT("width"), &width)) {
+        return ok::String::format(allocator, "the image chunk JSON object is missing the 'width' field");
+    }
+    if (!WebJsonObjectGetU32(&object, WEB_SV_LIT("height"), &height)) {
+        return ok::String::format(allocator, "the image chunk JSON object is missing the 'height' field");
+    }
+
+    web_string_view data_web_sv;
+    if (!WebJsonObjectGetStringView(&object, WEB_SV_LIT("data"), &data_web_sv)) {
+        return ok::String::format(allocator, "the image chunk JSON object is missing the 'data' field");
+    }
+
+    ok::StringView data_sv = {(const char *) data_web_sv.Items, data_web_sv.Count};
+    ok::Optional<ok::Slice<U8>> data_opt = xmdb::from_hex_string(allocator, data_sv);
+    if (!data_opt.has_value()) {
+        return ok::String::format(allocator, "the image chunk's 'data' field is not a valid hex string");
+    }
+
+    ok::Slice<U8> data = data_opt.get();
+
+    XMDB_FIXME("No way to currently obtain the pixel format of the image, so setting chunk's pixel format to RGB");
+
+    return xmdb::ImageChunk{
+        .x = x,
+        .y = y,
+        .width = width,
+        .height = height,
+        .data = data,
+        .pixel_format = xmdb::PixelFormat::RGB,
+    };
+}
 
 int main(int argc, char **argv) {
     ok::Slice<char *> args = {argv + 1, (UZ)argc - 1};
@@ -15,15 +61,21 @@ int main(int argc, char **argv) {
     const char *port_cstr = args[1];
     const char *db_name = args[2];
     const char *username = args[3];
-    const char *password_hash = args[4];
+    const char *password = args[4];
 
     S64 port;
     if (!ok::parse_int64(ok::StringView{port_cstr}, &port)) {
         xmdb::dief("Invalid port number '%s'", port_cstr);
     }
 
+    xmdb::SHA256Digest password_hash = xmdb::sha256_digest(ok::StringView{password});
+
     web_arena arena;
     WebArenaInit(&arena, 1024 * 1024);
+
+    xmdb::WebArenaAllocator arena_adapter{&arena};
+
+    ok::String password_hash_hex = xmdb::to_hex_string(&arena_adapter, password_hash.bytes.slice());
 
     WebJsonBegin(&arena);
 
@@ -36,7 +88,7 @@ int main(int argc, char **argv) {
     WebJsonPutString(WEB_SV_LIT(username));
 
     WebJsonPutKey(WEB_SV_LIT("password_hash"));
-    WebJsonPutString(WEB_SV_LIT(password_hash));
+    WebJsonPutString(WEB_SV_LIT(password_hash_hex.cstr()));
 
     WebJsonEndObject();
 
@@ -58,7 +110,13 @@ int main(int argc, char **argv) {
                             port,
                             request,
                             &response)) {
-        xmdb::dief("Failed to send an http response");
+        xmdb::dief("Failed to send the HTTP connection request");
+    }
+
+    if (response.Status != HTTP_STATUS_OK) {
+        xmdb::dief("Connection request to the server returned status '%s': %s",
+                   WebHttpGetResponseStatusReason(response.Status),
+                   response.Body);
     }
 
     S64 connection_id;
@@ -71,6 +129,7 @@ int main(int argc, char **argv) {
     printf("Successfully connected to the server [connection_id = %lu]\n", (U64)connection_id);
 
     while (true) {
+    main_loop:
         WebArenaReset(&arena);
 
         printf("> ");
@@ -110,19 +169,19 @@ int main(int argc, char **argv) {
                                 port,
                                 request,
                                 &response)) {
-            ok::println("Failed to send a request to the server");
+            ok::println("Failed to send a query request to the server");
             continue;
         }
 
         if (response.Status != HTTP_STATUS_OK) {
             const char *http_reason = WebHttpGetResponseStatusReason(response.Status);
-            printf("Failed to fetch: %s\n", http_reason);
+            printf("Query request to the server failed with status '%s': " WEB_SV_FMT "\n", http_reason, WEB_SV_ARG(response.Body));
             continue;
         }
 
         web_json_value json;
         if (!WebJsonParse(&arena, response.Body, &json) || json.Type != JSON_OBJECT) {
-            ok::println("ERROR: Got an invalid JSON response from the server");
+            printf("ERROR: invalid JSON response from the server: " WEB_SV_FMT "\n", WEB_SV_ARG(response.Body));
             continue;
         }
 
@@ -150,6 +209,37 @@ int main(int argc, char **argv) {
                 continue;
             }
 
+            web_json_array json_column_types;
+            if (!WebJsonObjectGetArray(&json_obj, WEB_SV_LIT("column_types"), &json_column_types)) {
+                ok::println("ERROR: The server sent JSON is missing the 'column_types' field");
+                continue;
+            }
+
+            xmdb::SQL::ColumnType *column_types_ptr = arena_adapter.alloc<xmdb::SQL::ColumnType>(json_column_types.Count);
+            ok::Slice<xmdb::SQL::ColumnType> column_types = {column_types_ptr, json_column_types.Count};
+
+            for (UZ i = 0; i < json_column_types.Count; ++i) {
+                web_json_value column_type_val = json_column_types.Items[i];
+                if (column_type_val.Type != JSON_STRING) {
+                    printf("ERROR: 'column_types' array member at position %zu is not of type 'string'\n", i);
+                    goto main_loop;
+                }
+
+                web_string_view column_type_web_sv = column_type_val.String;
+                ok::StringView column_type_sv = {(const char *) column_type_web_sv.Items, column_type_web_sv.Count};
+
+                ok::Optional<xmdb::SQL::ColumnType> column_type_opt = xmdb::SQL::parse_column_type(column_type_sv);
+                if (!column_type_opt.has_value()) {
+                    printf("ERROR: could not parse the column type '" OK_SV_FMT "' at position %zu as a valid column type\n",
+                           OK_SV_ARG(column_type_sv),
+                           i);
+                    goto main_loop;
+                }
+
+                xmdb::SQL::ColumnType column_type = column_type_opt.get();
+                column_types[i] = column_type;
+            }
+
             web_json_array rows;
             if (!WebJsonObjectGetArray(&json_obj, WEB_SV_LIT("rows"), &rows)) {
                 ok::println("ERROR: The server sent JSON is missing the 'rows' field");
@@ -175,6 +265,7 @@ int main(int argc, char **argv) {
                     }
 
                     web_string_view column_name = column_json.String;
+                    xmdb::SQL::ColumnType column_type = column_types[i];
 
                     web_json_value column_value;
                     if (!WebJsonObjectGet(&row, column_name, &column_value)) {
@@ -200,7 +291,54 @@ int main(int argc, char **argv) {
                         printf("\"" WEB_SV_FMT "\"", WEB_SV_ARG(string));
                         break;
                     }
-                    default: OK_TODO();
+                    case JSON_OBJECT: {
+                        web_json_object value_obj = column_value.Object;
+
+                        switch (column_type) {
+                        case xmdb::SQL::ColumnType::PNG: {
+                            xmdb::Result<xmdb::ImageChunk, ok::String> parse_result = parse_image_chunk_from_json_object(&arena_adapter, value_obj);
+
+                            if (!parse_result.ok()) {
+                                const ok::String &error_message = parse_result.error();
+                                printf("ERROR: failed to parse the received JSON object as a valid image chunk: %s\n", error_message.cstr());
+                                continue;
+                            }
+
+                            const xmdb::ImageChunk &chunk = parse_result.unwrap();
+
+                            xmdb::log::debug("Parsed an image chunk:\n\tx => %u\n\ty => %u\n\tw => %u\n\th => %u\n\tdata size => %zu\n",
+                                             chunk.x,
+                                             chunk.y,
+                                             chunk.width,
+                                             chunk.height,
+                                             chunk.data.count);
+
+                            printf("<image chunk of size %zu>", chunk.data.count);
+
+                            break;
+                        }
+                        default: {
+                            const char *column_type_str = xmdb::SQL::column_type_to_string(column_type);
+                            printf("ERROR: got a JSON object for a column of type '%s'\n", column_type_str);
+                            break;
+                        }
+                        }
+
+                        break;
+                    }
+                    case JSON_TRUE: {
+                        printf("TRUE");
+                        break;
+                    }
+                    case JSON_FALSE: {
+                        printf("FALSE");
+                        break;
+                    }
+                    case JSON_NULL: {
+                        printf("NULL");
+                        break;
+                    }
+                    case JSON_ARRAY: OK_PANIC("Unexpectedly got a value of JSON array type");
                     }
 
                     printf("|");

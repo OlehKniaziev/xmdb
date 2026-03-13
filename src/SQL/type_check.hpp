@@ -9,6 +9,7 @@ namespace xmdb::SQL {
 enum Type {
     TYPE_INT,
     TYPE_STRING,
+    TYPE_PNG,
     TYPE_IMAGE,
     TYPE_BOOL,
     TYPE_NULL,
@@ -18,6 +19,7 @@ enum Type {
 };
 
 Type column_type_to_type(ColumnType);
+bool is_image(Type);
 
 const char *type_name(Type);
 
