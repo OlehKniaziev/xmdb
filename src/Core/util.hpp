@@ -3,7 +3,9 @@
 #include "SourceLocation.hpp"
 #include "ok.hpp"
 
+#if !defined(OK_NO_STDLIB)
 #include <common.h>
+#endif // !OK_NO_STDLIB
 
 #define TRY(x)                                                                                                          \
     do {                                                                                                                \
@@ -22,6 +24,7 @@ struct ErrorWithSourceLocation {
 ok::String to_hex_string(ok::Allocator *, ok::Slice<U8>);
 ok::Optional<ok::Slice<U8>> from_hex_string(ok::Allocator *, ok::StringView);
 
+#if !defined(OK_NO_STDLIB)
 struct WebArenaAllocator : public ok::Allocator {
     explicit WebArenaAllocator(web_arena *impl) : impl{impl} {}
 
@@ -40,4 +43,5 @@ struct WebArenaAllocator : public ok::Allocator {
 
     web_arena *impl;
 };
+#endif // !OK_NO_STDLIB
 } // namespace xmdb

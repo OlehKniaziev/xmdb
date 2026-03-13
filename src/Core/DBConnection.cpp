@@ -4,7 +4,6 @@
 #include "constants.hpp"
 
 #include <SQL/ir.hpp>
-#include <base64.h>
 #include <csetjmp>
 
 namespace xmdb {

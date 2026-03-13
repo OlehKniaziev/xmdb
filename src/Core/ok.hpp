@@ -1609,12 +1609,14 @@ struct File {
     using CloseError = IOError;
     using RemoveError = IOError;
 #elif OK_WINDOWS
+    using IOError = DWORD;
     using OpenError = DWORD;
     using ReadError = DWORD;
     using WriteError = DWORD;
     using CloseError = DWORD;
     using RemoveError = DWORD;
 #else
+    struct IOError {};
     struct OpenError {};
     struct ReadError {};
     struct WriteError {};
