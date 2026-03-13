@@ -114,9 +114,9 @@ int main(int argc, char **argv) {
     }
 
     if (response.Status != HTTP_STATUS_OK) {
-        xmdb::dief("Connection request to the server returned status '%s': %s",
+        xmdb::dief("Connection request to the server returned status '%s': " WEB_SV_FMT,
                    WebHttpGetResponseStatusReason(response.Status),
-                   response.Body);
+                   WEB_SV_ARG(response.Body));
     }
 
     S64 connection_id;

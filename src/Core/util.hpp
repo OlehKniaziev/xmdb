@@ -14,7 +14,7 @@
 
 namespace xmdb {
 [[noreturn]]
-void dief(const char *fmt, ...);
+void dief(const char *fmt, ...) OK_ATTRIBUTE_PRINTF(1, 2);
 
 struct ErrorWithSourceLocation {
     ok::String message;
