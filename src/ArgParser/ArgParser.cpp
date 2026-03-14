@@ -1,24 +1,24 @@
 #include "ArgParser.hpp"
 
 namespace xmdb::argparser {
-ArgParser &ArgParser::string(const char *name, const char **dest, const char *default_value) {
-    arg(name, Flag::STRING, dest, default_value);
+ArgParser &ArgParser::string(const char *name, const char **dest, const char *description, const char *default_value) {
+    arg(name, Flag::STRING, dest, description, default_value);
     return *this;
 }
 
-ArgParser &ArgParser::integer(const char *name, S64 *dest, ok::Optional<S64> default_value_opt) {
+ArgParser &ArgParser::integer(const char *name, S64 *dest, const char *description, ok::Optional<S64> default_value_opt) {
     S64 *default_value = nullptr;
     if (default_value_opt) {
         default_value = m_allocator->alloc<S64>();
         *default_value = default_value_opt.get();
     }
 
-    arg(name, Flag::INT, dest, default_value);
+    arg(name, Flag::INT, dest, description, default_value);
     return *this;
 }
 
-ArgParser &ArgParser::boolean(const char *name, bool *dest) {
-    arg(name, Flag::BOOL, dest, nullptr);
+ArgParser &ArgParser::boolean(const char *name, bool *dest, const char *description) {
+    arg(name, Flag::BOOL, dest, description, nullptr);
     return *this;
 }
 
@@ -32,7 +32,9 @@ bool ArgParser::parse() {
     OK_VERIFY(m_argc > 0);
 
     UZ arg_count = m_argc - 1;
-    char **args = ++m_argv;
+    char **args = m_argv + 1;
+
+    ok::List<FlagSpec> flag_specs = m_flag_specs.copy(m_allocator);
 
     for (UZ i = 0; i < arg_count; ) {
         const char *arg = args[i];
@@ -42,8 +44,8 @@ bool ArgParser::parse() {
             continue;
         }
 
-        for (UZ f = 0; f < m_flag_specs.count; ) {
-            FlagSpec spec = m_flag_specs[f];
+        for (UZ f = 0; f < flag_specs.count; ) {
+            FlagSpec spec = flag_specs[f];
 
             const char *flag_name = flag_name_with_prefix(m_allocator, spec.name);
 
@@ -94,15 +96,15 @@ bool ArgParser::parse() {
                 }
                 }
 
-                m_flag_specs.remove_at(f);
+                flag_specs.remove_at(f);
             } else {
                 ++f;
             }
         }
     }
 
-    for (UZ i = 0; i < m_flag_specs.count; ++i) {
-        FlagSpec spec = m_flag_specs[i];
+    for (UZ i = 0; i < flag_specs.count; ++i) {
+        FlagSpec spec = flag_specs[i];
         if (spec.type != Flag::BOOL && spec.default_value == nullptr) {
             const char *flag_name = flag_name_with_prefix(m_allocator, spec.name);
 
@@ -144,5 +146,93 @@ ok::StringView ArgParser::error_message() {
     }
 
     return m_error_message;
+}
+
+void ArgParser::help() {
+    U32 max_width = 0;
+
+    printf("Expected usage of %s:\n", m_argv[0]);
+
+    ok::List<ok::String> formatted_flag_specs = ok::List<ok::String>::alloc(m_allocator);
+
+    for (UZ i = 0; i < m_flag_specs.count; ++i) {
+        FlagSpec spec = m_flag_specs[i];
+        ok::String formatted_spec = ok::String::alloc(m_allocator);
+        const char *flag_name = flag_name_with_prefix(m_allocator, spec.name);
+        formatted_spec.format_append("\t%s", flag_name);
+
+        if (spec.default_value != nullptr) {
+            formatted_spec.push('=');
+
+            switch (spec.type) {
+            case Flag::STRING: {
+                formatted_spec.format_append("%s", (const char *) spec.default_value);
+                break;
+            }
+            case Flag::INT: {
+                formatted_spec.format_append("%ld", *(S64 *) spec.default_value);
+                break;
+            }
+            case Flag::BOOL: break;
+            }
+        }
+
+        if (formatted_spec.count() > max_width) {
+            max_width = formatted_spec.count();
+        }
+
+        formatted_flag_specs.push(formatted_spec);
+    }
+
+    for (UZ i = 0; i < m_flag_specs.count; ++i) {
+        U32 total_written = 0;
+        FlagSpec spec = m_flag_specs[i];
+        ok::String formatted_flag_spec = formatted_flag_specs[i];
+
+        total_written += printf("%s", formatted_flag_spec.cstr());
+
+        U32 pad = max_width - total_written;
+
+        for (U32 i = 0; i < pad; ++i) {
+            printf(" ");
+        }
+
+        total_written = max_width;
+
+        if (spec.description != nullptr && strlen(spec.description) > 0) {
+            constexpr U32 column_limit = 80;
+            U32 desc_written = 0;
+            const char *separator = " - ";
+            const char *description = spec.description;
+
+            U32 desc_len = strlen(description);
+
+            total_written += printf("%s", separator);
+
+            S32 write_quota = (S32) column_limit - (S32) total_written;
+
+            if (write_quota <= 0) {
+                // TODO(oleh): Find a better way to work around this case.
+                printf("\n%s", spec.description);
+            } else {
+                while (true) {
+                    U32 w = ok::min(write_quota, (U32) strlen(description));
+                    printf("%.*s", (int) w, description);
+
+                    description += w;
+                    desc_written += w;
+
+                    if (desc_written == desc_len) break;
+
+                    printf("\n");
+                    for (U32 i = 0; i < total_written; ++i) {
+                        printf(" ");
+                    }
+                }
+            }
+        }
+
+        printf("\n");
+    }
 }
 } // namespace xmdb::argparser

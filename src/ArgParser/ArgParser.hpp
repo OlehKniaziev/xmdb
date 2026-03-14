@@ -12,6 +12,7 @@ enum class Flag {
 
 struct FlagSpec {
     const char *name;
+    const char *description;
     Flag type;
     void *dest;
     const void *default_value;
@@ -26,13 +27,13 @@ public:
             m_allocator = new MallocAllocator{};
         }
 
-        m_flag_specs = ok::List<FlagSpec>::alloc(allocator);
-        m_positionals = ok::List<const char *>::alloc(allocator);
+        m_flag_specs = ok::List<FlagSpec>::alloc(m_allocator);
+        m_positionals = ok::List<const char *>::alloc(m_allocator);
     }
 
-    ArgParser &string(const char *name, const char **dest, const char *default_value = nullptr);
-    ArgParser &integer(const char *name, S64 *dest, ok::Optional<S64> default_value = {});
-    ArgParser &boolean(const char *name, bool *dest);
+    ArgParser &string(const char *name, const char **dest, const char *description, const char *default_value = nullptr);
+    ArgParser &integer(const char *name, S64 *dest, const char *description, ok::Optional<S64> default_value = {});
+    ArgParser &boolean(const char *name, bool *dest, const char *description);
 
     bool parse();
 
@@ -43,8 +44,8 @@ public:
     void help();
 
 private:
-    void arg(const char *name, Flag type, void *dest, const void *default_value) {
-        m_flag_specs.push(FlagSpec{.name = name, .type = type, .dest = dest, .default_value = default_value});
+    void arg(const char *name, Flag type, void *dest, const char *description, const void *default_value) {
+        m_flag_specs.push(FlagSpec{.name = name, .description = description, .type = type, .dest = dest, .default_value = default_value});
     }
 
     int m_argc;
