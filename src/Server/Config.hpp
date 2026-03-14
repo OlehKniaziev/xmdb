@@ -8,7 +8,7 @@ enum class Protocol {
 };
 
 struct Config {
-    static Config parse(ok::Slice<char *> args);
+    static Config parse(int argc, char **argv);
 
     Protocol protocol;
     U16 port;

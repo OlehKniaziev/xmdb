@@ -512,9 +512,10 @@ struct List : public ArrayBase<List<T>, T> {
     }
 
     void dealloc() {
-        allocator->dealloc<T>(items, capacity);
-
-        memset(this, 0, sizeof(*this));
+        if (allocator != nullptr) {
+            allocator->dealloc<T>(items, capacity);
+            memset(this, 0, sizeof(*this));
+        }
     }
 
     T* items;

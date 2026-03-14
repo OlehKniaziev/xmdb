@@ -1,59 +1,43 @@
 #include "Config.hpp"
+
 #include <Core/util.hpp>
+#include <ArgParser/ArgParser.hpp>
 
 namespace xmdb::server {
-constexpr const Protocol XMDB_DEFAULT_PROTOCOL = Protocol::HTTP;
-constexpr const U16 XMDB_DEFAULT_PORT = 6969;
-
 using namespace ok::literals;
 
-Config Config::parse(ok::Slice<char *> args) {
-    // char *program_name = args[0];
-    args = args.slice(1);
+Config Config::parse(int argc, char **argv) {
+    xmdb::argparser::ArgParser arg_parser{argc, argv};
 
-    Protocol protocol = XMDB_DEFAULT_PROTOCOL;
-    U16 port = XMDB_DEFAULT_PORT;
+    constexpr const char *default_protocol = "http";
+    S64 default_port = 6969;
 
-    for (UZ i = 0; i < args.count; ++i) {
-        ok::StringView arg{args[i]};
+    const char *protocol_str{};
+    S64 port_s64{};
 
-        if (arg == "-protocol"_sv) {
-            ++i;
-            if (i >= args.count) {
-                dief("No value provided for argument '-protocol'");
-            }
+    arg_parser.string("protocol", &protocol_str, "Network protocol to use", default_protocol);
+    arg_parser.integer("port", &port_s64, "Port to start the server on", default_port);
 
-            ok::StringView protocol_sv{args[i]};
-            if (protocol_sv == "http"_sv) {
-                protocol = Protocol::HTTP;
-            } else {
-                dief("Invalid protocol '" OK_SV_FMT "'", OK_SV_ARG(protocol_sv));
-            }
-        } else if (arg == "-port"_sv) {
-            ++i;
-            if (i >= args.count) {
-                dief("No value provided for argument '-protocol'");
-            }
+    if (!arg_parser.parse()) {
+        ok::StringView error_message = arg_parser.error_message();
+        dief("Failed to parse command line arguments: " OK_SV_FMT, OK_SV_ARG(error_message));
+    }
 
-            S64 port_s64;
-            ok::StringView port_sv{args[i]};
-            if (!ok::parse_int64(port_sv, &port_s64)) {
-                dief("Invalid port value '" OK_SV_FMT "'", OK_SV_ARG(port_sv));
-            }
+    Protocol protocol{};
 
-            if (port_s64 < 0 || port_s64 > UINT16_MAX) {
-                dief("Port value out of range");
-            }
+    if (strcmp(protocol_str, "http") == 0) {
+        protocol = Protocol::HTTP;
+    } else {
+        dief("Invalid protocol '%s'", protocol_str);
+    }
 
-            port = (U16)port_s64;
-        } else {
-            dief("Unknown argument '" OK_SV_FMT "'", OK_SV_ARG(arg));
-        }
+    if (port_s64 < 0 || port_s64 > UINT16_MAX) {
+        dief("Port value out of range");
     }
 
     return Config {
         .protocol = protocol,
-        .port = port,
+        .port = (U16) port_s64,
     };
 }
 } // namespace xmbd::server
