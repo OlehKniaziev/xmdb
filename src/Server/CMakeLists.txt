@@ -6,4 +6,4 @@ add_executable(
   Config.cpp
 )
 
-target_link_libraries(xmdb_server PUBLIC LibCore LibSQL::static libweb)
+target_link_libraries(xmdb_server PUBLIC LibCore LibSQL::static LibArgParser libweb)

@@ -15,9 +15,7 @@ namespace log = xmdb::log;
 int main(int argc, char **argv) {
     xmdb::SQL::init_global_state();
 
-    ok::Slice<char *> args = {argv, (UZ)argc};
-
-    Config config = Config::parse(args);
+    Config config = Config::parse(argc, argv);
 
     switch (config.protocol) {
     case Protocol::HTTP: {
