@@ -1,5 +1,7 @@
 #include <cmath>
 
+#include <ArgParser/ArgParser.hpp>
+
 #include <Core/ok.hpp>
 #include <Core/util.hpp>
 #include <Core/hash.hpp>
@@ -52,20 +54,22 @@ static xmdb::Result<xmdb::ImageChunk, ok::String> parse_image_chunk_from_json_ob
 }
 
 int main(int argc, char **argv) {
-    ok::Slice<char *> args = {argv + 1, (UZ)argc - 1};
-    if (args.count < 5) {
-        xmdb::dief("Not enough arguments");
-    }
+    xmdb::argparser::ArgParser parser{argc, argv};
 
-    const char *hostname_cstr = args[0];
-    const char *port_cstr = args[1];
-    const char *db_name = args[2];
-    const char *username = args[3];
-    const char *password = args[4];
-
+    const char *hostname, *db, *username, *password;
     S64 port;
-    if (!ok::parse_int64(ok::StringView{port_cstr}, &port)) {
-        xmdb::dief("Invalid port number '%s'", port_cstr);
+
+    parser.string("hostname", &hostname, "The hostname or IP address on which the server is running");
+    parser.string("db", &db, "Database name to use");
+    parser.string("user", &username, "User name to connect as");
+    parser.string("password", &password, "User's password");
+    parser.integer("port", &port, "The port on which to establish the connection", 6969);
+
+    if (!parser.parse()) {
+        ok::StringView error_message = parser.error_message();
+        parser.help();
+        printf("\nFailed to parse command line flags: " OK_SV_FMT "\n", OK_SV_ARG(error_message));
+        return 1;
     }
 
     xmdb::set_log_level(xmdb::LogLevel::DEBUG);
@@ -84,7 +88,7 @@ int main(int argc, char **argv) {
     WebJsonBeginObject();
 
     WebJsonPutKey(WEB_SV_LIT("db_name"));
-    WebJsonPutString(WEB_SV_LIT(db_name));
+    WebJsonPutString(WEB_SV_LIT(db));
 
     WebJsonPutKey(WEB_SV_LIT("username"));
     WebJsonPutString(WEB_SV_LIT(username));
@@ -104,11 +108,11 @@ int main(int argc, char **argv) {
         .Body = payload,
     };
 
-    web_string_view hostname = WEB_SV_LIT(hostname_cstr);
+    web_string_view hostname_web_sv = WEB_SV_LIT(hostname);
     web_http_response response;
 
     if (!WebHttpRequestSend(&arena,
-                            hostname,
+                            hostname_web_sv,
                             port,
                             request,
                             &response)) {
@@ -167,7 +171,7 @@ int main(int argc, char **argv) {
         };
 
         if (!WebHttpRequestSend(&arena,
-                                hostname,
+                                hostname_web_sv,
                                 port,
                                 request,
                                 &response)) {
