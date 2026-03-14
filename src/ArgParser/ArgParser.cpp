@@ -162,14 +162,19 @@ void ArgParser::help() {
         formatted_spec.format_append("\t%s", flag_name);
 
         if (spec.default_value != nullptr) {
-            formatted_spec.push('=');
-
             switch (spec.type) {
             case Flag::STRING: {
+                const char *default_value = (const char *) spec.default_value;
+                if (*default_value == 0) {
+                    break;
+                }
+
+                formatted_spec.push('=');
                 formatted_spec.format_append("%s", (const char *) spec.default_value);
                 break;
             }
             case Flag::INT: {
+                formatted_spec.push('=');
                 formatted_spec.format_append("%ld", *(S64 *) spec.default_value);
                 break;
             }
