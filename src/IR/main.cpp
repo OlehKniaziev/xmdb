@@ -3,6 +3,7 @@
 #include <SQL/Parser.hpp>
 #include <SQL/util.hpp>
 #include <Core/util.hpp>
+#include <ArgParser/ArgParser.hpp>
 
 const char *help_message =
     "ir SOURCE - Usage\n\n"
@@ -24,61 +25,43 @@ void err(const char *why, xmdb::ErrorWithSourceLocation error) {
 }
 
 int main(int argc, char **argv) {
-    if (argc == 1) {
-        h(1, "not enough arguments");
-    }
-
-    --argc;
-    ++argv;
+    xmdb::argparser::ArgParser arg_parser{argc, argv};
 
     bool untyped = false;
-    bool parse_tables = false;
-    int flags = 0;
+    const char *tables_str;
+
+    arg_parser.boolean("untyped", &untyped, "Whether to type check the compiled query");
+    arg_parser.string("tables", &tables_str, "List of comma-separated tables to define for the semantic analysis. Useful with the '-untyped' flag", "");
+
+    if (!arg_parser.parse()) {
+        ok::StringView error_message = arg_parser.error_message();
+        arg_parser.help();
+        xmdb::dief("\nFailed to parse command line arguments: " OK_SV_FMT, OK_SV_ARG(error_message));
+    }
+
+    if (arg_parser.positionals().count == 0) {
+        arg_parser.help();
+        xmdb::dief("\nFailed to parse command line arguments: expected at least one positional argument");
+    }
+
+    const char *src = arg_parser.positionals()[0];
 
     ok::ArenaAllocator arena{};
 
     ok::List<ok::StringView> tables = ok::List<ok::StringView>::alloc(&arena);
 
-    for (int i = 0; i < argc - 1; ++i) {
-        if (parse_tables) {
-            const char *tables_str = argv[i];
-            while (*tables_str) {
-                const char *comma = strchr(tables_str, ',');
-                UZ len = 0;
-                if (comma == NULL) {
-                    len = strlen(tables_str);
-                } else {
-                    len = (UZ)(comma - tables_str);
-                }
-                tables.push(ok::StringView{tables_str, len});
-                if (comma == NULL) break;
-                tables_str = comma + 1;
-            }
-            ++flags;
-            parse_tables = false;
-            continue;
-        }
-
-        if ((strcmp(argv[i], "-u") == 0) || (strcmp(argv[i], "--untyped") == 0)) {
-            ++flags;
-            untyped = true;
-        } else if ((strcmp(argv[i], "-t") == 0) || (strcmp(argv[i], "--tables") == 0)) {
-            ++flags;
-            parse_tables = true;
+    while (*tables_str) {
+        const char *comma = strchr(tables_str, ',');
+        UZ len = 0;
+        if (comma == NULL) {
+            len = strlen(tables_str);
         } else {
-            ok::String msg = ok::String::format(ok::temp_allocator(), "unrecognized flag %s", argv[i]);
-            h(1, msg.cstr());
+            len = (UZ)(comma - tables_str);
         }
+        tables.push(ok::StringView{tables_str, len});
+        if (comma == NULL) break;
+        tables_str = comma + 1;
     }
-
-    argc -= flags;
-    argv += flags;
-
-    if (argc != 1) {
-        h(1, "only 1 argument expected");
-    }
-
-    const char *src = argv[argc - 1];
 
     ok::StringView source{src};
 
