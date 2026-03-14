@@ -65,12 +65,19 @@ int main(int argc, char **argv) {
     parser.string("password", &password, "User's password");
     parser.integer("port", &port, "The port on which to establish the connection", 6969);
 
+    if (argc == 1) {
+        parser.help();
+        return 1;
+    }
+
     if (!parser.parse()) {
         ok::StringView error_message = parser.error_message();
         parser.help();
         printf("\nFailed to parse command line flags: " OK_SV_FMT "\n", OK_SV_ARG(error_message));
         return 1;
     }
+
+    parser.dealloc();
 
     xmdb::set_log_level(xmdb::LogLevel::DEBUG);
 

@@ -500,7 +500,7 @@ struct List : public ArrayBase<List<T>, T> {
     inline List<Dest> cast() {
         List<Dest> list;
         list.allocator = allocator;
-        list.items = (Dest*)items;
+        list.items = reinterpret_cast<Dest*>(items);
         list.count = count;
         list.capacity = capacity;
         return list;
@@ -509,6 +509,12 @@ struct List : public ArrayBase<List<T>, T> {
     inline T& pop() {
         OK_ASSERT(count > 0);
         return items[--count];
+    }
+
+    void dealloc() {
+        allocator->dealloc<T>(items, capacity);
+
+        memset(this, 0, sizeof(*this));
     }
 
     T* items;
@@ -908,6 +914,10 @@ struct String : public StringBase<String, char> {
 
     inline char* get_items() const {
         return data.items;
+    }
+
+    void dealloc() {
+        data.dealloc();
     }
 
     List<char> data;

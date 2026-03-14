@@ -31,6 +31,7 @@ static const char *flag_name_with_prefix(ok::Allocator *allocator, const char *f
 bool ArgParser::parse() {
     OK_VERIFY(m_argc > 0);
 
+    bool result = true;
     UZ arg_count = m_argc - 1;
     char **args = m_argv + 1;
 
@@ -47,9 +48,7 @@ bool ArgParser::parse() {
         for (UZ f = 0; f < flag_specs.count; ) {
             FlagSpec spec = flag_specs[f];
 
-            const char *flag_name = flag_name_with_prefix(m_allocator, spec.name);
-
-            if (strcmp(arg, flag_name) == 0) {
+            if (strcmp(arg + 1, spec.name) == 0) {
                 switch (spec.type) {
                 case Flag::BOOL: {
                     *(bool *) spec.dest = true;
@@ -59,9 +58,9 @@ bool ArgParser::parse() {
                 case Flag::INT: {
                     ++i;
                     if (i >= arg_count) {
-                        m_error_message = ok::String::format(m_allocator, "'%s' flag provided, but no value specified", flag_name).view();
-                        m_failed = true;
-                        return false;
+                        m_error_message = ok::String::format(m_allocator, "'-%s' flag provided, but no value specified", spec.name);
+                        result = false;
+                        goto cleanup;
                     }
 
                     const char *flag_value = args[i];
@@ -69,11 +68,11 @@ bool ArgParser::parse() {
                     S64 *dest = (S64 *) spec.dest;
                     if (!ok::parse_int64(ok::StringView{flag_value}, dest)) {
                         m_error_message = ok::String::format(m_allocator,
-                                                             "failed to parse '%s' as a valid integer value for the flag '%s'",
+                                                             "failed to parse '%s' as a valid integer value for the flag '-%s'",
                                                              flag_value,
-                                                             flag_name).view();
-                        m_failed = true;
-                        return false;
+                                                             spec.name);
+                        result = false;
+                        goto cleanup;
                     }
 
                     break;
@@ -82,10 +81,10 @@ bool ArgParser::parse() {
                     ++i;
                     if (i >= arg_count) {
                         m_error_message = ok::String::format(m_allocator,
-                                                             "'%s' flag provided, but no value specified",
-                                                             flag_name).view();
-                        m_failed = true;
-                        return false;
+                                                             "'-%s' flag provided, but no value specified",
+                                                             spec.name);
+                        result = false;
+                        goto cleanup;
                     }
 
                     const char *flag_value = args[i];
@@ -106,13 +105,11 @@ bool ArgParser::parse() {
     for (UZ i = 0; i < flag_specs.count; ++i) {
         FlagSpec spec = flag_specs[i];
         if (spec.type != Flag::BOOL && spec.default_value == nullptr) {
-            const char *flag_name = flag_name_with_prefix(m_allocator, spec.name);
-
             m_error_message = ok::String::format(m_allocator,
-                                                 "'%s' flag requires a value",
-                                                 flag_name).view();
-            m_failed = true;
-            return false;
+                                                 "'-%s' flag requires a value",
+                                                 spec.name);
+            result = false;
+            goto cleanup;
         }
 
         switch (spec.type) {
@@ -133,7 +130,10 @@ bool ArgParser::parse() {
         }
     }
 
-    return true;
+cleanup:
+    flag_specs.dealloc();
+    m_failed = !result;
+    return result;
 }
 
 ok::Slice<const char *> ArgParser::positionals() {
@@ -145,7 +145,7 @@ ok::StringView ArgParser::error_message() {
         OK_PANIC("'error_message' called when there is no error");
     }
 
-    return m_error_message;
+    return m_error_message.view();
 }
 
 void ArgParser::help() {
@@ -233,6 +233,14 @@ void ArgParser::help() {
         }
 
         printf("\n");
+    }
+}
+
+void ArgParser::dealloc() {
+    m_positionals.dealloc();
+    m_flag_specs.dealloc();
+    if (m_failed) {
+        m_error_message.dealloc();
     }
 }
 } // namespace xmdb::argparser

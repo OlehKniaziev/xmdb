@@ -20,7 +20,7 @@ struct FlagSpec {
 
 class ArgParser {
 public:
-    ArgParser(int argc, char **argv, ok::Allocator *allocator = nullptr) : m_argc{argc}, m_argv{argv} {
+    ArgParser(int argc, char **argv, ok::Allocator *allocator = nullptr) : m_argc{argc}, m_argv{argv}, m_failed{false} {
         OK_VERIFY(m_argc > 0);
 
         if (allocator == nullptr) {
@@ -43,6 +43,12 @@ public:
 
     void help();
 
+    void dealloc();
+
+    ~ArgParser() {
+        dealloc();
+    }
+
 private:
     void arg(const char *name, Flag type, void *dest, const char *description, const void *default_value) {
         m_flag_specs.push(FlagSpec{.name = name, .description = description, .type = type, .dest = dest, .default_value = default_value});
@@ -53,7 +59,7 @@ private:
     ok::Allocator *m_allocator;
     ok::List<FlagSpec> m_flag_specs;
     ok::List<const char *> m_positionals;
-    ok::StringView m_error_message;
+    ok::String m_error_message;
     bool m_failed;
 };
 } // namespace xmdb::argparser
