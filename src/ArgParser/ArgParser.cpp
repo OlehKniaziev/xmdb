@@ -202,8 +202,10 @@ void ArgParser::help() {
             printf(" ");
         }
 
-        total_written = max_width;
+        total_written += pad;
 
+        // TODO(oleh): This will work well if we get the width of the tab character. I'm too lazy for it now though.
+#if 0
         if (spec.description != nullptr && strlen(spec.description) > 0) {
             constexpr U32 column_limit = 80;
             U32 desc_written = 0;
@@ -235,6 +237,12 @@ void ArgParser::help() {
                     }
                 }
             }
+        }
+#endif // 0
+
+        if (spec.description != nullptr && strlen(spec.description) > 0) {
+            const char *separator = " - ";
+            printf("%s%s", separator, spec.description);
         }
 
         printf("\n");
