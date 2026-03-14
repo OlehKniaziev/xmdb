@@ -18,6 +18,11 @@ struct FlagSpec {
     const void *default_value;
 };
 
+struct PositionalSpec {
+    U32 idx;
+    const char *name;
+};
+
 class ArgParser {
 public:
     ArgParser(int argc, char **argv, ok::Allocator *allocator = nullptr) : m_argc{argc}, m_argv{argv}, m_failed{false} {
@@ -29,7 +34,10 @@ public:
 
         m_flag_specs = ok::List<FlagSpec>::alloc(m_allocator);
         m_positionals = ok::List<const char *>::alloc(m_allocator);
+        m_positional_specs = ok::List<PositionalSpec>::alloc(m_allocator);
     }
+
+    ArgParser &positional(U32 idx, const char *name);
 
     ArgParser &string(const char *name, const char **dest, const char *description, const char *default_value = nullptr);
     ArgParser &integer(const char *name, S64 *dest, const char *description, ok::Optional<S64> default_value = {});
@@ -58,6 +66,7 @@ private:
     char **m_argv;
     ok::Allocator *m_allocator;
     ok::List<FlagSpec> m_flag_specs;
+    ok::List<PositionalSpec> m_positional_specs;
     ok::List<const char *> m_positionals;
     ok::String m_error_message;
     bool m_failed;

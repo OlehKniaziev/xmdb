@@ -1,6 +1,11 @@
 #include "ArgParser.hpp"
 
 namespace xmdb::argparser {
+ArgParser &ArgParser::positional(U32 idx, const char *name) {
+    m_positional_specs.push(PositionalSpec{.idx = idx, .name = name});
+    return *this;
+}
+
 ArgParser &ArgParser::string(const char *name, const char **dest, const char *description, const char *default_value) {
     arg(name, Flag::STRING, dest, description, default_value);
     return *this;
@@ -52,7 +57,6 @@ bool ArgParser::parse() {
                 switch (spec.type) {
                 case Flag::BOOL: {
                     *(bool *) spec.dest = true;
-                    ++i;
                     break;
                 }
                 case Flag::INT: {
@@ -95,6 +99,8 @@ bool ArgParser::parse() {
                 }
                 }
 
+                ++i;
+
                 flag_specs.remove_at(f);
             } else {
                 ++f;
@@ -130,6 +136,15 @@ bool ArgParser::parse() {
         }
     }
 
+    if (m_positionals.count != m_positional_specs.count) {
+        m_error_message = ok::String::format(m_allocator,
+                                             "expected %zu positional arguments, but got %zu instead",
+                                             m_positional_specs.count,
+                                             m_positionals.count);
+        result = false;
+        goto cleanup;
+    }
+
 cleanup:
     flag_specs.dealloc();
     m_failed = !result;
@@ -151,7 +166,27 @@ ok::StringView ArgParser::error_message() {
 void ArgParser::help() {
     U32 max_width = 0;
 
-    printf("Expected usage of %s:\n", m_argv[0]);
+    printf("Usage: %s", m_argv[0]);
+
+    const char **positional_names = ok::temp_allocator()->alloc<const char *>(m_positional_specs.count);
+
+    for (UZ i = 0; i < m_positional_specs.count; ++i) {
+        PositionalSpec spec = m_positional_specs[i];
+        if (spec.idx >= m_positional_specs.count) {
+            OK_PANIC_FMT("Index %u for a positional argument '%s' is out of range for expected number of positionals %zu",
+                         spec.idx,
+                         spec.name,
+                         m_positional_specs.count);
+        }
+
+        positional_names[spec.idx] = spec.name;
+    }
+
+    for (UZ i = 0; i < m_positional_specs.count; ++i) {
+        printf(" %s", positional_names[i]);
+    }
+
+    printf("\n");
 
     ok::List<ok::String> formatted_flag_specs = ok::List<ok::String>::alloc(m_allocator);
 
