@@ -33,15 +33,12 @@ int main(int argc, char **argv) {
     arg_parser.boolean("untyped", &untyped, "Whether to type check the compiled query");
     arg_parser.string("tables", &tables_str, "List of comma-separated tables to define for the semantic analysis. Useful with the '-untyped' flag", "");
 
+    arg_parser.positional(0, "SOURCE");
+
     if (!arg_parser.parse()) {
         ok::StringView error_message = arg_parser.error_message();
         arg_parser.help();
         xmdb::dief("\nFailed to parse command line arguments: " OK_SV_FMT, OK_SV_ARG(error_message));
-    }
-
-    if (arg_parser.positionals().count == 0) {
-        arg_parser.help();
-        xmdb::dief("\nFailed to parse command line arguments: expected at least one positional argument");
     }
 
     const char *src = arg_parser.positionals()[0];
@@ -102,6 +99,6 @@ int main(int argc, char **argv) {
 good:
 
     ok::String ir_string = stringify_ir(&arena, &compiled_query);
-    printf("%s\n", ir_string.cstr());
+    printf("%s", ir_string.cstr());
     return 0;
 }
