@@ -289,8 +289,10 @@ static void execute_instruction(TypedCompiledQuery *query, UZ i, QueryExecutionC
     }
     case IRInstructionOperator_Call: {
         Triple<String, StringView, S64> operands = operands_of_Call(&query->untyped, i);
+        ok::StringView var_name = operands.op1.view();
 
-        ctx->call(operands.op2, (U64) operands.op3);
+        DBValue *return_value = ctx->call(operands.op2, (U64) operands.op3);
+        ctx->put_var(i, var_name, return_value);
 
         break;
     }

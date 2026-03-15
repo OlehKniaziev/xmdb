@@ -66,7 +66,7 @@ namespace xmdb {
 
         void prepare_call_arg(DBValue *);
 
-        void call(StringView, U64);
+        DBValue *call(StringView, U64);
 
         QueryExecutionContext *next;
         QueryGraph query_graph;

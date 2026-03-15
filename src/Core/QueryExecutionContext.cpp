@@ -510,13 +510,13 @@ void QueryExecutionContext::prepare_call_arg(DBValue *arg_value) {
     call_args.push(arg_value);
 }
 
-void QueryExecutionContext::call(ok::StringView fn_name, U64 arg_count) {
+DBValue *QueryExecutionContext::call(ok::StringView fn_name, U64 arg_count) {
     OK_ASSERT(call_args.count == arg_count);
 
     Slice<DBValue *> args = call_args.slice();
-
-    query_graph.call(fn_name, args);
-
     call_args.count = 0;
+
+    QueryGraph::CallNode *call_node = query_graph.call(allocator, fn_name, args);
+    return call_node->return_value();
 }
 } // namespace xmdb

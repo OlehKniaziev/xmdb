@@ -157,14 +157,22 @@ public:
 
     class CallNode : public Node {
     public:
-        explicit CallNode(ok::StringView fn_name, Slice<DBValue *> args) : Node{Type::CALL},
-                                                                           m_fn_name{fn_name},
-                                                                           m_args{args} {
+        explicit CallNode(ok::Allocator *allocator,
+                          ok::StringView fn_name,
+                          Slice<DBValue *> args) : Node{Type::CALL},
+                                                   m_fn_name{fn_name},
+                                                   m_args{args},
+                                                   m_return_value{new (allocator) DelayedDBValue{}} {
+        }
+
+        DBValue *return_value() {
+            return m_return_value;
         }
 
     private:
         ok::StringView m_fn_name;
         Slice<DBValue *> m_args;
+        DelayedDBValue *m_return_value;
     };
 
     ok::Optional<Node *> root_node() const {
@@ -187,8 +195,8 @@ public:
         return add_generic_node<WriteColumnNode>(table, idx, value);
     }
 
-    CallNode *call(ok::StringView fn_name, Slice<DBValue *> args) {
-        return add_generic_node<CallNode>(fn_name, args);
+    CallNode *call(ok::Allocator *allocator, ok::StringView fn_name, Slice<DBValue *> args) {
+        return add_generic_node<CallNode>(allocator, fn_name, args);
     }
 
     void reset();
