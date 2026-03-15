@@ -10,7 +10,7 @@ enum Type {
     TYPE_INT,
     TYPE_STRING,
     TYPE_PNG,
-    TYPE_IMAGE,
+    TYPE_IMAGE_CHUNK,
     TYPE_BOOL,
     TYPE_NULL,
     TYPE_TABLE,

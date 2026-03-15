@@ -3,6 +3,7 @@
 
 #include <Core/ok.hpp>
 #include <Core/util.hpp>
+#include <Core/image.hpp>
 
 #include "ast.hpp"
 

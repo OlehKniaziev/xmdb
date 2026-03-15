@@ -22,7 +22,8 @@ static inline ColumnType type_to_column_type(Type type) {
     case TYPE_BOOL:   return ColumnType::BOOLEAN;
     case TYPE_FLOAT:  return ColumnType::FLOAT;
     case TYPE_DOUBLE: return ColumnType::DOUBLE;
-    case TYPE_IMAGE:
+
+    case TYPE_IMAGE_CHUNK:
     case TYPE_NULL:
     case TYPE_TABLE:  OK_PANIC("Unsupported type to column type conversion");
     }

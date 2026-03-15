@@ -50,20 +50,20 @@ Type column_type_to_type(ColumnType column_type) {
 }
 
 bool is_image(Type ty) {
-    return ty == TYPE_PNG || ty == TYPE_IMAGE;
+    return ty == TYPE_PNG || ty == TYPE_IMAGE_CHUNK;
 }
 
 const char *type_name(Type type) {
     switch (type) {
-    case TYPE_BOOL:   return "bool";
-    case TYPE_STRING: return "string";
-    case TYPE_NULL:   return "null";
-    case TYPE_INT:    return "int";
-    case TYPE_TABLE:  return "table";
-    case TYPE_FLOAT:  return "float";
-    case TYPE_DOUBLE: return "double";
-    case TYPE_PNG:    return "PNG";
-    case TYPE_IMAGE:  return "image";
+    case TYPE_BOOL:        return "bool";
+    case TYPE_STRING:      return "string";
+    case TYPE_NULL:        return "null";
+    case TYPE_INT:         return "int";
+    case TYPE_TABLE:       return "table";
+    case TYPE_FLOAT:       return "float";
+    case TYPE_DOUBLE:      return "double";
+    case TYPE_PNG:         return "PNG";
+    case TYPE_IMAGE_CHUNK: return "image";
     }
 
     OK_UNREACHABLE();
@@ -321,12 +321,44 @@ bool type_check_query(CompiledQuery *query, TypingContext *ctx, TypedCompiledQue
     return true;
 }
 
+template <typename T>
+Type cpp_to_tt() = delete;
+
+template <>
+Type cpp_to_tt<ok::StringView>() {
+    return TYPE_STRING;
+}
+
+template <>
+Type cpp_to_tt<U32>() {
+    return TYPE_INT;
+}
+
+template <>
+Type cpp_to_tt<ImageChunk>() {
+    return TYPE_IMAGE_CHUNK;
+}
+
+template <typename... Args>
+Slice<Type> cpp_to_tt_multiple(ok::Allocator *allocator) {
+    ok::List<Type> types = ok::List<Type>::alloc(allocator);
+    (..., types.push(cpp_to_tt<Args>()));
+    return types.slice();
+}
+
 TypingContext::TypingContext(Allocator *allocator, StringView source) : allocator{allocator}, source{source} {
     ir_instruction_types = Table<U32, Type>::alloc(allocator);
     table_types = Table<U32, TypedTableSchema>::alloc(allocator);
     function_signatures = Table<StringView, FunctionSignature>::alloc(allocator);
     emitted_columns = List<U32>::alloc(allocator);
     call_args = List<U32>::alloc(allocator);
-}
 
+#define X(fn_name, ret_type, ...) do { \
+    Type return_type = cpp_to_tt<ret_type>(); \
+    Slice<Type> parameter_types = cpp_to_tt_multiple<__VA_ARGS__>(allocator); \
+    function_signatures.put(ok::StringView{#fn_name}, FunctionSignature{return_type, parameter_types}); \
+    } while (false);
+XMDB_ENUM_BUILTIN_FUNCTIONS
+#undef X
+}
 }; // namespace xmdb::SQL
