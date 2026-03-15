@@ -40,6 +40,7 @@ QueryExecutionContext *DBPool::rent_empty_execution_context(DBDescriptor *db, DB
         ctx->rows_to_insert_count = 0;
         ctx->rows_to_insert.clear();
         ctx->columns_to_update.count = 0;
+        ctx->call_args.count = 0;
         ctx->table_to_update = {};
         ctx->last_emitted_query = {};
         ctx->alter_user_atomic_node = {};
@@ -58,6 +59,7 @@ QueryExecutionContext *DBPool::rent_empty_execution_context(DBDescriptor *db, DB
     ctx->rows_to_insert_count = 0;
     ctx->rows_to_insert = ok::Table<StringView, ok::List<DBValue *>>::alloc(allocator);
     ctx->columns_to_update = ok::MultiList<StringView, DBValue *>::alloc(allocator);
+    ctx->call_args = ok::List<DBValue *>::alloc(allocator);
     ctx->current_db = db;
     ctx->table_to_update = {};
     ctx->last_emitted_query = {};

@@ -278,6 +278,22 @@ static void execute_instruction(TypedCompiledQuery *query, UZ i, QueryExecutionC
         OK_ASSERT(deleted);
         break;
     }
+    case IRInstructionOperator_Arg: {
+        U32 value_id = operands_of_Arg(&query->untyped, i);
+
+        DBValue *value = ctx->fetch_var(value_id);
+        ctx->prepare_call_arg(value);
+
+        break;
+    }
+    case IRInstructionOperator_Call: {
+        Triple<String, StringView, S64> operands = operands_of_Call(&query->untyped, i);
+
+        ctx->call(operands.op2, (U64) operands.op3);
+
+        break;
+    }
+#if 0
     case IRInstructionOperator_RGB: {
         Triple<ok::String, S64, ok::StringView> operands = operands_of_RGB(&query->untyped, i);
 
@@ -310,6 +326,7 @@ static void execute_instruction(TypedCompiledQuery *query, UZ i, QueryExecutionC
 
         break;
     }
+#endif // 0
     }
 }
 
@@ -343,6 +360,8 @@ static void run_single_node(QueryExecutionContext *ctx, QueryGraph::Node *node) 
 
         break;
     }
+    case QueryGraph::Node::Type::CALL:
+        OK_TODO_MSG("CALL");
     case QueryGraph::Node::Type::READ:
         OK_TODO_MSG("READ");
     case QueryGraph::Node::Type::WRITE:

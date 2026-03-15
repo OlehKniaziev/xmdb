@@ -119,10 +119,6 @@ static inline bool type_check_ir_instruction(U32 ip, CompiledQuery *ir_emitter, 
         ctx->ir_instruction_types.put(ip, TYPE_NULL);
         return true;
     }
-    case IRInstructionOperator_RGB: {
-        ctx->ir_instruction_types.put(ip, TYPE_IMAGE);
-        return true;
-    }
     case IRInstructionOperator_FetchTable: {
         Triple<String, StringView, TableSchema *> operands = operands_of_FetchTable(ir_emitter, ip);
         TableSchema *table_schema = operands.op3;
@@ -236,6 +232,67 @@ static inline bool type_check_ir_instruction(U32 ip, CompiledQuery *ir_emitter, 
 
         return true;
     }
+    case IRInstructionOperator_Arg: {
+        U32 value_id = operands_of_Arg(ir_emitter, ip);
+
+        Type arg_type = ctx->ir_instruction_types.get(value_id).get();
+
+        ctx->ir_instruction_types.put(ip, arg_type);
+
+        ctx->call_args.push(ip);
+
+        return true;
+    }
+    case IRInstructionOperator_Call: {
+        Triple<ok::String, ok::StringView, S64> operands = operands_of_Call(ir_emitter, ip);
+        StringView fn_name = operands.op2;
+        S64 argument_count = operands.op3;
+
+        Optional<FunctionSignature> fn_signature_opt = ctx->function_signatures.get(fn_name);
+        if (!fn_signature_opt.has_value()) {
+            Token token = ir_emitter->tokens[ip];
+            String message = String::format(ctx->allocator,
+                                            "undefined function '" OK_SV_FMT "'",
+                                            OK_SV_ARG(fn_name));
+            error_on(ctx, token, message);
+            return false;
+        }
+
+        FunctionSignature signature = fn_signature_opt.get();
+
+        if ((S64) signature.parameter_types.count != argument_count) {
+            Token token = ir_emitter->tokens[ip];
+            String message = String::format(ctx->allocator,
+                                            "function '" OK_SV_FMT "' expects %zu arguments, but %ld provided",
+                                            OK_SV_ARG(fn_name),
+                                            signature.parameter_types.count,
+                                            argument_count);
+            error_on(ctx, token, message);
+            return false;
+        }
+
+        OK_ASSERT((S64) ctx->call_args.count == argument_count);
+
+        for (UZ i = 0; i < ctx->call_args.count; ++i) {
+            U32 arg_id = ctx->call_args[i];
+            Type arg_type = ctx->ir_instruction_types.get(arg_id).get();
+            Type param_type = signature.parameter_types[i];
+            if (arg_type != param_type) {
+                Token token = ir_emitter->tokens[arg_id];
+                String message = String::format(ctx->allocator,
+                                                "expected call argument at index %zu to be of type '%s', but got a value of type '%s' instead",
+                                                i,
+                                                type_name(param_type),
+                                                type_name(arg_type));
+                error_on(ctx, token, message);
+                return false;
+            }
+        }
+
+        ctx->ir_instruction_types.put(ip, signature.return_type);
+
+        return true;
+    }
     case IRInstructionOperator_CreateTable:
     case IRInstructionOperator_CreateDatabase:
     case IRInstructionOperator_DropTable:
@@ -267,7 +324,9 @@ bool type_check_query(CompiledQuery *query, TypingContext *ctx, TypedCompiledQue
 TypingContext::TypingContext(Allocator *allocator, StringView source) : allocator{allocator}, source{source} {
     ir_instruction_types = Table<U32, Type>::alloc(allocator);
     table_types = Table<U32, TypedTableSchema>::alloc(allocator);
+    function_signatures = Table<StringView, FunctionSignature>::alloc(allocator);
     emitted_columns = List<U32>::alloc(allocator);
+    call_args = List<U32>::alloc(allocator);
 }
 
 }; // namespace xmdb::SQL

@@ -64,6 +64,10 @@ namespace xmdb {
                          UZ column_index,
                          Value column_value);
 
+        void prepare_call_arg(DBValue *);
+
+        void call(StringView, U64);
+
         QueryExecutionContext *next;
         QueryGraph query_graph;
         ok::Allocator *allocator;
@@ -79,6 +83,7 @@ namespace xmdb {
         Optional<DBTable *> table_to_insert;
         Optional<DBTable *> table_to_update;
         Optional<DBTable *> last_emitted_query;
+        List<DBValue *> call_args;
         Optional<ErrorWithSourceLocation> error;
         // TODO(oleh): Abstract this probably so it's easier to port later on.
         jmp_buf jmpbuf;

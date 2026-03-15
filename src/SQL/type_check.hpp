@@ -33,14 +33,21 @@ struct TypedCompiledQuery {
     Table<U32, TypedTableSchema> table_types;
 };
 
+struct FunctionSignature {
+    Type return_type;
+    Slice<Type> parameter_types;
+};
+
 struct TypingContext {
     TypingContext(Allocator *allocator, StringView source);
 
     Allocator *allocator;
     Table<U32, Type> ir_instruction_types;
     Table<U32, TypedTableSchema> table_types;
+    Table<StringView, FunctionSignature> function_signatures;
     List<U32> emitted_columns;
-    StringView source; // used only for error reporting
+    List<U32> call_args;
+    StringView source; // NOTE(oleh): Used only for error reporting.
     Optional<ErrorWithSourceLocation> error{};
 };
 

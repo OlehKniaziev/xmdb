@@ -19,6 +19,7 @@ public:
             ALTER_USER,
             ATOMIC,
             WRITE_COLUMN,
+            CALL,
         };
 
         Type type() const {
@@ -154,6 +155,18 @@ public:
         DBValue *m_value;
     };
 
+    class CallNode : public Node {
+    public:
+        explicit CallNode(ok::StringView fn_name, Slice<DBValue *> args) : Node{Type::CALL},
+                                                                           m_fn_name{fn_name},
+                                                                           m_args{args} {
+        }
+
+    private:
+        ok::StringView m_fn_name;
+        Slice<DBValue *> m_args;
+    };
+
     ok::Optional<Node *> root_node() const {
         return m_root_node;
     }
@@ -172,6 +185,10 @@ public:
 
     WriteColumnNode *write_column(DBTable *table, UZ idx, DBValue *value) {
         return add_generic_node<WriteColumnNode>(table, idx, value);
+    }
+
+    CallNode *call(ok::StringView fn_name, Slice<DBValue *> args) {
+        return add_generic_node<CallNode>(fn_name, args);
     }
 
     void reset();
