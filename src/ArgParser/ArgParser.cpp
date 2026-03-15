@@ -145,6 +145,20 @@ bool ArgParser::parse() {
         goto cleanup;
     }
 
+    for (UZ i = 0; i < m_positional_specs.count; ++i) {
+        PositionalSpec spec = m_positional_specs[i];
+        if (spec.idx >= m_positionals.count) {
+            m_error_message = ok::String::format(m_allocator,
+                                                 "index %u of positional argument '%s' is out of bounds with %zu positional arguments",
+                                                 spec.idx,
+                                                 spec.name,
+                                                 m_positionals.count);
+            result = false;
+            goto cleanup;
+        }
+    }
+
+
 cleanup:
     flag_specs.dealloc();
     m_failed = !result;
@@ -173,7 +187,7 @@ void ArgParser::help() {
     for (UZ i = 0; i < m_positional_specs.count; ++i) {
         PositionalSpec spec = m_positional_specs[i];
         if (spec.idx >= m_positional_specs.count) {
-            OK_PANIC_FMT("Index %u for a positional argument '%s' is out of range for expected number of positionals %zu",
+            OK_PANIC_FMT("Index %u for a positional argument '%s' is out of range for specified number of positionals %zu",
                          spec.idx,
                          spec.name,
                          m_positional_specs.count);
