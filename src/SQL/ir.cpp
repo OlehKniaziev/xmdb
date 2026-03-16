@@ -880,18 +880,20 @@ Optional<Slice<U32>> compile_graph_node(StmtGraph *g, U32 node_id, IrContext *ct
 
                     StringView column_name = insert_stmt->columns[j].view();
 
-                    emit_InsertColumn(&ctx->ir_emitter, value_edge_node->up.expr->token, table_node_id.value,
-                                      value_id.value, column_name);
+                    emit_InsertColumn(&ctx->ir_emitter,
+                                      value_edge_node->up.expr->token,
+                                      column_name,
+                                      value_id.value);
                 }
 
-                emit_InsertRow(&ctx->ir_emitter, first_expr_node->up.expr->token, table_node_id.value);
+                emit_InsertRow(&ctx->ir_emitter, first_expr_node->up.expr->token);
 
                 values_start += values_count;
             }
         }
         ctx->pop_namespace();
 
-        node->ir_id = emit_CommitInsert(&ctx->ir_emitter, insert_stmt->token);
+        node->ir_id = emit_CommitInsert(&ctx->ir_emitter, insert_stmt->token, table_node_id.value);
         result_nodes_ids.push(node->ir_id);
         break;
     }

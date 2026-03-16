@@ -176,27 +176,22 @@ static void execute_instruction(TypedCompiledQuery *query, UZ i, QueryExecutionC
         break;
     }
     case IRInstructionOperator_InsertColumn: {
-        Triple<U32, U32, StringView> operands = operands_of_InsertColumn(&query->untyped, i);
+        Tuple<StringView, U32> operands = operands_of_InsertColumn(&query->untyped, i);
 
-        DBTable *table = ctx->fetch_table(operands.op1);
         DBValue *column_value = ctx->fetch_var(operands.op2);
-        StringView column_name = operands.op3;
+        StringView column_name = operands.op1;
 
-        ctx->insert_column(table, column_name, column_value);
+        ctx->insert_column(column_name, column_value);
         break;
     }
     case IRInstructionOperator_InsertRow: {
-        // TODO(oleh): Make this instruction not carry any operands
-        U32 table_ip = operands_of_InsertRow(&query->untyped, i);
-
-        DBTable *table = ctx->fetch_table(table_ip);
-        OK_UNUSED(table);
         ctx->insert_row();
-
         break;
     }
     case IRInstructionOperator_CommitInsert: { // NOTE(oleh): This instruction has no operands!
-        ctx->commit_insert();
+        U32 table_ip = operands_of_CommitInsert(&query->untyped, i);
+        DBTable *table = ctx->fetch_table(table_ip);
+        ctx->commit_insert(table);
         break;
     }
     case IRInstructionOperator_UpdateColumn: {
@@ -363,6 +358,8 @@ static void run_single_node(QueryExecutionContext *ctx, QueryGraph::Node *node) 
 
         break;
     }
+    case QueryGraph::Node::Type::INSERT:
+        OK_TODO_MSG("INSERT");
     case QueryGraph::Node::Type::CALL:
         OK_TODO_MSG("CALL");
     case QueryGraph::Node::Type::READ:

@@ -191,22 +191,36 @@ static inline bool type_check_ir_instruction(U32 ip, CompiledQuery *ir_emitter, 
         return true;
     }
     case IRInstructionOperator_InsertColumn: {
-        Triple<U32, U32, StringView> operands = operands_of_InsertColumn(ir_emitter, ip);
+        Tuple<StringView, U32> operands = operands_of_InsertColumn(ir_emitter, ip);
 
-        TypedTableSchema table_schema = ctx->table_types.get(operands.op1).get();
+        ctx->insert_column_names.push(operands.op1);
+        ctx->insert_column_values.push(operands.op2);
 
-        Type column_type = ctx->ir_instruction_types.get(operands.op2).get();
+        return true;
+    }
+    case IRInstructionOperator_CommitInsert: {
+        U32 table_ip = operands_of_CommitInsert(ir_emitter, ip);
+        TypedTableSchema table_schema = ctx->table_types.get(table_ip).get();
 
-        Type expected_column_type;
-        OK_ASSERT(find_column(table_schema, operands.op3, &expected_column_type));
+        for (UZ i = 0; i < ctx->insert_column_names.count; ++i) {
+            StringView column_name = ctx->insert_column_names[i];
+            U32 value_ip = ctx->insert_column_values[i];
 
-        if (!types_are_equal(column_type, expected_column_type)) {
-            Token token = ir_emitter->tokens[ip];
-            String message =
+            Type expected_column_type;
+
+            OK_ASSERT(find_column(table_schema, column_name, &expected_column_type));
+
+            Type column_type = ctx->ir_instruction_types.get(value_ip).get();
+
+            if (!types_are_equal(column_type, expected_column_type)) {
+                Token token = ir_emitter->tokens[ip];
+                String message =
                     String::format(ctx->allocator, "expected a value of type '%s', but got '%s' instead",
                                    type_name(expected_column_type), type_name(column_type));
-            error_on(ctx, token, message);
-            return false;
+                error_on(ctx, token, message);
+                return false;
+            }
+
         }
 
         return true;
@@ -299,7 +313,6 @@ static inline bool type_check_ir_instruction(U32 ip, CompiledQuery *ir_emitter, 
     case IRInstructionOperator_DropDatabase:
     case IRInstructionOperator_UseDatabase:
     case IRInstructionOperator_InsertRow:
-    case IRInstructionOperator_CommitInsert:
     case IRInstructionOperator_CommitUpdate:
     case IRInstructionOperator_DeleteTable:
     case IRInstructionOperator_CreateUser:
@@ -352,6 +365,8 @@ TypingContext::TypingContext(Allocator *allocator, StringView source) : allocato
     function_signatures = Table<StringView, FunctionSignature>::alloc(allocator);
     emitted_columns = List<U32>::alloc(allocator);
     call_args = List<U32>::alloc(allocator);
+    insert_column_names = List<StringView>::alloc(allocator);
+    insert_column_values = List<U32>::alloc(allocator);
 
 #define X(fn_name, ret_type, ...) do { \
     Type return_type = cpp_to_tt<ret_type>(); \

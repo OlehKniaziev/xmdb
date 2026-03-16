@@ -47,6 +47,8 @@ struct TypingContext {
     Table<StringView, FunctionSignature> function_signatures;
     List<U32> emitted_columns;
     List<U32> call_args;
+    List<StringView> insert_column_names;
+    List<U32> insert_column_values;
     StringView source; // NOTE(oleh): Used only for error reporting.
     Optional<ErrorWithSourceLocation> error{};
 };

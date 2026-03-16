@@ -43,10 +43,10 @@ namespace xmdb {
 
         DBTable *emit_query(U32, SQL::ColumnType *);
 
-        void insert_column(DBTable *, StringView, DBValue *);
+        void insert_column(StringView, DBValue *);
         void insert_row();
 
-        void commit_insert();
+        void commit_insert(DBTable *);
 
         void update_column(DBTable *, StringView, DBValue *);
         void commit_update();
@@ -74,8 +74,9 @@ namespace xmdb {
         DBUser *user;
         ok::Table<U32, DBValue *> vars;
         ok::Table<U32, DBTable *> tables;
-        ok::Table<StringView, ok::List<DBValue *>> rows_to_insert;
-        UZ rows_to_insert_count;
+        List<StringView> insert_column_names;
+        List<DBValue *> insert_column_values;
+        List<ok::Pair<Slice<StringView>, Slice<DBValue *>>> rows_to_insert;
         ok::MultiList<StringView, DBValue *, DBTable *> emitted_columns;
         ok::MultiList<StringView, DBValue *> columns_to_update;
         Optional<QueryGraph::AtomicNode *> alter_user_atomic_node;

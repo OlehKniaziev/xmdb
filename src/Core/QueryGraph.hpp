@@ -20,6 +20,7 @@ public:
             ATOMIC,
             WRITE_COLUMN,
             CALL,
+            INSERT,
         };
 
         Type type() const {
@@ -175,6 +176,27 @@ public:
         DelayedDBValue *m_return_value;
     };
 
+    class InsertNode : public Node {
+    public:
+        using ValuesSlice = Slice<ok::Pair<StringView, DBValue *>>;
+
+        explicit InsertNode(DBTable *table,
+                            Slice<StringView> columns_names,
+                            Slice<DBValue *> columns_values,
+                            UZ rows_count) : Node{Type::INSERT},
+                                             m_table{table},
+                                             m_columns_names{columns_names},
+                                             m_columns_values{columns_values},
+                                             m_rows_count{rows_count} {
+        }
+
+    private:
+        DBTable *m_table;
+        Slice<StringView> m_columns_names;
+        Slice<DBValue *> m_columns_values;
+        UZ m_rows_count;
+    };
+
     ok::Optional<Node *> root_node() const {
         return m_root_node;
     }
@@ -197,6 +219,13 @@ public:
 
     CallNode *call(ok::Allocator *allocator, ok::StringView fn_name, Slice<DBValue *> args) {
         return add_generic_node<CallNode>(allocator, fn_name, args);
+    }
+
+    InsertNode *insert(DBTable *table,
+                       Slice<StringView> names,
+                       Slice<DBValue *> values,
+                       UZ rows_count) {
+        return add_generic_node<InsertNode>(table, names, values, rows_count);
     }
 
     void reset();

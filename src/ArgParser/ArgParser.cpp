@@ -41,6 +41,7 @@ bool ArgParser::parse() {
     char **args = m_argv + 1;
 
     ok::List<FlagSpec> flag_specs = m_flag_specs.copy(m_allocator);
+    UZ flag_specs_starting_count = flag_specs.count;
 
     for (UZ i = 0; i < arg_count; ) {
         const char *arg = args[i];
@@ -102,9 +103,20 @@ bool ArgParser::parse() {
                 ++i;
 
                 flag_specs.remove_at(f);
+
+                break;
             } else {
                 ++f;
             }
+        }
+
+        // NOTE(oleh): No spec matched the specified flag.
+        if (flag_specs.count == flag_specs_starting_count) {
+            m_error_message = ok::String::format(m_allocator,
+                                                 "unrecognized flag '%s'",
+                                                 arg);
+            result = false;
+            goto cleanup;
         }
     }
 

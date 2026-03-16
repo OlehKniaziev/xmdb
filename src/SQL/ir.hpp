@@ -76,9 +76,9 @@ struct TableSchema {
     INSTR_1(CreateUser, StringView)                                                                                    \
     INSTR_1(DropTable, StringView)                                                                                     \
     INSTR_1(DropDatabase, StringView)                                                                                  \
-    INSTR_3(InsertColumn, U32, U32, StringView)                                                                        \
-    INSTR_1(InsertRow, U32)                                                                                            \
-    INSTR_0(CommitInsert)                                                                                              \
+    INSTR_2(InsertColumn, StringView, U32)                                                                             \
+    INSTR_0(InsertRow)                                                                                            \
+    INSTR_1(CommitInsert, U32)                                                                                              \
     INSTR_3(UpdateColumn, U32, U32, StringView)                                                                        \
     INSTR_0(CommitUpdate)                                                                                              \
     INSTR_1(DeleteTable, U32)                                                                                          \

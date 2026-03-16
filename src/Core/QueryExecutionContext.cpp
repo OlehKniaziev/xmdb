@@ -128,38 +128,26 @@ DBTable *QueryExecutionContext::emit_query(U32 columns_count, SQL::ColumnType *c
     return table;
 }
 
-void QueryExecutionContext::insert_column(DBTable *table, StringView column_name, DBValue *column_value) {
+void QueryExecutionContext::insert_column(StringView column_name, DBValue *column_value) {
     CHECK_WRITE(this);
 
-    if (!table_to_insert) {
-        table_to_insert = table;
-    } else {
-        OK_ASSERT(table == table_to_insert.get());
-    }
-
-    ok::Optional<ok::List<DBValue *>> values_opt = rows_to_insert.get(column_name);
-    ok::List<DBValue *> values{};
-
-    if (values_opt) {
-        values = values_opt.get();
-    } else {
-        values = ok::List<DBValue *>::alloc(allocator);
-    }
-
-    values.push(column_value);
-    rows_to_insert.put(column_name, values);
+    insert_column_names.push(column_name);
+    insert_column_values.push(column_value);
 }
 
 void QueryExecutionContext::insert_row() {
-    OK_ASSERT(table_to_insert);
-    ++rows_to_insert_count;
+    Slice<StringView> column_names = insert_column_names.copy(allocator).slice();
+    Slice<DBValue *> column_values = insert_column_values.copy(allocator).slice();
+    insert_column_names.count = 0;
+    insert_column_values.count = 0;
+    rows_to_insert.push({column_names, column_values});
 }
 
 // TODO(oleh): This should depend on the size of a single record for a given table, since we don't
 // want to exceed some given memory usage quota.
 constexpr UZ DB_RECORD_BUFFER_CAPACITY = 32;
 
-static void flush_buffer(QueryExecutionContext *ctx,
+void flush_buffer(QueryExecutionContext *ctx,
                          DBTable *table,
                          ok::Slice<DBRecord> record_buffer) {
     OK_UNUSED(ctx);
@@ -315,13 +303,30 @@ void QueryExecutionContext::fill_column(DBRecord *record,
     }
 }
 
-void QueryExecutionContext::commit_insert() {
+void QueryExecutionContext::commit_insert(DBTable *table) {
     CHECK_WRITE(this);
 
-    OK_ASSERT(table_to_insert);
+    Slice<StringView> insert_column_names{};
+    List<DBValue *> insert_column_values = List<DBValue *>::alloc(allocator);
 
-    DBTable *table = table_to_insert.get();
+    for (UZ i = 0; i < rows_to_insert.count; ++i) {
+        ok::Pair<Slice<StringView>, Slice<DBValue *>> row = rows_to_insert[i];
+        insert_column_names = row.a;
 
+        for (UZ val_idx = 0; val_idx < row.b.count; ++val_idx) {
+            DBValue *val = row.b[val_idx];
+            insert_column_values.push(val);
+        }
+    }
+
+    query_graph.insert(table,
+                       insert_column_names.slice(),
+                       insert_column_values.slice(),
+                       rows_to_insert.count);
+
+    rows_to_insert.count = 0;
+
+#if 0
     if (table->flags() & DBTable::F_PERSIST) {
         TableLayout table_layout = table->layout();
 
@@ -352,7 +357,6 @@ void QueryExecutionContext::commit_insert() {
             }
 
             if (records_buffer_count >= records_buffer.count) {
-                OK_PANIC("break");
                 flush_buffer(this, table, records_buffer);
                 records_buffer_count = 0;
             } else {
@@ -364,7 +368,7 @@ void QueryExecutionContext::commit_insert() {
         flush_buffer(this, table, records_buffer.slice(0, records_buffer_count));
     } else {
         OK_TODO();
-#if 0
+#if OLD_CODE
         Slice<DBValue *> table_columns_values = table->proxy_column_values();
 
         for (UZ row_idx = 0; row_idx < rows.count; ++row_idx) {
@@ -392,8 +396,7 @@ void QueryExecutionContext::commit_insert() {
         table->set_rows_count(table->rows_count() + rows.count);
 #endif // 0
     }
-
-    rows_to_insert.clear();
+#endif // 0
 }
 
 void QueryExecutionContext::update_column(DBTable *table, StringView column_name, DBValue *column_value) {
