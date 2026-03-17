@@ -60,11 +60,6 @@ namespace xmdb {
 
         DBValue *compare(DBValue *, DBValue *);
 
-        void fill_column(DBRecord *record,
-                         DBTable *table,
-                         UZ column_index,
-                         Value column_value);
-
         void prepare_call_arg(DBValue *);
 
         DBValue *call(StringView, U64);
