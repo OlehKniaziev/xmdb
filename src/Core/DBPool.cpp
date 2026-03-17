@@ -31,6 +31,7 @@ DBDescriptor *DBPool::create_db(StringView db_name) {
 QueryExecutionContext *DBPool::rent_empty_execution_context(DBDescriptor *db, DBUser *user) {
     if (execution_contexts) {
         QueryExecutionContext *ctx = execution_contexts;
+        ctx->static_storage = make_or_get_static_storage();
         ctx->query_graph.reset();
         ctx->current_db = db;
         ctx->user = user;
@@ -51,6 +52,7 @@ QueryExecutionContext *DBPool::rent_empty_execution_context(DBDescriptor *db, DB
 
     QueryExecutionContext *ctx = allocator->alloc<QueryExecutionContext>();
     ctx->next = nullptr;
+    ctx->static_storage = make_or_get_static_storage();
     ctx->query_graph = QueryGraph{allocator};
     ctx->allocator = allocator;
     ctx->user = user;

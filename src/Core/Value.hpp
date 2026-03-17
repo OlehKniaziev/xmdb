@@ -72,8 +72,12 @@ public:
     }
 
     FixedString as_string() {
+        return *as_string_ptr();
+    }
+
+    const FixedString *as_string_ptr() const {
         OK_VERIFY(type() == Type::STRING);
-        return *reinterpret_cast<FixedString *>(m_data);
+        return reinterpret_cast<const FixedString *>(m_data);
     }
 
     ImageChunk *as_chunk() {

@@ -8,6 +8,7 @@
 #include "DBValue.hpp"
 #include "DBRecord.hpp"
 #include "QueryGraph.hpp"
+#include "StaticStorage.hpp"
 
 #define XMDB_FAIL(ctx, msg)                                             \
     do {                                                                \
@@ -69,6 +70,7 @@ namespace xmdb {
         DBValue *call(StringView, U64);
 
         QueryExecutionContext *next;
+        StaticStorage *static_storage;
         QueryGraph query_graph;
         ok::Allocator *allocator;
         DBUser *user;

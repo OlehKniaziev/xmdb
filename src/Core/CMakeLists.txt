@@ -19,6 +19,7 @@ add_library(LibCore
   FixedString.cpp
   state.cpp
   image.cpp
+  StaticStorage.cpp
 )
 
 set_property(TARGET LibCore PROPERTY POSITION_INDEPENDENT_CODE 1)

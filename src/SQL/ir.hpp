@@ -144,6 +144,9 @@ static inline const char *ir_instruction_operator_name(IRInstructionOperator op)
 #define XMDB_ENUM_BUILTIN_FUNCTIONS \
     X(RGB, ImageChunk, U32, U32, StringView)
 
+#define XMDB_BUILTIN_FUNCTION_SIG_NAME(name, ret, ...) Result<ret, ErrorWithSourceLocation>(*name)(SourceLocation, ok::Allocator *, __VA_ARGS__)
+#define XMDB_BUILTIN_FUNCTION_SIG(ret, ...) Result<ret, ErrorWithSourceLocation>(*)(SourceLocation, ok::Allocator *, __VA_ARGS__)
+
 struct IRInstruction {
     inline bool is_table_generating() const {
         return op == IRInstructionOperator_FetchTable || op == IRInstructionOperator_EmitQuery;

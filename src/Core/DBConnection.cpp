@@ -2,8 +2,10 @@
 #include "Logger.hpp"
 #include "DBRecord.hpp"
 #include "constants.hpp"
+#include "Result.hpp"
 
 #include <SQL/ir.hpp>
+#include <SQL/util.hpp>
 #include <csetjmp>
 
 namespace xmdb {
@@ -328,6 +330,88 @@ static void execute_instruction(TypedCompiledQuery *query, UZ i, QueryExecutionC
     }
 }
 
+template <typename T>
+DBValue *cpp_to_db_value(ok::Allocator *, const T&) = delete;
+
+template <>
+DBValue *cpp_to_db_value<ImageChunk>(ok::Allocator *allocator, const ImageChunk& image_chunk) {
+    return new (allocator) ImageDataDBValue{
+        image_chunk.width,
+        image_chunk.height,
+        image_chunk.data,
+        image_chunk.pixel_format,
+    };
+}
+
+template <typename... Args>
+consteval UZ args_count() {
+    return sizeof...(Args);
+}
+
+template <typename T>
+T extract(Allocator *allocator, DBValue *) = delete;
+
+template <UZ Idx, typename T>
+T extract(Allocator *allocator, Slice<DBValue *> values) {
+    return extract<T>(allocator, values[Idx]);
+}
+
+template <>
+U32 extract<U32>(Allocator *allocator, DBValue *db_value) {
+    Value value = poll(allocator, db_value).get();
+    OK_ASSERT(value.type() == Value::Type::INT);
+
+    S64 i = value.as_int();
+
+    OK_VERIFY(i >= 0);
+    OK_VERIFY(i < UINT32_MAX);
+
+    return static_cast<U32>(i);
+}
+
+template <>
+StringView extract<StringView>(Allocator *allocator, DBValue *db_value) {
+    Value value = poll(allocator, db_value).get();
+    OK_ASSERT(value.type() == Value::Type::STRING);
+
+    const FixedString *s = value.as_string_ptr();
+    return s->view();
+}
+
+template <UZ... Xs>
+struct Seq {};
+
+template <UZ Counter, UZ Max, UZ... Ints>
+struct SeqLoop {
+    using Type = typename SeqLoop<Counter + 1, Max, Ints..., Counter>::Type;
+};
+
+template <UZ Max, UZ... Ints>
+struct SeqLoop<Max, Max, Ints...> {
+    using Type = Seq<Ints...>;
+};
+
+template <typename... args>
+using MakeSeq = typename SeqLoop<0, sizeof...(args)>::Type;
+
+template <typename Return, typename... Args, UZ... I>
+Result<Return, ErrorWithSourceLocation> call_impl(SourceLocation location,
+                                                  ok::Allocator *allocator,
+                                                  XMDB_BUILTIN_FUNCTION_SIG_NAME(fn_ptr, Return, Args...),
+                                                  ok::Array<DBValue *, sizeof...(Args)> raw_args,
+                                                  Seq<I...>) {
+    Slice<DBValue *> raw_args_slice = raw_args.slice();
+    return fn_ptr(location, allocator, extract<I, Args>(allocator, raw_args_slice)...);
+}
+
+template <typename Return, typename... Args>
+Result<Return, ErrorWithSourceLocation> call(SourceLocation location,
+                                             ok::Allocator *allocator,
+                                             XMDB_BUILTIN_FUNCTION_SIG_NAME(fn_ptr, Return, Args...),
+                                             ok::Array<DBValue *, sizeof...(Args)> raw_args) {
+    return call_impl(location, allocator, fn_ptr, raw_args, MakeSeq<Args...>{});
+}
+
 static void run_single_node(QueryExecutionContext *ctx, QueryGraph::Node *node) {
     switch (node->type()) {
     case QueryGraph::Node::Type::ALTER_USER: {
@@ -350,7 +434,7 @@ static void run_single_node(QueryExecutionContext *ctx, QueryGraph::Node *node) 
 
             Value password_value = password_value_stream.next().get();
             FixedString new_password = password_value.as_string();
-            user->sha256_password_digest = sha256_digest(view(&new_password));
+            user->sha256_password_digest = sha256_digest(new_password.view());
 
             break;
         }
@@ -360,8 +444,47 @@ static void run_single_node(QueryExecutionContext *ctx, QueryGraph::Node *node) 
     }
     case QueryGraph::Node::Type::INSERT:
         OK_TODO_MSG("INSERT");
-    case QueryGraph::Node::Type::CALL:
-        OK_TODO_MSG("CALL");
+    case QueryGraph::Node::Type::CALL: {
+        auto *call_node = static_cast<QueryGraph::CallNode *>(node);
+        StringView fn_name = call_node->fn_name();
+        Slice<DBValue *> call_args = call_node->args();
+
+#define X(name, ret, ...) do {                                          \
+            if (fn_name == StringView{#name}) {                         \
+                void *raw_ptr = ctx->static_storage->builtin_functions.get(StringView{#name}).get(); \
+                auto fn_ptr = reinterpret_cast<XMDB_BUILTIN_FUNCTION_SIG(ret, __VA_ARGS__)>(raw_ptr); \
+                ok::Array<DBValue *, args_count<__VA_ARGS__>()> args_array{}; \
+                OK_VERIFY(call_args.count == args_array.get_count());   \
+                for (UZ i = 0; i < call_args.count; ++i) {              \
+                    args_array.items[i] = call_args[i];                 \
+                }                                                       \
+                XMDB_FIXME("Propagate source location to built-in functions"); \
+                Result<ret, ErrorWithSourceLocation> call_result = call<ret, __VA_ARGS__>({}, ctx->allocator, fn_ptr, args_array); \
+                if (!call_result.ok()) {                                \
+                    ErrorWithSourceLocation err = call_result.error();  \
+                    ok::String error_message = SQL::format_error(ok::temp_allocator(), err.location, err.message.view()); \
+                    XMDB_FAIL_FMT(ctx, "Failed to call builtin function '%s': %s", \
+                                  #name,                             \
+                                  error_message.cstr());                \
+                } else {                                                \
+                    ret builtin_result = call_result.unwrap();          \
+                    DBValue *builtin_value_result = cpp_to_db_value(ctx->allocator, builtin_result); \
+                    DelayedDBValue *call_node_return_value = call_node->return_value(); \
+                    call_node_return_value->set(builtin_value_result);  \
+                }                                                       \
+                goto success;                                           \
+            }                                                           \
+        } while (false);
+
+        XMDB_ENUM_BUILTIN_FUNCTIONS
+
+#undef X
+
+        OK_TODO_MSG("User-defined function");
+
+success:
+        break;
+    }
     case QueryGraph::Node::Type::READ:
         OK_TODO_MSG("READ");
     case QueryGraph::Node::Type::WRITE:

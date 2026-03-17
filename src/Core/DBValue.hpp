@@ -163,13 +163,13 @@ public:
 
 class ImageDataDBValue : public DBValue {
 public:
-    ImageDataDBValue(U64 width, U64 height, ok::Slice<U8> data, PixelFormat format) : DBValue{SQL::TYPE_IMAGE_CHUNK, Kind::IMAGE_DATA}, m_width{width}, m_height{height}, m_data{data}, m_format{format} {}
+    ImageDataDBValue(U32 width, U32 height, ok::Slice<U8> data, PixelFormat format) : DBValue{SQL::TYPE_IMAGE_CHUNK, Kind::IMAGE_DATA}, m_width{width}, m_height{height}, m_data{data}, m_format{format} {}
 
-    U64 width() {
+    U32 width() {
         return m_width;
     }
 
-    U64 height() {
+    U32 height() {
         return m_height;
     }
 
@@ -182,8 +182,8 @@ public:
     }
 
 private:
-    U64 m_width;
-    U64 m_height;
+    U32 m_width;
+    U32 m_height;
     ok::Slice<U8> m_data;
     PixelFormat m_format;
 };

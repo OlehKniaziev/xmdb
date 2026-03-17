@@ -158,20 +158,28 @@ public:
 
     class CallNode : public Node {
     public:
-        explicit CallNode(ok::Allocator *allocator,
-                          ok::StringView fn_name,
+        explicit CallNode(Allocator *allocator,
+                          StringView fn_name,
                           Slice<DBValue *> args) : Node{Type::CALL},
                                                    m_fn_name{fn_name},
                                                    m_args{args},
                                                    m_return_value{new (allocator) DelayedDBValue{}} {
         }
 
-        DBValue *return_value() {
+        Slice<DBValue *> args() const {
+            return m_args;
+        }
+
+        DelayedDBValue *return_value() const {
             return m_return_value;
         }
 
+        StringView fn_name() const {
+            return m_fn_name;
+        }
+
     private:
-        ok::StringView m_fn_name;
+        StringView m_fn_name;
         Slice<DBValue *> m_args;
         DelayedDBValue *m_return_value;
     };
