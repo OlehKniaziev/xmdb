@@ -3,6 +3,7 @@
 
 #include <Core/ok.hpp>
 #include <Core/util.hpp>
+#include <Core/image.hpp>
 
 #include "ast.hpp"
 
@@ -65,18 +66,19 @@ struct TableSchema {
     INSTR_VAR_2(Gt, U32, U32)                                                                                          \
     INSTR_VAR_2(FetchColumn, U32, StringView)                                                                          \
     INSTR_VAR_2(FetchTable, StringView, TableSchema *)                                                                 \
-    INSTR_VAR_2(RGB, S64, StringView)                                   \
+    INSTR_VAR_2(Call, StringView, S64) \
     INSTR_3(EmitColumn, U32, U32, StringView)                                                                          \
     INSTR_VAR_1(EmitQuery, U32)                                                                                        \
     INSTR_1(UseDatabase, StringView)                                                                                   \
+    INSTR_1(Arg, U32) \
     INSTR_2(CreateTable, StringView, TableSchema *)                                                                    \
     INSTR_1(CreateDatabase, StringView)                                                                                \
     INSTR_1(CreateUser, StringView)                                                                                    \
     INSTR_1(DropTable, StringView)                                                                                     \
     INSTR_1(DropDatabase, StringView)                                                                                  \
-    INSTR_3(InsertColumn, U32, U32, StringView)                                                                        \
-    INSTR_1(InsertRow, U32)                                                                                            \
-    INSTR_0(CommitInsert)                                                                                              \
+    INSTR_2(InsertColumn, StringView, U32)                                                                             \
+    INSTR_0(InsertRow)                                                                                            \
+    INSTR_1(CommitInsert, U32)                                                                                              \
     INSTR_3(UpdateColumn, U32, U32, StringView)                                                                        \
     INSTR_0(CommitUpdate)                                                                                              \
     INSTR_1(DeleteTable, U32)                                                                                          \
@@ -138,6 +140,12 @@ static inline const char *ir_instruction_operator_name(IRInstructionOperator op)
 #undef INSTR_1
 #undef INSTR_2
 #undef INSTR_3
+
+#define XMDB_ENUM_BUILTIN_FUNCTIONS \
+    X(RGB, ImageChunk, U32, U32, StringView)
+
+#define XMDB_BUILTIN_FUNCTION_SIG_NAME(name, ret, ...) Result<ret, ErrorWithSourceLocation>(*name)(SourceLocation, ok::Allocator *, __VA_ARGS__)
+#define XMDB_BUILTIN_FUNCTION_SIG(ret, ...) Result<ret, ErrorWithSourceLocation>(*)(SourceLocation, ok::Allocator *, __VA_ARGS__)
 
 struct IRInstruction {
     inline bool is_table_generating() const {

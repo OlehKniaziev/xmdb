@@ -212,53 +212,16 @@ static Optional<U32> compile_expr(Expr *expr, IrContext *ctx) {
         auto *call = static_cast<CallExpr *>(expr);
         OK_VERIFY(call->fn->type == Expr::IDENT);
 
-        constexpr UZ RGB_ARITY = 3;
-
         ok::String fn_name = static_cast<IdentifierExpr *>(call->fn)->value;
-        if (fn_name == "RGB"_sv) {
-            if (call->args.count != RGB_ARITY) {
-                ok::String message = ok::String::format(ctx->allocator, "arity mismatch: expected %zu args, got %zu instead", RGB_ARITY, call->args.count);
-                ctx->error_on(call->token, message);
-                return {};
-            }
 
-            Expr *we = call->args[0];
-            Expr *he = call->args[1];
-            Expr *de = call->args[2];
-
-            if (we->type != Expr::INTEGER_LIT) {
-                ok::String message = ok::String::format(ctx->allocator, "expected the 'width' argument to be of type 'INT'");
-                ctx->error_on(we->token, message);
-                return {};
-            }
-
-            if (he->type != Expr::INTEGER_LIT) {
-                ok::String message = ok::String::format(ctx->allocator, "expected the 'height' argument to be of type 'INT'");
-                ctx->error_on(he->token, message);
-                return {};
-            }
-
-            if (de->type != Expr::STRING_LIT) {
-                ok::String message = ok::String::format(ctx->allocator, "expected the 'data' argument to be of type 'STRING'");
-                ctx->error_on(de->token, message);
-                return {};
-            }
-
-            S64 w = static_cast<IntegerExpr *>(we)->value;
-            S64 h = static_cast<IntegerExpr *>(he)->value;
-            U32 u32_max = ~(U32)0;
-            OK_VERIFY(w <= u32_max);
-            OK_VERIFY(h <= u32_max);
-            S64 wh = (S64)(((U64)w << 32) | ((U64)h & u32_max));
-
-            ok::StringView data = static_cast<StringExpr *>(de)->value.view();
-
-            return emit_RGB(e, expr->token, wh, data);
-        } else {
-            ok::String message = ok::String::format(ctx->allocator, "unknown built-in function '%s'", fn_name.cstr());
-            ctx->error_on(call->fn->token, message);
-            return {};
+        for (UZ i = 0; i < call->args.count; ++i) {
+            Expr *arg = call->args[i];
+            Optional<U32> arg_id = compile_expr(arg, ctx);
+            TRY(arg_id);
+            emit_Arg(e, arg->token, arg_id.get());
         }
+
+        return emit_Call(e, expr->token, fn_name.view(), call->args.count);
     }
     case Expr::STAR:
     case Expr::BINARY_OP:
@@ -917,18 +880,20 @@ Optional<Slice<U32>> compile_graph_node(StmtGraph *g, U32 node_id, IrContext *ct
 
                     StringView column_name = insert_stmt->columns[j].view();
 
-                    emit_InsertColumn(&ctx->ir_emitter, value_edge_node->up.expr->token, table_node_id.value,
-                                      value_id.value, column_name);
+                    emit_InsertColumn(&ctx->ir_emitter,
+                                      value_edge_node->up.expr->token,
+                                      column_name,
+                                      value_id.value);
                 }
 
-                emit_InsertRow(&ctx->ir_emitter, first_expr_node->up.expr->token, table_node_id.value);
+                emit_InsertRow(&ctx->ir_emitter, first_expr_node->up.expr->token);
 
                 values_start += values_count;
             }
         }
         ctx->pop_namespace();
 
-        node->ir_id = emit_CommitInsert(&ctx->ir_emitter, insert_stmt->token);
+        node->ir_id = emit_CommitInsert(&ctx->ir_emitter, insert_stmt->token, table_node_id.value);
         result_nodes_ids.push(node->ir_id);
         break;
     }

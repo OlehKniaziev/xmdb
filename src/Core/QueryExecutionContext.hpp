@@ -8,6 +8,7 @@
 #include "DBValue.hpp"
 #include "DBRecord.hpp"
 #include "QueryGraph.hpp"
+#include "StaticStorage.hpp"
 
 #define XMDB_FAIL(ctx, msg)                                             \
     do {                                                                \
@@ -43,10 +44,10 @@ namespace xmdb {
 
         DBTable *emit_query(U32, SQL::ColumnType *);
 
-        void insert_column(DBTable *, StringView, DBValue *);
+        void insert_column(StringView, DBValue *);
         void insert_row();
 
-        void commit_insert();
+        void commit_insert(DBTable *);
 
         void update_column(DBTable *, StringView, DBValue *);
         void commit_update();
@@ -59,19 +60,20 @@ namespace xmdb {
 
         DBValue *compare(DBValue *, DBValue *);
 
-        void fill_column(DBRecord *record,
-                         DBTable *table,
-                         UZ column_index,
-                         Value column_value);
+        void prepare_call_arg(DBValue *);
+
+        DBValue *call(StringView, U64);
 
         QueryExecutionContext *next;
+        StaticStorage *static_storage;
         QueryGraph query_graph;
         ok::Allocator *allocator;
         DBUser *user;
         ok::Table<U32, DBValue *> vars;
         ok::Table<U32, DBTable *> tables;
-        ok::Table<StringView, ok::List<DBValue *>> rows_to_insert;
-        UZ rows_to_insert_count;
+        List<StringView> insert_column_names;
+        List<DBValue *> insert_column_values;
+        List<ok::Pair<Slice<StringView>, Slice<DBValue *>>> rows_to_insert;
         ok::MultiList<StringView, DBValue *, DBTable *> emitted_columns;
         ok::MultiList<StringView, DBValue *> columns_to_update;
         Optional<QueryGraph::AtomicNode *> alter_user_atomic_node;
@@ -79,6 +81,7 @@ namespace xmdb {
         Optional<DBTable *> table_to_insert;
         Optional<DBTable *> table_to_update;
         Optional<DBTable *> last_emitted_query;
+        List<DBValue *> call_args;
         Optional<ErrorWithSourceLocation> error;
         // TODO(oleh): Abstract this probably so it's easier to port later on.
         jmp_buf jmpbuf;

@@ -3,6 +3,7 @@
 #include "ok.hpp"
 #include "new.hpp"
 #include "DBValue.hpp"
+#include "DBTable.hpp"
 
 namespace xmdb {
 class QueryGraph {
@@ -19,6 +20,10 @@ public:
             ALTER_USER,
             ATOMIC,
             WRITE_COLUMN,
+            CALL,
+            INSERT,
+            EMIT_QUERY,
+            DELETE_TABLE,
         };
 
         Type type() const {
@@ -154,6 +159,120 @@ public:
         DBValue *m_value;
     };
 
+    class CallNode : public Node {
+    public:
+        explicit CallNode(Allocator *allocator,
+                          StringView fn_name,
+                          Slice<DBValue *> args) : Node{Type::CALL},
+                                                   m_fn_name{fn_name},
+                                                   m_args{args},
+                                                   m_return_value{new (allocator) DelayedDBValue{}} {
+        }
+
+        Slice<DBValue *> args() const {
+            return m_args;
+        }
+
+        DelayedDBValue *return_value() const {
+            return m_return_value;
+        }
+
+        StringView fn_name() const {
+            return m_fn_name;
+        }
+
+    private:
+        StringView m_fn_name;
+        Slice<DBValue *> m_args;
+        DelayedDBValue *m_return_value;
+    };
+
+    class InsertNode : public Node {
+    public:
+        using ValuesSlice = Slice<ok::Pair<StringView, DBValue *>>;
+
+        explicit InsertNode(DBTable *table,
+                            Slice<StringView> column_names,
+                            Slice<DBValue *> column_values,
+                            UZ rows_count) : Node{Type::INSERT},
+                                             m_table{table},
+                                             m_column_names{column_names},
+                                             m_column_values{column_values},
+                                             m_rows_count{rows_count} {
+        }
+
+        DBTable *table() const {
+            return m_table;
+        }
+
+        Slice<StringView> column_names() const {
+            return m_column_names;
+        }
+
+        Slice<DBValue *> column_values() const {
+            return m_column_values;
+        }
+
+        UZ rows_count() const {
+            return m_rows_count;
+        }
+
+    private:
+        DBTable *m_table;
+        Slice<StringView> m_column_names;
+        Slice<DBValue *> m_column_values;
+        UZ m_rows_count;
+    };
+
+    class EmitQueryNode : public Node {
+    public:
+        explicit EmitQueryNode(Allocator *allocator,
+                               Slice<DBTable *> queried_tables,
+                               Slice<StringView> column_names,
+                               Slice<DBValue *> column_values,
+                               Slice<SQL::ColumnType> column_types) : Node{Type::EMIT_QUERY},
+                                                                      m_queried_tables{queried_tables},
+                                                                      m_column_values{column_values},
+                                                                      m_emitted_table{new (allocator) DBTable{allocator,
+                                                                                                              DBTable::F_ANON | DBTable::F_PROXY,
+                                                                                                              ""_sv,
+                                                                                                              column_values.count,
+                                                                                                              column_names.items,
+                                                                                                              column_types.items}} {
+        }
+
+        DBTable *table() const {
+            return m_emitted_table;
+        }
+
+        Slice<DBTable *> queried_tables() const {
+            return m_queried_tables;
+        }
+
+        Slice<DBValue *> column_values() const {
+            return m_column_values;
+        }
+
+    private:
+        Slice<DBTable *> m_queried_tables;
+        Slice<DBValue *> m_column_values;
+        DBTable *m_emitted_table;
+    };
+
+    class DeleteTableNode : public Node {
+    public:
+        explicit DeleteTableNode(DBTable *table) : Node{Type::DELETE_TABLE},
+                                                   m_table{table} {
+        }
+
+        DBTable *table() const {
+            return m_table;
+        }
+
+    private:
+        DBTable *m_table;
+    };
+
     ok::Optional<Node *> root_node() const {
         return m_root_node;
     }
@@ -172,6 +291,33 @@ public:
 
     WriteColumnNode *write_column(DBTable *table, UZ idx, DBValue *value) {
         return add_generic_node<WriteColumnNode>(table, idx, value);
+    }
+
+    CallNode *call(ok::Allocator *allocator, ok::StringView fn_name, Slice<DBValue *> args) {
+        return add_generic_node<CallNode>(allocator, fn_name, args);
+    }
+
+    EmitQueryNode *emit_query(Allocator *allocator,
+                              Slice<DBTable *> queried_tables,
+                              Slice<StringView> column_names,
+                              Slice<DBValue *> column_values,
+                              Slice<SQL::ColumnType> column_types) {
+        return add_generic_node<EmitQueryNode>(allocator,
+                                               queried_tables,
+                                               column_names,
+                                               column_values,
+                                               column_types);
+    }
+
+    DeleteTableNode *delete_table(DBTable *table) {
+        return add_generic_node<DeleteTableNode>(table);
+    }
+
+    InsertNode *insert(DBTable *table,
+                       Slice<StringView> names,
+                       Slice<DBValue *> values,
+                       UZ rows_count) {
+        return add_generic_node<InsertNode>(table, names, values, rows_count);
     }
 
     void reset();

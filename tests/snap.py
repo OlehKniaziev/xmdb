@@ -70,7 +70,11 @@ def record_snapshot(executable: str) -> None:
     return snapshot
 
 def print_diff(expected: str, actual: str) -> None:
-    subprocess.run(["diff", f"<(echo {expected})", f"<(echo {actual})"])
+    print("Expected:")
+    print(expected)
+
+    print("Actual:")
+    print(actual)
 
 def report_snapshot_diff(expected: dict, actual: dict) -> (bool, bool):
     failed = False

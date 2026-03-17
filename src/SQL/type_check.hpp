@@ -10,7 +10,7 @@ enum Type {
     TYPE_INT,
     TYPE_STRING,
     TYPE_PNG,
-    TYPE_IMAGE,
+    TYPE_IMAGE_CHUNK,
     TYPE_BOOL,
     TYPE_NULL,
     TYPE_TABLE,
@@ -33,14 +33,23 @@ struct TypedCompiledQuery {
     Table<U32, TypedTableSchema> table_types;
 };
 
+struct FunctionSignature {
+    Type return_type;
+    Slice<Type> parameter_types;
+};
+
 struct TypingContext {
     TypingContext(Allocator *allocator, StringView source);
 
     Allocator *allocator;
     Table<U32, Type> ir_instruction_types;
     Table<U32, TypedTableSchema> table_types;
+    Table<StringView, FunctionSignature> function_signatures;
     List<U32> emitted_columns;
-    StringView source; // used only for error reporting
+    List<U32> call_args;
+    List<StringView> insert_column_names;
+    List<U32> insert_column_values;
+    StringView source; // NOTE(oleh): Used only for error reporting.
     Optional<ErrorWithSourceLocation> error{};
 };
 

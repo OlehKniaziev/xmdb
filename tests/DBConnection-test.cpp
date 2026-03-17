@@ -168,7 +168,7 @@ TEST(DBConnection, execute_create_insert_and_select_on_table_with_one_row) {
     ASSERT_EQ(next_value.get().type(), Value::Type::STRING);
 
     FixedString val_fs = next_value.get().as_string();
-    ok::StringView val = view(&val_fs);
+    ok::StringView val = val_fs.view();
     ASSERT_EQ(val, "1"_sv);
 
     ASSERT_FALSE(column2_value.next());
@@ -230,7 +230,7 @@ TEST(DBConnection, execute_create_insert_update_and_select_on_table_with_one_row
     FixedString val2_fs = val2.get().as_string();
 
     ASSERT_EQ(val2.get().type(), Value::Type::STRING);
-    ASSERT_EQ(view(&val2_fs), "2"_sv);
+    ASSERT_EQ(val2_fs, "2"_sv);
 
     ASSERT_FALSE(column2_stream.next());
 }
@@ -341,7 +341,7 @@ TEST(DBConnection, create_new_db_and_execute_create_insert_and_select_on_table_w
     FixedString val2_fs = val2.get().as_string();
 
     ASSERT_EQ(val2.get().type(), Value::Type::STRING);
-    ASSERT_EQ(view(&val2_fs), "1"_sv);
+    ASSERT_EQ(val2_fs, "1"_sv);
 
     ASSERT_FALSE(column2_stream.next());
 }

@@ -50,20 +50,20 @@ Type column_type_to_type(ColumnType column_type) {
 }
 
 bool is_image(Type ty) {
-    return ty == TYPE_PNG || ty == TYPE_IMAGE;
+    return ty == TYPE_PNG || ty == TYPE_IMAGE_CHUNK;
 }
 
 const char *type_name(Type type) {
     switch (type) {
-    case TYPE_BOOL:   return "bool";
-    case TYPE_STRING: return "string";
-    case TYPE_NULL:   return "null";
-    case TYPE_INT:    return "int";
-    case TYPE_TABLE:  return "table";
-    case TYPE_FLOAT:  return "float";
-    case TYPE_DOUBLE: return "double";
-    case TYPE_PNG:    return "PNG";
-    case TYPE_IMAGE:  return "image";
+    case TYPE_BOOL:        return "bool";
+    case TYPE_STRING:      return "string";
+    case TYPE_NULL:        return "null";
+    case TYPE_INT:         return "int";
+    case TYPE_TABLE:       return "table";
+    case TYPE_FLOAT:       return "float";
+    case TYPE_DOUBLE:      return "double";
+    case TYPE_PNG:         return "PNG";
+    case TYPE_IMAGE_CHUNK: return "image";
     }
 
     OK_UNREACHABLE();
@@ -117,10 +117,6 @@ static inline bool type_check_ir_instruction(U32 ip, CompiledQuery *ir_emitter, 
     }
     case IRInstructionOperator_ConstNull: {
         ctx->ir_instruction_types.put(ip, TYPE_NULL);
-        return true;
-    }
-    case IRInstructionOperator_RGB: {
-        ctx->ir_instruction_types.put(ip, TYPE_IMAGE);
         return true;
     }
     case IRInstructionOperator_FetchTable: {
@@ -195,22 +191,36 @@ static inline bool type_check_ir_instruction(U32 ip, CompiledQuery *ir_emitter, 
         return true;
     }
     case IRInstructionOperator_InsertColumn: {
-        Triple<U32, U32, StringView> operands = operands_of_InsertColumn(ir_emitter, ip);
+        Tuple<StringView, U32> operands = operands_of_InsertColumn(ir_emitter, ip);
 
-        TypedTableSchema table_schema = ctx->table_types.get(operands.op1).get();
+        ctx->insert_column_names.push(operands.op1);
+        ctx->insert_column_values.push(operands.op2);
 
-        Type column_type = ctx->ir_instruction_types.get(operands.op2).get();
+        return true;
+    }
+    case IRInstructionOperator_CommitInsert: {
+        U32 table_ip = operands_of_CommitInsert(ir_emitter, ip);
+        TypedTableSchema table_schema = ctx->table_types.get(table_ip).get();
 
-        Type expected_column_type;
-        OK_ASSERT(find_column(table_schema, operands.op3, &expected_column_type));
+        for (UZ i = 0; i < ctx->insert_column_names.count; ++i) {
+            StringView column_name = ctx->insert_column_names[i];
+            U32 value_ip = ctx->insert_column_values[i];
 
-        if (!types_are_equal(column_type, expected_column_type)) {
-            Token token = ir_emitter->tokens[ip];
-            String message =
+            Type expected_column_type;
+
+            OK_ASSERT(find_column(table_schema, column_name, &expected_column_type));
+
+            Type column_type = ctx->ir_instruction_types.get(value_ip).get();
+
+            if (!types_are_equal(column_type, expected_column_type)) {
+                Token token = ir_emitter->tokens[ip];
+                String message =
                     String::format(ctx->allocator, "expected a value of type '%s', but got '%s' instead",
                                    type_name(expected_column_type), type_name(column_type));
-            error_on(ctx, token, message);
-            return false;
+                error_on(ctx, token, message);
+                return false;
+            }
+
         }
 
         return true;
@@ -236,13 +246,73 @@ static inline bool type_check_ir_instruction(U32 ip, CompiledQuery *ir_emitter, 
 
         return true;
     }
+    case IRInstructionOperator_Arg: {
+        U32 value_id = operands_of_Arg(ir_emitter, ip);
+
+        Type arg_type = ctx->ir_instruction_types.get(value_id).get();
+
+        ctx->ir_instruction_types.put(ip, arg_type);
+
+        ctx->call_args.push(ip);
+
+        return true;
+    }
+    case IRInstructionOperator_Call: {
+        Triple<ok::String, ok::StringView, S64> operands = operands_of_Call(ir_emitter, ip);
+        StringView fn_name = operands.op2;
+        S64 argument_count = operands.op3;
+
+        Optional<FunctionSignature> fn_signature_opt = ctx->function_signatures.get(fn_name);
+        if (!fn_signature_opt.has_value()) {
+            Token token = ir_emitter->tokens[ip];
+            String message = String::format(ctx->allocator,
+                                            "undefined function '" OK_SV_FMT "'",
+                                            OK_SV_ARG(fn_name));
+            error_on(ctx, token, message);
+            return false;
+        }
+
+        FunctionSignature signature = fn_signature_opt.get();
+
+        if ((S64) signature.parameter_types.count != argument_count) {
+            Token token = ir_emitter->tokens[ip];
+            String message = String::format(ctx->allocator,
+                                            "function '" OK_SV_FMT "' expects %zu arguments, but %ld provided",
+                                            OK_SV_ARG(fn_name),
+                                            signature.parameter_types.count,
+                                            argument_count);
+            error_on(ctx, token, message);
+            return false;
+        }
+
+        OK_ASSERT((S64) ctx->call_args.count == argument_count);
+
+        for (UZ i = 0; i < ctx->call_args.count; ++i) {
+            U32 arg_id = ctx->call_args[i];
+            Type arg_type = ctx->ir_instruction_types.get(arg_id).get();
+            Type param_type = signature.parameter_types[i];
+            if (arg_type != param_type) {
+                Token token = ir_emitter->tokens[arg_id];
+                String message = String::format(ctx->allocator,
+                                                "expected call argument at index %zu to be of type '%s', but got a value of type '%s' instead",
+                                                i,
+                                                type_name(param_type),
+                                                type_name(arg_type));
+                error_on(ctx, token, message);
+                return false;
+            }
+        }
+
+        ctx->ir_instruction_types.put(ip, signature.return_type);
+
+        return true;
+    }
     case IRInstructionOperator_CreateTable:
     case IRInstructionOperator_CreateDatabase:
     case IRInstructionOperator_DropTable:
     case IRInstructionOperator_DropDatabase:
     case IRInstructionOperator_UseDatabase:
     case IRInstructionOperator_InsertRow:
-    case IRInstructionOperator_CommitInsert:
     case IRInstructionOperator_CommitUpdate:
     case IRInstructionOperator_DeleteTable:
     case IRInstructionOperator_CreateUser:
@@ -264,10 +334,46 @@ bool type_check_query(CompiledQuery *query, TypingContext *ctx, TypedCompiledQue
     return true;
 }
 
+template <typename T>
+Type cpp_to_tt() = delete;
+
+template <>
+Type cpp_to_tt<ok::StringView>() {
+    return TYPE_STRING;
+}
+
+template <>
+Type cpp_to_tt<U32>() {
+    return TYPE_INT;
+}
+
+template <>
+Type cpp_to_tt<ImageChunk>() {
+    return TYPE_IMAGE_CHUNK;
+}
+
+template <typename... Args>
+Slice<Type> cpp_to_tt_multiple(ok::Allocator *allocator) {
+    ok::List<Type> types = ok::List<Type>::alloc(allocator);
+    (..., types.push(cpp_to_tt<Args>()));
+    return types.slice();
+}
+
 TypingContext::TypingContext(Allocator *allocator, StringView source) : allocator{allocator}, source{source} {
     ir_instruction_types = Table<U32, Type>::alloc(allocator);
     table_types = Table<U32, TypedTableSchema>::alloc(allocator);
+    function_signatures = Table<StringView, FunctionSignature>::alloc(allocator);
     emitted_columns = List<U32>::alloc(allocator);
-}
+    call_args = List<U32>::alloc(allocator);
+    insert_column_names = List<StringView>::alloc(allocator);
+    insert_column_values = List<U32>::alloc(allocator);
 
+#define X(fn_name, ret_type, ...) do { \
+    Type return_type = cpp_to_tt<ret_type>(); \
+    Slice<Type> parameter_types = cpp_to_tt_multiple<__VA_ARGS__>(allocator); \
+    function_signatures.put(ok::StringView{#fn_name}, FunctionSignature{return_type, parameter_types}); \
+    } while (false);
+XMDB_ENUM_BUILTIN_FUNCTIONS
+#undef X
+}
 }; // namespace xmdb::SQL

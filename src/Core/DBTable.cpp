@@ -133,6 +133,24 @@ constexpr U64 chunk_size = chunk_width * chunk_height;
 
 DBTableStream DBTableStream::from_value(ok::Allocator *allocator, DBValue *value) {
     switch (value->kind()) {
+    case DBValue::Kind::DELAYED: {
+        auto delayed = static_cast<DelayedDBValue *>(value);
+        ok::Optional<DBValue *> delayed_value_opt = delayed->value();
+
+        if (!delayed_value_opt.has_value()) {
+            return DBTableStream{
+                allocator,
+                [](void *arg) -> ok::Optional<Value> {
+                    (void) arg;
+                    return ok::Optional<Value>::empty();
+                },
+                nullptr,
+            };
+        } else {
+            DBValue *delayed_value = delayed_value_opt.get();
+            return DBTableStream::from_value(allocator, delayed_value);
+        }
+    }
     case DBValue::Kind::CONSTANT: {
         auto *const_val = static_cast<ConstDBValue *>(value);
         return DBTableStream{allocator, *const_val};
