@@ -19,34 +19,76 @@ static inline constexpr U64 gen_magic(ok::StringView s) {
 
 constexpr U64 DB_STATE_HEADER_MAGIC = ((U64) 's' << 56) | ((U64) 'x' << 48) | ((U64) 'm' << 40) | ((U64) 'd' << 32) | ((U64) 'b' << 24);
 
+/**
+ * @brief Header for a table state file.
+ */
 struct DBStateHeader {
-    U64 magic;
-    U64 record_count;
+    U64 magic;        ///< Magic number identifying the file type.
+    U64 record_count; ///< Total number of records in the table.
 };
 
+/**
+ * @brief Represents the persistent state of a database table.
+ */
 struct DBState {
-    DBStateHeader header;
-    ok::File file;
+    DBStateHeader header; ///< The state header.
+    ok::File file;        ///< The backing file for the state.
 };
 
-bool db_state_create(ok::File, DBState *);
-bool db_state_sync  (DBState *);
-bool db_state_reset (DBState *);
+/**
+ * @brief Creates a new table state in the given file.
+ * @param file The file to use.
+ * @param out Pointer to store the resulting DBState.
+ * @return true if successful, false otherwise.
+ */
+bool db_state_create(ok::File file, DBState *out);
+
+/**
+ * @brief Synchronizes the table state to disk.
+ * @param state Pointer to the state to sync.
+ * @return true if successful, false otherwise.
+ */
+bool db_state_sync  (DBState *state);
+
+/**
+ * @brief Resets the table state.
+ * @param state Pointer to the state to reset.
+ * @return true if successful, false otherwise.
+ */
+bool db_state_reset (DBState *state);
 
 constexpr U64 COLUMN_STATE_HEADER_MAGIC = gen_magic("ixmdb"_sv);
 
+/**
+ * @brief Header for an image column state file.
+ */
 struct ImageColumnStateHeader {
-    U64 magic;
-    U64 chunks_count;
+    U64 magic;        ///< Magic number.
+    U64 chunks_count; ///< Number of image chunks stored.
 };
 
 constexpr UZ IMAGE_COLUMN_STATE_HEADER_SIZE = sizeof(ImageColumnStateHeader);
 
+/**
+ * @brief Represents the persistent state of an image column.
+ */
 struct ImageColumnState {
-    ImageColumnStateHeader header;
-    ok::File file;
+    ImageColumnStateHeader header; ///< The state header.
+    ok::File file;                 ///< The backing file.
 };
 
-bool image_state_create(ok::File, ImageColumnState *);
-bool image_state_sync  (ImageColumnState *);
+/**
+ * @brief Creates a new image column state in the given file.
+ * @param file The file to use.
+ * @param out Pointer to store the resulting ImageColumnState.
+ * @return true if successful, false otherwise.
+ */
+bool image_state_create(ok::File file, ImageColumnState *out);
+
+/**
+ * @brief Synchronizes the image column state to disk.
+ * @param state Pointer to the state to sync.
+ * @return true if successful, false otherwise.
+ */
+bool image_state_sync  (ImageColumnState *state);
 } // namespace xmdb

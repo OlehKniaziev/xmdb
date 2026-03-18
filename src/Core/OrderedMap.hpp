@@ -2,12 +2,20 @@
 
 #include "numeric.hpp"
 
+/**
+ * @brief A map that maintains the order of elements as they were inserted.
+ * @tparam K The type of keys.
+ * @tparam V The type of values.
+ */
 template <typename K, typename V>
 class OrderedMap {
 public:
-    OrderedMap(ok::Allocator *allocator, U64 capacity = kDefaultCapacity) : m_allocator{allocator},
-                                                                            m_capacity{capacity || kDefaultCapacity} {
-    }
+    /**
+     * @brief Constructs a new OrderedMap.
+     * @param allocator The allocator to use.
+     * @param capacity The initial capacity of the map.
+     */
+    OrderedMap(ok::Allocator *allocator, U64 capacity = kDefaultCapacity);
 
 private:
     XMDB_MAKE_DISTINCT_NUMERIC(EntryMeta, U8)

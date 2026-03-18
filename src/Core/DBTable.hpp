@@ -8,30 +8,48 @@
 #include "state.hpp"
 
 namespace xmdb {
+/**
+ * @brief Attributes of a column.
+ */
 struct ColumnAttribute {
     enum {
-        F_IMAGE = 1 << 0,
+        F_IMAGE = 1 << 0, ///< The column contains image data.
     };
 
     using Flags = U8;
 
-    Flags flags;
+    Flags flags; ///< The attribute flags.
 
     union {
-        ImageColumnState image_state;
+        ImageColumnState image_state; ///< State for image columns.
     } u;
 };
 
+/**
+ * @brief Represents a database table, managing its metadata and data.
+ */
 class DBTable {
 public:
     using Flags = U16;
+    /**
+     * @brief Table flags indicating its nature and storage.
+     */
     enum : Flags {
-        F_ANON      = 1 << 0,
-        F_PERSIST   = 1 << 1,
-        F_PROXY     = 1 << 2,
-        F_EPHEMERAL = 1 << 3,
+        F_ANON      = 1 << 0, ///< Anonymous table.
+        F_PERSIST   = 1 << 1, ///< Persistent table (stored on disk).
+        F_PROXY     = 1 << 2, ///< Proxy table (values are held externally).
+        F_EPHEMERAL = 1 << 3, ///< Ephemeral table (temporary).
     };
 
+    /**
+     * @brief Constructs a new DBTable.
+     * @param allocator The allocator to use.
+     * @param flags The table flags.
+     * @param name The name of the table.
+     * @param column_count The number of columns.
+     * @param column_names The names of the columns.
+     * @param column_types The types of the columns.
+     */
     DBTable(ok::Allocator *allocator,
             Flags flags,
             ok::StringView name,
@@ -39,30 +57,58 @@ public:
             ok::StringView *column_names,
             SQL::ColumnType *column_types);
 
+    /**
+     * @brief Gets the table flags.
+     * @return The flags.
+     */
     Flags flags() const {
         return m_flags;
     }
 
+    /**
+     * @brief Gets the table name.
+     * @return The name.
+     */
     ok::StringView name() const {
         return m_name;
     }
 
+    /**
+     * @brief Gets the number of columns in the table.
+     * @return The column count.
+     */
     UZ columns_count() const {
         return m_columns_count;
     }
 
+    /**
+     * @brief Gets the names of the columns.
+     * @return A slice of column names.
+     */
     ok::Slice<ok::StringView> columns_names() {
         return {m_columns_names, m_columns_count};
     }
 
+    /**
+     * @brief Gets the types of the columns.
+     * @return A slice of column types.
+     */
     ok::Slice<SQL::ColumnType> columns_types() {
         return {m_columns_types, m_columns_count};
     }
 
+    /**
+     * @brief Gets the table layout.
+     * @return The layout.
+     */
     TableLayout layout() const {
         return m_layout;
     }
 
+    /**
+     * @brief Gets the total number of rows in the table.
+     * @return The row count.
+     */
     UZ rows_count() {
         if (m_flags & F_PROXY) {
             return m_proxy_rows_count;
@@ -72,11 +118,19 @@ public:
         }
     }
 
+    /**
+     * @brief Sets the row count for a proxy table.
+     * @param x The row count.
+     */
     void set_proxy_rows_count(UZ x) {
         OK_VERIFY(m_flags & F_PROXY);
         m_proxy_rows_count = x;
     }
 
+    /**
+     * @brief Sets the values for a proxy table's columns.
+     * @param values A slice of pointers to DBValue.
+     */
     void set_proxy_column_values(ok::Slice<DBValue *> values) {
         OK_VERIFY(m_flags & F_PROXY);
         OK_VERIFY(values.count == m_columns_count);
@@ -89,6 +143,10 @@ public:
         m_proxy_columns_values = values.items;
     }
 
+    /**
+     * @brief Gets the column values for a proxy table.
+     * @return A slice of pointers to DBValue.
+     */
     ok::Slice<DBValue *> proxy_column_values() {
         OK_VERIFY(m_flags & F_PROXY);
         OK_VERIFY(m_proxy_columns_values != nullptr);
@@ -96,25 +154,45 @@ public:
         return {m_proxy_columns_values, m_columns_count};
     }
 
+    /**
+     * @brief Gets the B-Tree index for a persistent table.
+     * @return Pointer to the index.
+     */
     BTreeIndex *index() {
         OK_ASSERT(m_flags & F_PERSIST);
         return &m_index;
     }
 
+    /**
+     * @brief Sets the B-Tree index for the table.
+     * @param index The index to set.
+     */
     void set_index(BTreeIndex index) {
         m_index = index;
     }
 
+    /**
+     * @brief Gets the persistence state for the table.
+     * @return Pointer to the state.
+     */
     DBState *state() {
         OK_VERIFY(m_flags & F_PERSIST);
         return &m_state;
     }
 
+    /**
+     * @brief Sets the persistence state for the table.
+     * @param state The state to set.
+     */
     void set_state(DBState state) {
         OK_VERIFY(m_flags & F_PERSIST);
         m_state = state;
     }
 
+    /**
+     * @brief Gets the attributes for each column.
+     * @return A slice of column attributes.
+     */
     ok::Slice<ColumnAttribute> column_attributes() {
         return {m_column_attributes, m_columns_count};
     }
@@ -133,20 +211,44 @@ private:
     DBState m_state;
 };
 
+/**
+ * @brief Provides a stream-like interface for pulling values out of different sources i.e. a DBTable or DBValue.
+ */
 class DBTableStream {
 public:
+    /**
+     * @brief The type of data source for the stream.
+     */
     enum class Type {
-        CONSTANT,
-        COLUMN,
-        COMPUTE,
+        CONSTANT, ///< Stream from a constant value.
+        COLUMN,   ///< Stream from a table column.
+        COMPUTE,  ///< Stream from a computation function.
     };
 
+    /**
+     * @brief Constructs a DBTableStream from a constant value.
+     * @param allocator The allocator to use.
+     * @param constant The constant value.
+     */
     explicit DBTableStream(ok::Allocator *allocator, ConstDBValue constant) : m_allocator{allocator}, m_type{Type::CONSTANT}, m_u{.constant = constant} {}
 
     using Computation = ok::Optional<Value> (*)(void *);
 
+    /**
+     * @brief Constructs a DBTableStream from a computation function.
+     * @param allocator The allocator to use.
+     * @param comp The computation function.
+     * @param arg The argument to pass to the computation function.
+     */
     DBTableStream(ok::Allocator *allocator, Computation comp, void *arg) : m_allocator{allocator}, m_type{Type::COMPUTE}, m_u{.compute = {.comp = comp, .arg = arg}} {}
 
+
+    /**
+     * @brief Constructs a DBTableStream from a table column.
+     * @param allocator The allocator to use.
+     * @param table The table to stream from.
+     * @param column_index The index of the column to stream.
+     */
     DBTableStream(ok::Allocator *allocator,
                   DBTable *table,
                   UZ column_index) : m_allocator{allocator},
@@ -165,8 +267,19 @@ public:
         m_u.column.buffer = allocator->alloc<U8>(col_layout.size);
     }
 
-    static DBTableStream from_value(ok::Allocator *, DBValue *);
 
+    /**
+     * @brief Creates a DBTableStream from a DBValue.
+     * @param allocator The allocator to use.
+     * @param value The value to stream from.
+     * @return The resulting stream.
+     */
+    static DBTableStream from_value(ok::Allocator *allocator, DBValue *value);
+
+    /**
+     * @brief Retrieves the next value from the stream.
+     * @return An optional containing the next value, or empty if the stream has ended.
+     */
     ok::Optional<Value> next();
 
 private:
@@ -191,10 +304,23 @@ private:
     } m_u;
 };
 
+/**
+ * @brief Acts as an outlet for a DBTable, providing access to its columns as streams.
+ */
 class DBTableOutlet {
 public:
+    /**
+     * @brief Constructs a new DBTableOutlet.
+     * @param table The table to act as an outlet for.
+     */
     explicit DBTableOutlet(DBTable *table) : m_table{table} {}
 
+    /**
+     * @brief Creates a stream for a specific column in the table.
+     * @param allocator The allocator to use for the stream.
+     * @param i The column index.
+     * @return The resulting DBTableStream.
+     */
     DBTableStream column_stream(ok::Allocator *allocator, UZ i) {
         ok::Slice<DBValue *> values = m_table->proxy_column_values();
         DBValue *value = values[i];
