@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, type FormEvent } from "react";
 import "../styles/bars-style.css";
 import "../styles/forms-style.css";
 import { useConnectionStore } from "../data/global-states";
+import { sha256HexDigest, toHexString } from "../data/util";
 
 function ConnectionDialog() {
   // const [isConnected, setIsConnected] = useState(false);
@@ -39,8 +40,8 @@ function ConnectionDialog() {
         body: JSON.stringify({
           db_name: database.toString(),
           username: user.toString(),
-          // FIXME(liza): Replace by base64 encoding of SHA256 hash of the password.
-          password_hash: password.toString(),
+          // FIXME(liza): Replace by hex encoding of SHA256 hash of the password.
+          password_hash: sha256HexDigest(password.toString()),
         }),
       });
 
@@ -54,6 +55,8 @@ function ConnectionDialog() {
         setId(connectionId);
         dialogRef.current?.close();
       } else {
+        const errorReason = await resp.text();
+        console.error("Status: %s, reason: %s", resp.statusText, errorReason);
         setErrorMessage("Wrong credentials! Try again!");
       }
     } catch (e: any) {

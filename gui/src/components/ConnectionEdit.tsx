@@ -10,6 +10,7 @@ import {
 import "../styles/bars-style.css";
 import "../styles/forms-style.css";
 import { useConnectionStore } from "../data/global-states";
+import { toHexString } from "../data/util";
 
 export type ConnectionEditHandle = {
   open: () => void;
@@ -26,6 +27,7 @@ const ConnectionEdit = forwardRef<ConnectionEditHandle>((_, ref) => {
     addInfo,
     disconnect,
   } = useConnectionStore();
+
   const [errorMessage, setErrorMessage] = useState("No error");
   const [isLoadingConnect, setIsLoadingConnect] = useState(false);
   const [isLoadingDisconnect, setIsLoadingDisconnect] = useState(false);
@@ -71,7 +73,7 @@ const ConnectionEdit = forwardRef<ConnectionEditHandle>((_, ref) => {
             db_name: database.toString(),
             username: user.toString(),
             // FIXME(liza): Replace by base64 encoding of SHA256 hash of the password.
-            password_hash: password.toString(),
+            password_hash: toHexString(password.toString()),
           }),
         });
 
@@ -84,6 +86,8 @@ const ConnectionEdit = forwardRef<ConnectionEditHandle>((_, ref) => {
           setId(connectionId);
           dialogRef.current?.close();
         } else {
+          const errorReason = await resp.text();
+          console.error("Status: %s, reason: %s", resp.statusText, errorReason);
           setErrorMessage("Wrong credentials! Try again!");
         }
       } catch (e: any) {
