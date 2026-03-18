@@ -12,9 +12,9 @@
 using namespace xmdb::server;
 
 int main(int argc, char **argv) {
-    xmdb::SQL::init_global_state();
-
     Config config = Config::parse(argc, argv);
+
+    xmdb::SQL::init_global_state();
 
     switch (config.protocol) {
     case Protocol::HTTP: {

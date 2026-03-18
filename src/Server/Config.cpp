@@ -19,6 +19,7 @@ Config Config::parse(int argc, char **argv) {
     arg_parser.integer("port", &port_s64, "Port to start the server on", default_port);
 
     if (!arg_parser.parse()) {
+        arg_parser.help();
         ok::StringView error_message = arg_parser.error_message();
         dief("Failed to parse command line arguments: " OK_SV_FMT, OK_SV_ARG(error_message));
     }
