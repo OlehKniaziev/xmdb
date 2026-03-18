@@ -7,7 +7,7 @@ set(CMAKE_CXX_STANDARD 20)
 
 include_directories(SYSTEM src)
 
-add_compile_options(-Wall -Wextra -Werror -g -O0)
+add_compile_options(-Wall -Wextra -Werror -Wno-c99-designator -g -O0)
 
 add_subdirectory(third_party)
 

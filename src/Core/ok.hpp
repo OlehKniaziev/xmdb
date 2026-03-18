@@ -242,24 +242,24 @@ namespace ok {
 
 // min and max
 template <typename T>
-constexpr const T& max(const T& a) {
+constexpr T max(T a) {
     return a;
 }
 
 template <typename T, typename... Rest>
-constexpr const T& max(const T& x, const Rest&... xs) {
-    const T& xs_max = max(xs...);
+constexpr T max(T x, const Rest&... xs) {
+    T xs_max = max(xs...);
     return x > xs_max ? x : xs_max;
 }
 
 template <typename T>
-constexpr const T& min(const T& a) {
+constexpr T min(T a) {
     return a;
 }
 
 template <typename T, typename... Rest>
-constexpr const T& min(const T& x, const Rest&... xs) {
-    const T& xs_min = min(xs...);
+constexpr T min(T x, Rest... xs) {
+    T xs_min = min(xs...);
     return x < xs_min ? x : xs_min;
 }
 

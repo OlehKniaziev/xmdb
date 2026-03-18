@@ -660,6 +660,7 @@ static inline bool is_stmt_graph_optimizable(Stmt *stmt) {
     OK_UNREACHABLE();
 }
 
+[[maybe_unused]]
 static void to_string(ok::String *string, StmtGraph *g, U32 node_idx, bool type_only = false) {
     auto *node = &g->nodes[node_idx];
 

@@ -1,8 +1,6 @@
 #include "connection.hpp"
 
 namespace xmdb::server {
-constexpr U32 XMDB_PASSWORD_HASH_LENGTH = 32;
-
 static ConnectionId last_connection_id = 0;
 
 static ok::ArenaAllocator shared_arena{};

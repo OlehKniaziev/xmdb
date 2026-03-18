@@ -127,9 +127,6 @@ struct StreamPair {
 };
 
 constexpr bool chunk_images = false;
-constexpr U32 chunk_width = 256;
-constexpr U32 chunk_height = 256;
-constexpr U64 chunk_size = chunk_width * chunk_height;
 
 DBTableStream DBTableStream::from_value(ok::Allocator *allocator, DBValue *value) {
     switch (value->kind()) {
