@@ -1,7 +1,8 @@
 import { useState } from "react";
 import { sampleData } from "../data/query-response";
 import QueryResponse from "./QueryResponse";
-import { useOutputMessagesStore, useQueryResponceStore } from "../data/global-states";
+import LoadingSpinner from "./LoadingSpinner";
+import { useOutputMessagesStore, useQueryResponseStore } from "../data/global-states";
 
 function BottomPanel() {
   const [activeTab, setActiveTab] = useState<"messages" | "results">(
@@ -9,7 +10,7 @@ function BottomPanel() {
   );
 
   const { message } = useOutputMessagesStore();
-  const { response } = useQueryResponceStore();
+  const { response, isLoading } = useQueryResponseStore();
 
   return (
     <div className="bottom-panel">
@@ -29,10 +30,12 @@ function BottomPanel() {
       </div>
 
       <div className="tab-content">
-        {activeTab === "messages" ? (
+        {isLoading ? (
+          <LoadingSpinner />
+        ) : activeTab === "messages" ? (
           <div className="messages-style">{message}</div>
         ) : (
-          <QueryResponse response={response} />
+          <QueryResponse response={response} isLoading={isLoading} />
         )}
       </div>
     </div>

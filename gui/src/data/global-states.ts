@@ -73,7 +73,6 @@ export type OutputMessagesStore = {
 
 export const useOutputMessagesStore = create<OutputMessagesStore>()(
    devtools(
-    persist(
       (set) => ({
         message: "Output messages will be shown here",
         setMessage: (message) => set({message}),
@@ -81,25 +80,26 @@ export const useOutputMessagesStore = create<OutputMessagesStore>()(
       {
         name: "message-storage"
       }
-    )
   )
 );
 
 export type QueryResponseStore = {
   response?: QueryResponse;
-  setQueryResponce: (response?: QueryResponse) => void;
+  setQueryResponse: (response?: QueryResponse) => void;
+  isLoading: boolean;
+  setIsLoading: (isLoading: boolean) => void;
 }
 
-export const useQueryResponceStore = create<QueryResponseStore>()(
+export const useQueryResponseStore = create<QueryResponseStore>()(
    devtools(
-    persist(
       (set) => ({
         response: undefined,
-        setQueryResponce: (response) => set({response}),
+        setQueryResponse: (response) => set({response}),
+        isLoading: false,
+        setIsLoading: (isLoading) => set({isLoading}),
       }),
       {
         name: "query-response-storage"
       }
-    )
   )
 );

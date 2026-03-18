@@ -8,7 +8,7 @@ function ConnectionDialog() {
   // const [isConnected, setIsConnected] = useState(false);
   const [errorMessage, setErrorMessage] = useState("No error");
   const [isLoading, setIsLoading] = useState(false);
-  const { setId, addInfo } = useConnectionStore();
+  const { Hostname, Database, Username, setId, addInfo } = useConnectionStore();
 
   const dialogRef = useRef<HTMLDialogElement>(null);
   useEffect(() => {
@@ -72,11 +72,11 @@ function ConnectionDialog() {
       <form autoComplete="off" onSubmit={handleSubmit}>
         <div className="vertical-container">
           <div className="horizontal-container">
-            <label htmlFor="hostname">Hostname \ IP:</label>
+            <label htmlFor="hostname">Server URL:</label>
             <input
               name="hostname"
               type="text"
-              placeholder="Hostname \ IP..."
+              placeholder="Server URL..."
             ></input>
           </div>
           <div className="horizontal-container">

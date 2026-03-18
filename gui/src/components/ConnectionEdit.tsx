@@ -10,7 +10,7 @@ import {
 import "../styles/bars-style.css";
 import "../styles/forms-style.css";
 import { useConnectionStore } from "../data/global-states";
-import { toHexString } from "../data/util";
+import { sha256HexDigest, toHexString } from "../data/util";
 
 export type ConnectionEditHandle = {
   open: () => void;
@@ -73,7 +73,7 @@ const ConnectionEdit = forwardRef<ConnectionEditHandle>((_, ref) => {
             db_name: database.toString(),
             username: user.toString(),
             // FIXME(liza): Replace by base64 encoding of SHA256 hash of the password.
-            password_hash: toHexString(password.toString()),
+            password_hash: sha256HexDigest(password.toString()),
           }),
         });
 

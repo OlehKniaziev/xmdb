@@ -1,6 +1,11 @@
 import type { QueryResponse } from "../data/query-response";
+import LoadingSpinner from "./LoadingSpinner";
 
-function QueryResponse({ response }: { response: QueryResponse }) {
+function QueryResponse({ response, isLoading }: { response: QueryResponse, isLoading: boolean }) {
+  if (isLoading) {
+    return <LoadingSpinner />;
+  }
+
   if(response === undefined) return <>Error</>;
   if (response.ok) {
     return (
