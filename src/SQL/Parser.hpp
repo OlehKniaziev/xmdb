@@ -8,6 +8,9 @@
 #include "ast.hpp"
 
 namespace xmdb::SQL {
+///
+/// Holds all parsing state.
+///
 struct Parser {
     explicit Parser(ok::ArenaAllocator*, StringView);
 

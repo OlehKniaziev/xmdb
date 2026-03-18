@@ -1,0 +1,23 @@
+var searchData=
+[
+  ['callexpr_0',['CallExpr',['../d4/de0/structxmdb_1_1SQL_1_1CallExpr.html',1,'xmdb::SQL']]],
+  ['callnode_1',['CallNode',['../d3/d98/classxmdb_1_1QueryGraph_1_1CallNode.html',1,'xmdb::QueryGraph']]],
+  ['chunkindices_2',['ChunkIndices',['../d6/de4/structxmdb_1_1ChunkIndices.html',1,'xmdb']]],
+  ['closeerror_3',['CloseError',['../de/d5d/structok_1_1File_1_1CloseError.html',1,'ok::File']]],
+  ['columnattribute_4',['ColumnAttribute',['../d3/dcc/structxmdb_1_1ColumnAttribute.html',1,'xmdb']]],
+  ['columndbvalue_5',['ColumnDBValue',['../db/dc1/classxmdb_1_1ColumnDBValue.html',1,'xmdb']]],
+  ['columndescriptor_6',['ColumnDescriptor',['../df/d96/classxmdb_1_1ColumnDescriptor.html',1,'xmdb']]],
+  ['columnlayout_7',['ColumnLayout',['../dc/db4/structxmdb_1_1ColumnLayout.html',1,'xmdb']]],
+  ['command_8',['Command',['../dc/d97/structok_1_1Command.html',1,'ok']]],
+  ['comparedbvalue_9',['CompareDBValue',['../d2/dc0/classxmdb_1_1CompareDBValue.html',1,'xmdb']]],
+  ['compile_5fand_5ftype_5fcheck_5fsource_10',['compile_and_type_check_source',['../db/d2e/group__SQL__API.html#ga5ef0673eb6b5c4c23d791eed123e7ccc',1,'xmdb::SQL']]],
+  ['compiledquery_11',['CompiledQuery',['../de/d5e/structxmdb_1_1SQL_1_1CompiledQuery.html',1,'xmdb::SQL']]],
+  ['concatdbvalue_12',['ConcatDBValue',['../de/dd5/classxmdb_1_1ConcatDBValue.html',1,'xmdb']]],
+  ['config_13',['Config',['../dd/df9/structxmdb_1_1server_1_1Config.html',1,'xmdb::server']]],
+  ['connectiondata_14',['ConnectionData',['../d9/dea/structxmdb_1_1server_1_1ConnectionData.html',1,'xmdb::server']]],
+  ['constdbvalue_15',['ConstDBValue',['../d9/d33/classxmdb_1_1ConstDBValue.html',1,'xmdb']]],
+  ['createdatabasestmt_16',['CreateDatabaseStmt',['../da/d1e/structxmdb_1_1SQL_1_1CreateDatabaseStmt.html',1,'xmdb::SQL']]],
+  ['createstmt_17',['CreateStmt',['../df/dd4/structxmdb_1_1SQL_1_1CreateStmt.html',1,'xmdb::SQL']]],
+  ['createtablestmt_18',['CreateTableStmt',['../d2/d0a/structxmdb_1_1SQL_1_1CreateTableStmt.html',1,'xmdb::SQL']]],
+  ['createuserstmt_19',['CreateUserStmt',['../da/d28/structxmdb_1_1SQL_1_1CreateUserStmt.html',1,'xmdb::SQL']]]
+];
