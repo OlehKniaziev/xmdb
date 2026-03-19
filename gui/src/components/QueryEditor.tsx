@@ -100,6 +100,7 @@ function QueryEditor() {
             onChange={(val) => updateActiveTabQuery(val || "")}
             options={{
               fontFamily: '"Fragment Mono", monospace',
+              wordWrap: "on",
             }}
           />
         </Panel>

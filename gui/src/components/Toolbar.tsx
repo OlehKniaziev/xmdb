@@ -15,12 +15,46 @@ export default function Toolbar({ onAddTab }: ToolbarProps) {
   const location = useLocation();
   const navigate = useNavigate();
 
-  const { tabs, activeTabId, addTab, updateTabResults, updateTabSaveStatus } = useMultiTabQueryStore();
+  const {
+    tabs,
+    activeTabId,
+    addTab,
+    openTab,
+    updateTabResults,
+    updateTabSaveStatus,
+  } = useMultiTabQueryStore();
   const { ConnectionId, Hostname, Database, Username } = useConnectionStore();
 
-  const activeTab = tabs.find(t => t.id === activeTabId);
+  const activeTab = tabs.find((t) => t.id === activeTabId);
 
   const dialogRef = useRef<ConnectionEditHandle>(null);
+
+  async function openQueryOnClick() {
+    try {
+      // @ts-expect-error - File System Access API
+      const [handle] = await window.showOpenFilePicker({
+        types: [
+          {
+            description: "SQL Files",
+            accept: { "text/plain": [".sql"] },
+          },
+        ],
+        multiple: false,
+      });
+
+      if (handle) {
+        const file = await handle.getFile();
+        const content = await file.text();
+        openTab(file.name, content, handle);
+        navigate("/query");
+      }
+    } catch (err: unknown) {
+      if (err instanceof Error && err.name !== "AbortError") {
+        console.error("Failed to open file:", err);
+        alert("Failed to open file: " + err.message);
+      }
+    }
+  }
 
   async function saveQueryOnClick() {
     if (!activeTab) return;
@@ -29,13 +63,17 @@ export default function Toolbar({ onAddTab }: ToolbarProps) {
       let handle = activeTab.fileHandle;
 
       if (!handle) {
-        // @ts-ignore - File System Access API
+        // @ts-expect-error - File System Access API
         handle = await window.showSaveFilePicker({
-          suggestedName: activeTab.title.endsWith('.sql') ? activeTab.title : `${activeTab.title}.sql`,
-          types: [{
-            description: 'SQL Files',
-            accept: { 'text/plain': ['.sql'] },
-          }],
+          suggestedName: activeTab.title.endsWith(".sql")
+            ? activeTab.title.replace(/\*$/, "")
+            : `${activeTab.title.replace(/\*$/, "")}.sql`,
+          types: [
+            {
+              description: "SQL Files",
+              accept: { "text/plain": [".sql"] },
+            },
+          ],
         });
       }
 
@@ -43,14 +81,14 @@ export default function Toolbar({ onAddTab }: ToolbarProps) {
         const writable = await handle.createWritable();
         await writable.write(activeTab.query);
         await writable.close();
-        
+
         const file = await handle.getFile();
         updateTabSaveStatus(activeTab.id, false, file.name, handle);
       }
-    } catch (err: any) {
-      if (err.name !== 'AbortError') {
-        console.error('Failed to save file:', err);
-        alert('Failed to save file: ' + err.message);
+    } catch (err: unknown) {
+      if (err instanceof Error && err.name !== "AbortError") {
+        console.error("Failed to save file:", err);
+        alert("Failed to save file: " + err.message);
       }
     }
   }
@@ -88,24 +126,35 @@ export default function Toolbar({ onAddTab }: ToolbarProps) {
         if (resp.status == 200) {
           const body = await resp.json();
           const q = body as QueryResponse;
-          if(q.ok === true) {
+          if (q.ok === true) {
             updateTabResults(tabId, "Query executed successfully.", q, false);
           } else {
             updateTabResults(tabId, `Error: ${q.error_message}`, q, false);
           }
         } else {
-          updateTabResults(tabId, "Could not execute query. Network error.", undefined, false);
+          updateTabResults(
+            tabId,
+            "Could not execute query. Network error.",
+            undefined,
+            false,
+          );
         }
-      } catch (e: unknown) {
+      } catch (e: any) {
         console.error(e);
-        updateTabResults(tabId, `${(e as Error).name}: ${(e as Error).message}`, undefined, false);
+        updateTabResults(
+          tabId,
+          `${e.name}: ${e.message}`,
+          undefined,
+          false,
+        );
       }
     }
   }
 
   function newQueryOnClick() {
-    const sqlTabs = tabs.filter(tab => tab.title.startsWith('SQL Query'));
-    const newTitle = sqlTabs.length === 0 ? 'SQL Query' : `SQL Query ${sqlTabs.length}`;
+    const sqlTabs = tabs.filter((tab) => tab.title.startsWith("SQL Query"));
+    const newTitle =
+      sqlTabs.length === 0 ? "SQL Query" : `SQL Query ${sqlTabs.length}`;
     addTab(newTitle);
   }
 
@@ -147,6 +196,22 @@ export default function Toolbar({ onAddTab }: ToolbarProps) {
             ></img>
           </button>
           <label htmlFor="newQueryBtn">New Query</label>
+        </div>
+
+        <div className="btn-label-container">
+          <button
+            name="openQueryBtn"
+            className="toolbar-btn"
+            data-src="src/assets/icons/open-file.png"
+            data-hover="src/assets/icons/open-file-dark-outline.png"
+            onClick={openQueryOnClick}
+          >
+            <img
+              alt="Open query icon"
+              src="src/assets/icons/open-file.png"
+            ></img>
+          </button>
+          <label htmlFor="openQueryBtn">Open Query</label>
         </div>
 
         <div className="btn-label-container">
@@ -199,6 +264,23 @@ export default function Toolbar({ onAddTab }: ToolbarProps) {
           </button>
           <label htmlFor="connectionBtn">Connection</label>
         </div>
+
+        <div className="btn-label-container">
+          <button
+            name="openQueryBtnHome"
+            className="toolbar-btn"
+            data-src="src/assets/icons/open-file.png"
+            data-hover="src/assets/icons/open-file-dark-outline.png"
+            onClick={openQueryOnClick}
+          >
+            <img
+              alt="Open query icon"
+              src="src/assets/icons/open-file.png"
+            ></img>
+          </button>
+          <label htmlFor="openQueryBtnHome">Open Query</label>
+        </div>
+
         <div className="btn-label-container">
           <button
             name="newQueryBtnHomePage"
