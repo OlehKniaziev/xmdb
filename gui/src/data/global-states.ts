@@ -63,6 +63,7 @@ export type MultiTabQueryStore = {
   tabs: TabState[];
   activeTabId: string | null;
   addTab: (title: string) => string;
+  openTab: (title: string, query: string, fileHandle: FileSystemFileHandle) => string;
   closeTab: (id: string) => void;
   setActiveTab: (id: string | null) => void;
   updateActiveTabQuery: (query: string) => void;
@@ -88,6 +89,25 @@ export const useMultiTabQueryStore = create<MultiTabQueryStore>()(
             isLoading: false,
             bottomPanelTab: "messages",
             isDirty: false,
+          };
+          set((state) => ({
+            tabs: [...state.tabs, newTab],
+            activeTabId: id,
+          }));
+          return id;
+        },
+        openTab: (title, query, fileHandle) => {
+          const id = `query-${Date.now()}`;
+          const newTab: TabState = {
+            id,
+            title,
+            query,
+            message: "Output messages will be shown here",
+            isLoading: false,
+            bottomPanelTab: "messages",
+            isDirty: false,
+            filePath: title,
+            fileHandle: fileHandle,
           };
           set((state) => ({
             tabs: [...state.tabs, newTab],
