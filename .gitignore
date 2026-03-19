@@ -3,3 +3,4 @@
 build/
 cmake-build-debug/
 doxy/
+latex-docs/
