@@ -1,11 +1,13 @@
 # XMDB
-XMDB is a media-first relational database which (*in the future*) supports most popular video, audio and image codecs as builtin SQL
+XMDB is a media-first relational database which supports most popular video, audio and image codecs as builtin SQL
 column types.
 
-## How to build
+## Quick start
+
+### Building
 Prerequisites:
 
-* A linux system (might work on other POSIX-compatible systems like Mac, not tested though)
+* A linux system (might work on other POSIX-compatible systems like Mac or the BSDs, not tested though)
 * CMake >= 3.20
 * A C compiler
 * A C++ compiler with support for C++20
@@ -23,7 +25,25 @@ cmake --build .
 
 After that, you will have multiple executables built inside the `build/src/*` subfoulders.
 
-## How to run the GUI
+### Running the server
+```shell
+cd ./build/
+# To override default configuration see the command line flags: ./src/Server/xmdb_server -help
+./src/Server/xmdb_server
+```
+
+### Connecting to a running server from the terminal
+```shell
+cd ./build/
+./src/CLI/xmdb -hostname <hostname> -port <port, default 6969> -db <database name> -user <username> -password <plaintext password of the user>
+> create table tab (id int, name text);
+> insert into tab(id, name) values (1, "hello"), (2, "world");
+> select * from tab;
+|1|hello|
+|2|world|
+```
+
+### How to run the GUI
 Prerequisites:
 
 * A working browser
@@ -42,6 +62,8 @@ After that, you can open `http://localhost:5137` in your browser.
 Alternatively, you can build the GUI project using `npm run build`, and then use it however you like.
 Note that to function correctly you need to have a working HTTP server (not HTTPS currently) serving
 built files which can be then accessed from the browser.
+
+For the GUI usage guide, consult appropriate [documentation](./gui/README.md).
 
 ## Demo
 ![](./demos/general.gif)

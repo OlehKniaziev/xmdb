@@ -51,17 +51,29 @@ using ok::Table;
 namespace xmdb::SQL {
 extern StringView token_types_pretty[];
 
+/**
+ * @brief Represents a single token in SQL source code.
+ */
 struct Token {
+    /**
+     * @brief Types of SQL tokens.
+     */
     enum Type : uint8_t {
 #define X(_t, t) t,
         XMDB_ENUM_SQL_TOKENS
 #undef X
     };
 
-    Type type;
-    StringView data;
+    Type type;       ///< The type of the token.
+    StringView data; ///< The literal text of the token in the source.
 };
 
+/**
+ * @brief Calculates the source location of a given token.
+ * @param source The full source string.
+ * @param token The token to locate.
+ * @return The source location information.
+ */
 static inline SourceLocation locate_token(StringView source, Token token) {
     OK_ASSERT((uintptr_t) token.data.data >= (uintptr_t) source.data);
 
@@ -86,6 +98,11 @@ static inline SourceLocation locate_token(StringView source, Token token) {
     };
 }
 
+/**
+ * @brief Converts a token type to its human-readable string representation.
+ * @param type The token type.
+ * @return A string view of the type name.
+ */
 inline StringView token_type_to_string_view(Token::Type type) {
     return token_types_pretty[type];
 }
@@ -94,14 +111,36 @@ using TokenTable = Table<StringView, Token::Type>;
 
 extern TokenTable token_table;
 
+/**
+ * @brief Lexical analyzer for SQL source code.
+ */
 struct Lexer {
+    /**
+     * @brief Constructs a Lexer from an ok::String.
+     * @param source The source string.
+     */
     explicit Lexer(String source) : source{source.view()}, pos{0} {
     }
+
+    /**
+     * @brief Constructs a Lexer from an ok::StringView.
+     * @param source The source string view.
+     */
     explicit Lexer(StringView source) : source{source}, pos{0} {
     }
 
+    /**
+     * @brief Retrieves the next token from the source.
+     * @return An optional containing the next token, or empty if end of source.
+     */
     Optional<Token> next();
 
+    /**
+     * @brief Consumes characters while a predicate is true and returns them as a view.
+     * @tparam F Type of the predicate function.
+     * @param pred The predicate function.
+     * @return A string view of the consumed characters.
+     */
     template<typename F>
     StringView take_while(F pred) {
         size_t start = pos;
@@ -111,17 +150,25 @@ struct Lexer {
         return source.view(start, pos);
     }
 
+    /**
+     * @brief Skips characters while a predicate is true.
+     * @tparam F Type of the predicate function.
+     * @param pred The predicate function.
+     */
     template <typename F>
     void skip_while(F pred) {
         while (pos < source.count && pred(source[pos])) ++pos;
     }
 
+    /**
+     * @brief Skips all whitespace characters.
+     */
     inline void skip_whitespace() {
         skip_while(ok::is_whitespace);
     }
 
-    StringView source;
-    size_t pos;
+    StringView source; ///< The source string being analyzed.
+    size_t pos;        ///< Current position in the source string.
 };
 }; // namespace xmdb::SQL
 

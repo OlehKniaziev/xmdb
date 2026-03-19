@@ -1,0 +1,30 @@
+name: Generate Documentation
+
+on:
+  push:
+    branches: [ "production" ]
+
+jobs:
+  docs:
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        submodules: recursive
+
+    - name: Install dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y doxygen python3-sphinx
+
+    - name: Generate docs
+      run: ./scripts/generate_docs.sh html
+
+    - name: Commit and push updated docs
+      run: |
+        git config user.name "github-actions[bot]"
+        git config user.email "github-actions[bot]@users.noreply.github.com"
+        git add docs/
+        git diff --cached --quiet || git commit -m "docs: regenerate documentation [skip ci]"
+        git push

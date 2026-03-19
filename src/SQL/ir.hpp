@@ -25,16 +25,38 @@ namespace xmdb::SQL {
     X(BOOLEAN) \
     X(PNG)
 
+/**
+ * @brief Supported types for table columns.
+ */
 enum class ColumnType {
 #define X(type) type,
 XMDB_ENUM_COLUMN_TYPES
 #undef X
 };
 
-const char *column_type_to_string(ColumnType);
-ok::Optional<ColumnType> parse_column_type(ok::StringView);
+/**
+ * @brief Converts a ColumnType to its string representation.
+ * @param type The column type.
+ * @return The name of the column type.
+ */
+const char *column_type_to_string(ColumnType type);
 
+/**
+ * @brief Parses a column type from a string view.
+ * @param sv The string view to parse.
+ * @return The parsed ColumnType, or empty if unknown.
+ */
+ok::Optional<ColumnType> parse_column_type(ok::StringView sv);
+
+/**
+ * @brief Represents the schema of a table in the IR.
+ */
 struct TableSchema {
+    /**
+     * @brief Creates an untyped table schema.
+     * @param a The allocator to use.
+     * @return The new TableSchema.
+     */
     static TableSchema untyped(Allocator *a) {
         TableSchema schema;
         schema.columns_names = List<Optional<String>>::alloc(a);
@@ -42,12 +64,22 @@ struct TableSchema {
         return schema;
     }
 
+    /**
+     * @brief Creates a typed table schema.
+     * @param a The allocator to use.
+     * @return The new TableSchema.
+     */
     static TableSchema typed(Allocator *a) {
         TableSchema schema = TableSchema::untyped(a);
         schema.columns_types = List<ColumnType>::alloc(a);
         return schema;
     }
 
+    /**
+     * @brief Checks if a column with the given name exists in the schema.
+     * @param name The column name to search for.
+     * @return true if found, false otherwise.
+     */
     inline bool find_column(StringView name) const {
         for (UZ i = 0; i < columns_names.count; ++i) {
             if (columns_names[i].has_value() && columns_names[i].value == name) return true;
@@ -56,8 +88,8 @@ struct TableSchema {
         return false;
     }
 
-    List<Optional<String>> columns_names;
-    Optional<List<ColumnType>> columns_types;
+    List<Optional<String>> columns_names;     ///< The names of the columns.
+    Optional<List<ColumnType>> columns_types; ///< The types of the columns (if typed).
 };
 
 #define ENUM_IR_CONTRACTS                                                                                              \
@@ -99,6 +131,9 @@ struct TableSchema {
 #define INSTR_3(instr, _op1, _op2, _op3) IRInstructionOperator_##instr,
 #define INSTR_VAR_3(instr, _op1, _op2, _op3) IRInstructionOperator_##instr,
 
+/**
+ * @brief Opcodes for IR instructions.
+ */
 enum IRInstructionOperator : U32 { ENUM_IR_CONTRACTS };
 
 #undef INSTR_VAR_0
@@ -127,6 +162,11 @@ enum IRInstructionOperator : U32 { ENUM_IR_CONTRACTS };
 #define INSTR_VAR_3(instr, _op1, _op2, _op3)                                                                           \
     case IRInstructionOperator_##instr: return #instr;
 
+/**
+ * @brief Gets the name of an IR instruction operator.
+ * @param op The instruction operator.
+ * @return The name string.
+ */
 static inline const char *ir_instruction_operator_name(IRInstructionOperator op) {
     switch (op) { ENUM_IR_CONTRACTS }
     OK_UNREACHABLE();
@@ -147,22 +187,36 @@ static inline const char *ir_instruction_operator_name(IRInstructionOperator op)
 #define XMDB_BUILTIN_FUNCTION_SIG_NAME(name, ret, ...) Result<ret, ErrorWithSourceLocation>(*name)(SourceLocation, ok::Allocator *, __VA_ARGS__)
 #define XMDB_BUILTIN_FUNCTION_SIG(ret, ...) Result<ret, ErrorWithSourceLocation>(*)(SourceLocation, ok::Allocator *, __VA_ARGS__)
 
+/**
+ * @brief Represents a single instruction in the IR.
+ */
 struct IRInstruction {
+    /**
+     * @brief Checks if the instruction generates a new table.
+     * @return true if table-generating, false otherwise.
+     */
     inline bool is_table_generating() const {
         return op == IRInstructionOperator_FetchTable || op == IRInstructionOperator_EmitQuery;
     }
 
-    IRInstructionOperator op;
-    U32 operand1;
-    U32 operand2;
-    U32 operand3;
+    IRInstructionOperator op; ///< The opcode.
+    U32 operand1;             ///< First operand.
+    U32 operand2;             ///< Second operand.
+    U32 operand3;             ///< Third operand.
 };
 
 static_assert(sizeof(IRInstruction) == sizeof(U32) * 4);
 
+/**
+ * @brief Emits IR instructions during compilation.
+ */
 struct IREmitter {
     IREmitter() = default;
 
+    /**
+     * @brief Constructs a new IREmitter.
+     * @param allocator The allocator to use.
+     */
     explicit IREmitter(Allocator *allocator) : allocator{allocator} {
         instructions = List<IRInstruction>::alloc(allocator);
         tokens = List<Token>::alloc(allocator);
@@ -171,6 +225,10 @@ struct IREmitter {
         schemas = List<TableSchema *>::alloc(allocator);
     }
 
+    /**
+     * @brief Generates a new unique temporary variable name.
+     * @return Index of the name in the strings pool.
+     */
     inline U32 gen_temp() {
         auto temp_name = String::format(allocator, "temp_%d", temps_count);
         ++temps_count;
@@ -178,48 +236,77 @@ struct IREmitter {
         return strings.count - 1;
     }
 
+    /**
+     * @brief Adds a string to the strings pool.
+     * @param string The string to add.
+     * @return The index of the string.
+     */
     inline U32 add_string(String string) {
         strings.push(string);
         return strings.count - 1;
     }
 
+    /**
+     * @brief Adds a string view to the strings pool.
+     * @param sv The string view to add.
+     * @return The index of the string.
+     */
     inline U32 add_string(StringView sv) {
         auto copy = sv.to_string(allocator);
         return add_string(copy);
     }
 
+    /**
+     * @brief Adds an integer to the integers pool.
+     * @param integer The integer to add.
+     * @return The index of the integer.
+     */
     inline U32 add_int(S64 integer) {
         integers.push(integer);
         return integers.count - 1;
     }
 
+    /**
+     * @brief Adds a table schema to the schemas pool.
+     * @param schema The schema to add.
+     * @return The index of the schema.
+     */
     inline U32 add_schema(TableSchema *schema) {
         schemas.push(schema);
         return schemas.count - 1;
     }
 
+    /**
+     * @brief Appends an instruction to the IR.
+     * @param instr The instruction to add.
+     * @return The index of the instruction.
+     */
     inline U32 add_instruction(IRInstruction instr) {
         instructions.push(instr);
         return instructions.count - 1;
     }
 
-    Allocator *allocator;
-    U32 temps_count = 0;
-    List<IRInstruction> instructions;
-    List<Token> tokens;
-    List<String> strings;
-    List<S64> integers;
-    // FIXME: instead of maintaining it's own list, the IREmitter structure should re-use indices
-    // into the 'table_schemas' array of some 'DBSchema' object
-    List<TableSchema *> schemas;
+    Allocator *allocator;             ///< The allocator.
+    U32 temps_count = 0;              ///< Count of temporary variables.
+    List<IRInstruction> instructions; ///< The list of instructions.
+    List<Token> tokens;               ///< Tokens associated with instructions.
+    List<String> strings;             ///< The string pool.
+    List<S64> integers;               ///< The integer pool.
+    List<TableSchema *> schemas;      ///< The schema pool.
 };
 
+/**
+ * @brief Helper for two values.
+ */
 template<typename A, typename B>
 struct Tuple {
     A op1;
     B op2;
 };
 
+/**
+ * @brief Helper for three values.
+ */
 template<typename A, typename B, typename C>
 struct Triple {
     A op1;
@@ -227,11 +314,20 @@ struct Triple {
     C op3;
 };
 
+/**
+ * @brief Template for getting operand values from the emitter store.
+ */
 template<typename T>
 struct IRContractGetter {};
 
 template<>
 struct IRContractGetter<StringView> {
+    /**
+     * @brief Retrieves a string view from the emitter.
+     * @param emitter The emitter.
+     * @param op The operand index.
+     * @return The string view.
+     */
     template<typename Store>
     static StringView get(Store *emitter, U32 op) {
         return emitter->strings[op].view();
@@ -240,6 +336,12 @@ struct IRContractGetter<StringView> {
 
 template<>
 struct IRContractGetter<S64> {
+    /**
+     * @brief Retrieves an integer from the emitter.
+     * @param emitter The emitter.
+     * @param op The operand index.
+     * @return The integer value.
+     */
     template<typename Store>
     static S64 get(Store *emitter, U32 op) {
         return emitter->integers[op];
@@ -248,6 +350,12 @@ struct IRContractGetter<S64> {
 
 template<>
 struct IRContractGetter<TableSchema *> {
+    /**
+     * @brief Retrieves a table schema pointer from the emitter.
+     * @param emitter The emitter.
+     * @param op The operand index.
+     * @return The table schema pointer.
+     */
     template<typename Store>
     static TableSchema *get(Store *emitter, U32 op) {
         return emitter->schemas[op];
@@ -256,6 +364,12 @@ struct IRContractGetter<TableSchema *> {
 
 template<>
 struct IRContractGetter<U32> {
+    /**
+     * @brief Retrieves a raw U32 operand.
+     * @param emitter The emitter (unused).
+     * @param op The operand value.
+     * @return The operand value.
+     */
     template<typename Store>
     static U32 get(Store *emitter, U32 op) {
         OK_UNUSED(emitter);
@@ -340,7 +454,16 @@ ENUM_IR_CONTRACTS
 #undef INSTR_2
 #undef INSTR_3
 
+/**
+ * @brief Represents a database schema in the IR.
+ */
 struct DBSchema {
+    /**
+     * @brief Allocates a new DBSchema.
+     * @param allocator The allocator to use.
+     * @param name The name of the database.
+     * @return The new DBSchema.
+     */
     static DBSchema alloc(Allocator *allocator, StringView name) {
         DBSchema schema;
         schema.allocator = allocator;
@@ -353,6 +476,11 @@ struct DBSchema {
         return schema;
     }
 
+    /**
+     * @brief Allocates the default DBSchema.
+     * @param allocator The allocator to use.
+     * @return The default DBSchema.
+     */
     static DBSchema alloc_default(Allocator *allocator) {
         DBSchema schema;
         schema.allocator = allocator;
@@ -365,6 +493,12 @@ struct DBSchema {
         return schema;
     }
 
+    /**
+     * @brief Allocates a new TableSchema within this DBSchema.
+     * @param name The name of the table.
+     * @param typed Whether the schema is typed.
+     * @return Pointer to the new TableSchema.
+     */
     inline TableSchema *alloc_table_schema(Optional<String> name, bool typed) {
         if (name) {
             table_schemas_index.put(name.value, table_schema_count);
@@ -378,17 +512,24 @@ struct DBSchema {
         return schema;
     }
 
-    U32 table_schema_count;
-    Allocator *allocator;
-    // FIXME: don't allocate it as a bigass block of memory, find out a better way
-    TableSchema *table_schemas;
-    String name;
-    Table<String, U32> table_schemas_index;
+    U32 table_schema_count;                ///< Number of table schemas.
+    Allocator *allocator;                  ///< The allocator.
+    TableSchema *table_schemas;            ///< Pointer to the array of table schemas.
+    String name;                           ///< Name of the database.
+    Table<String, U32> table_schemas_index; ///< Mapping of names to indices.
 };
 
+/**
+ * @brief Context for compiling AST to IR.
+ */
 struct IrContext {
     IrContext() = default;
 
+    /**
+     * @brief Constructs a new IrContext.
+     * @param allocator The allocator to use.
+     * @param source The original SQL source.
+     */
     explicit IrContext(Allocator *allocator, StringView source) :
         allocator{allocator}, source{source}, ir_emitter{allocator} {
         auto default_schema = DBSchema::alloc_default(allocator);
@@ -401,10 +542,20 @@ struct IrContext {
         push_namespace(NS_GLOBAL);
     }
 
+    /**
+     * @brief Gets the active database schema.
+     * @return Pointer to the active DBSchema.
+     */
     inline DBSchema *active_db_schema() {
         return &database_schemas[active_db_id];
     }
 
+    /**
+     * @brief Retrieves a TableSchema by its name within a database.
+     * @param db_schema_id The ID of the database schema.
+     * @param table_name The name of the table.
+     * @return Optional pointer to the TableSchema.
+     */
     inline Optional<TableSchema *> get_table_schema(U8 db_schema_id, StringView table_name) {
         auto *db_schema = &database_schemas[db_schema_id];
         Optional<U32> table_schema_id = db_schema->table_schemas_index.get(table_name);
@@ -415,6 +566,11 @@ struct IrContext {
         return &db_schema->table_schemas[table_schema_id.value];
     }
 
+    /**
+     * @brief Retrieves a TableSchema by instruction ID.
+     * @param id The instruction ID.
+     * @return Optional pointer to the TableSchema.
+     */
     inline Optional<TableSchema *> get_table_schema_by_id(U32 id) {
         IRInstruction instruction = ir_emitter.instructions[id];
 
@@ -427,6 +583,13 @@ struct IrContext {
         return {};
     }
 
+    /**
+     * @brief Allocates a new TableSchema.
+     * @param db_schema_id The database schema ID.
+     * @param table_name The name of the table.
+     * @param typed Whether the schema is typed.
+     * @return Pointer to the new TableSchema.
+     */
     inline TableSchema *alloc_table_schema(U8 db_schema_id, Optional<String> table_name, bool typed) {
         DBSchema *db_schema = &database_schemas[db_schema_id];
         TableSchema *table_schema = db_schema->alloc_table_schema(table_name, typed);
@@ -434,36 +597,63 @@ struct IrContext {
         return table_schema;
     }
 
+    /**
+     * @brief Namespace types.
+     */
     enum Namespace : U8 {
         NS_GLOBAL,
         NS_TABLE,
     };
 
+    /**
+     * @brief Gets the ID of the current table.
+     * @return The table ID.
+     */
     inline U32 current_table_id() const {
         OK_ASSERT(table_stack.count != 0);
         return table_stack[table_stack.count - 1];
     }
 
+    /**
+     * @brief Gets the current namespace.
+     * @return The namespace.
+     */
     inline Namespace current_namespace() const {
         OK_ASSERT(namespace_stack.count != 0);
         return namespace_stack[namespace_stack.count - 1];
     }
 
+    /**
+     * @brief Pushes a new namespace.
+     * @param ns The namespace to push.
+     */
     inline void push_namespace(Namespace ns) {
         OK_ASSERT(ns != NS_TABLE);
         namespace_stack.push(ns);
     }
 
+    /**
+     * @brief Pushes a table namespace.
+     * @param table_id The ID of the table.
+     */
     inline void push_table(U32 table_id) {
         table_stack.push(table_id);
         namespace_stack.push(NS_TABLE);
     }
 
+    /**
+     * @brief Pops the current namespace.
+     */
     inline void pop_namespace() {
         auto prev_ns = namespace_stack.pop();
         if (prev_ns == NS_TABLE) table_stack.pop();
     }
 
+    /**
+     * @brief Records an error at a token location.
+     * @param token The token where the error occurred.
+     * @param message The error message.
+     */
     inline void error_on(Token token, String message) {
         ErrorWithSourceLocation error;
         error.location = locate_token(source, token);
@@ -471,26 +661,43 @@ struct IrContext {
         this->error = error;
     }
 
-    Allocator *allocator;
-    StringView source; // used only for error reporting
-    List<DBSchema> database_schemas;
-    List<U32> table_stack;
-    List<Namespace> namespace_stack;
-    IREmitter ir_emitter;
-    U32 active_db_id = 0;
-    Optional<ErrorWithSourceLocation> error{};
+    Allocator *allocator;              ///< The allocator.
+    StringView source;                 ///< The original source.
+    List<DBSchema> database_schemas;   ///< List of database schemas.
+    List<U32> table_stack;             ///< Stack of table IDs.
+    List<Namespace> namespace_stack;   ///< Stack of namespaces.
+    IREmitter ir_emitter;              ///< The IR emitter.
+    U32 active_db_id = 0;              ///< The active database ID.
+    Optional<ErrorWithSourceLocation> error{}; ///< Error information.
 };
 
+/**
+ * @brief Represents a compiled SQL query in IR.
+ */
 struct CompiledQuery {
-    Slice<IRInstruction> instructions;
-    Slice<Token> tokens;
-    Slice<String> strings;
-    Slice<S64> integers;
-    Slice<TableSchema *> schemas;
+    Slice<IRInstruction> instructions; ///< The instructions.
+    Slice<Token> tokens;               ///< The tokens.
+    Slice<String> strings;             ///< The strings.
+    Slice<S64> integers;               ///< The integers.
+    Slice<TableSchema *> schemas;      ///< The schemas.
 };
 
+/**
+ * @brief Compiles a query AST to IR.
+ * @param in_query The input query AST.
+ * @param ctx The IR context.
+ * @param out_query Pointer to store the compiled query.
+ * @return true if successful, false otherwise.
+ */
 bool ir_compile_query(Query *in_query, IrContext *ctx, CompiledQuery *out_query);
-String stringify_ir(Allocator *, CompiledQuery *);
+
+/**
+ * @brief Stringifies a compiled query.
+ * @param allocator The allocator to use for the string.
+ * @param query The compiled query.
+ * @return The human-readable IR string.
+ */
+String stringify_ir(Allocator *allocator, CompiledQuery *query);
 }; // namespace xmdb::SQL
 
 #endif // XMDB_IR_HPP

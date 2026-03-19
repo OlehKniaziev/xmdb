@@ -58,7 +58,7 @@ public:
     }
 
 private:
-    void arg(const char *name, Flag type, void *dest, const char *description, const void *default_value) {
+    void flag(const char *name, Flag type, void *dest, const char *description, const void *default_value) {
         m_flag_specs.push(FlagSpec{.name = name, .description = description, .type = type, .dest = dest, .default_value = default_value});
     }
 

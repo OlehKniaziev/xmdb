@@ -1,5 +1,9 @@
 #pragma once
 
+/**
+ * @brief Macro to create a distinct numeric type that wraps an underlying type.
+ * This provides type safety by preventing accidental mixing of different numeric contexts.
+ */
 #define XMDB_MAKE_DISTINCT_NUMERIC(type, underlying)    \
     class type {                                        \
     public:                                             \
@@ -61,6 +65,9 @@
     underlying m_value;                                 \
     };
 
+/**
+ * @brief Macro to declare a type-safe flags class.
+ */
 #define XMDB_DECLARE_FLAGS(name, underlying)    \
     class name {                                \
     public:                                     \

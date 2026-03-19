@@ -4,14 +4,32 @@
 #include "DBUser.hpp"
 
 namespace xmdb {
+/**
+ * @brief Describes a database and manages its tables and users.
+ */
 struct DBDescriptor {
-    static DBDescriptor *alloc(ok::Allocator *, ok::StringView);
+    /**
+     * @brief Allocates a new DBDescriptor.
+     * @param allocator The allocator to use for the descriptor.
+     * @param name The name of the database.
+     * @return A pointer to the newly allocated DBDescriptor.
+     */
+    static DBDescriptor *alloc(ok::Allocator *allocator, ok::StringView name);
 
+    /**
+     * @brief Adds a user to the database.
+     * @param user The user to add.
+     */
     inline void add_user(DBUser *user) {
         user->next = users;
         users = user;
     }
 
+    /**
+     * @brief Finds a user by name.
+     * @param name The name of the user to find.
+     * @return An optional containing the user if found, or empty otherwise.
+     */
     inline Optional<DBUser *> find_user(StringView name) {
         for (DBUser *user = users; user != nullptr; user = user->next) {
             if (user->name == name) {
@@ -22,6 +40,16 @@ struct DBDescriptor {
         return {};
     }
 
+    /**
+     * @brief Creates a new table in the database.
+     * @param allocator The allocator to use for the table.
+     * @param name The name of the table.
+     * @param flags The table flags (e.g., storage type).
+     * @param columns_count The number of columns in the table.
+     * @param column_names The names of the columns.
+     * @param column_types The types of the columns.
+     * @return A pointer to the newly created table.
+     */
     DBTable *create_new_table(ok::Allocator *allocator,
                               ok::StringView name,
                               DBTable::Flags flags,
@@ -29,11 +57,16 @@ struct DBDescriptor {
                               ok::Slice<ok::StringView> column_names,
                               ok::Slice<SQL::ColumnType> column_types);
 
-    ok::Optional<DBTable *> load_existing_table(ok::StringView);
+    /**
+     * @brief Loads an existing table by name.
+     * @param name The name of the table to load.
+     * @return An optional containing the table if found, or empty otherwise.
+     */
+    ok::Optional<DBTable *> load_existing_table(ok::StringView name);
 
-    DBDescriptor *next;
-    ok::StringView name;
-    DBUser *users;
-    ok::List<DBTable *> tables;
+    DBDescriptor *next;             ///< Pointer to the next database descriptor in a list.
+    ok::StringView name;            ///< The name of the database.
+    DBUser *users;                  ///< Pointer to the head of the users list.
+    ok::List<DBTable *> tables;      ///< List of tables in the database.
 };
 }

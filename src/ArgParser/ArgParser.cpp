@@ -7,7 +7,7 @@ ArgParser &ArgParser::positional(U32 idx, const char *name) {
 }
 
 ArgParser &ArgParser::string(const char *name, const char **dest, const char *description, const char *default_value) {
-    arg(name, Flag::STRING, dest, description, default_value);
+    flag(name, Flag::STRING, dest, description, default_value);
     return *this;
 }
 
@@ -18,12 +18,12 @@ ArgParser &ArgParser::integer(const char *name, S64 *dest, const char *descripti
         *default_value = default_value_opt.get();
     }
 
-    arg(name, Flag::INT, dest, description, default_value);
+    flag(name, Flag::INT, dest, description, default_value);
     return *this;
 }
 
 ArgParser &ArgParser::boolean(const char *name, bool *dest, const char *description) {
-    arg(name, Flag::BOOL, dest, description, nullptr);
+    flag(name, Flag::BOOL, dest, description, nullptr);
     return *this;
 }
 
@@ -49,6 +49,11 @@ bool ArgParser::parse() {
             m_positionals.push(arg);
             ++i;
             continue;
+        }
+
+        if (strcmp(arg + 1, "help") == 0) {
+            help();
+            exit(0);
         }
 
         for (UZ f = 0; f < flag_specs.count; ) {
@@ -190,6 +195,8 @@ ok::StringView ArgParser::error_message() {
 }
 
 void ArgParser::help() {
+    flag("help", Flag::BOOL, nullptr, "print this help message", nullptr);
+
     U32 max_width = 0;
 
     printf("Usage: %s", m_argv[0]);
