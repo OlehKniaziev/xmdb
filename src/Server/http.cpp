@@ -264,6 +264,9 @@ DECLARE_HANDLER(run_query_handler) {
 
                         break;
                     }
+                    case Value::Type::BIG_STRING: {
+                        OK_UNREACHABLE();
+                    }
                     }
                 }
 

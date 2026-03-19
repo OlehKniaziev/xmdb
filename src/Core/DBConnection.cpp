@@ -375,10 +375,15 @@ U32 extract<U32>(Allocator *allocator, DBValue *db_value) {
 template <>
 StringView extract<StringView>(Allocator *allocator, DBValue *db_value) {
     Value value = poll(allocator, db_value).get();
-    OK_ASSERT(value.type() == Value::Type::STRING);
 
-    const FixedString *s = value.as_string_ptr();
-    return s->view();
+    if (value.type() == Value::Type::STRING) {
+        const FixedString *s = value.as_string_ptr();
+        return s->view();
+    } else if (value.type() == Value::Type::BIG_STRING) {
+        return value.as_big_string()->view();
+    } else {
+        OK_PANIC("value was expected to be of a string type");
+    }
 }
 
 template <UZ... Xs>
@@ -473,11 +478,11 @@ static void fill_column(DBRecord *record,
         if (input_chunk->data.count > MAX_DISK_IMAGE_CHUNK_DATA_SIZE) OK_TODO_MSG("Image too big");
 
         ok::Slice<ColumnAttribute> attrs = table->column_attributes();
-        ColumnAttribute attr = attrs[column_index];
+        ColumnAttribute *attr = &attrs[column_index];
 
-        OK_ASSERT(attr.flags & ColumnAttribute::F_IMAGE);
+        OK_ASSERT(attr->flags & ColumnAttribute::F_IMAGE);
 
-        ImageColumnState *image_state = &attr.u.image_state;
+        ImageColumnState *image_state = &attr->u.image_state;
 
         U64 new_chunk_index = image_state->header.chunks_count;
 
@@ -534,6 +539,9 @@ static void fill_column(DBRecord *record,
 
         break;
     }
+    case Value::Type::BIG_STRING: {
+        OK_UNREACHABLE();
+    }
     }
 }
 
@@ -574,6 +582,7 @@ static void flush_buffer(QueryExecutionContext *ctx,
     state->header.record_count += record_buffer.count;
     OK_VERIFY(db_state_sync(state));
 }
+
 static void run_single_node(QueryExecutionContext *ctx, QueryGraph::Node *node) {
     switch (node->type()) {
     case QueryGraph::Node::Type::ALTER_USER: {

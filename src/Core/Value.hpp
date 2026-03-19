@@ -18,8 +18,9 @@ public:
     enum class Type {
         INT,         ///< Integer value.
         BOOL,        ///< Boolean value.
-        STRING,      ///< String value.
+        STRING,      ///< Fixed string value.
         IMAGE_CHUNK, ///< Image chunk value.
+        BIG_STRING,  ///< String of size exceeding the maximum size of a fixed string.
     };
 
     Value() = delete;
@@ -80,6 +81,19 @@ public:
         chunk->data = data;
         chunk->pixel_format = format;
         return Value{Type::IMAGE_CHUNK, reinterpret_cast<void *>(chunk)};
+    }
+
+    /**
+     * @brief Creates a "big string" value.
+     * @param allocator The allocator to use.
+     * @param data String data.
+     * @return The resulting Value.
+     */
+    static Value big_string(ok::Allocator *allocator, ok::StringView data) {
+        ok::String s_value = data.to_string(allocator);
+        ok::String *s = allocator->alloc<ok::String>();
+        *s = s_value;
+        return Value{Type::BIG_STRING, reinterpret_cast<void *>(s)};
     }
 
     /**
@@ -148,6 +162,15 @@ public:
     ImageChunk *as_chunk() {
         OK_VERIFY(type() == Type::IMAGE_CHUNK);
         return reinterpret_cast<ImageChunk *>(m_data);
+    }
+
+    /**
+     * @brief Retrieves the value as a pointer to a String.
+     * @return Pointer to the string.
+     */
+    ok::String *as_big_string() {
+        OK_VERIFY(type() == Type::BIG_STRING);
+        return reinterpret_cast<ok::String *>(m_data);
     }
 
     /**

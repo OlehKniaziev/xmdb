@@ -297,11 +297,15 @@ ok::Optional<Value> DBTableStream::next() {
         }
         case ConstDBValue::ConstKind::STRING: {
             ok::String *value = constant.as_string();
-            OK_VERIFY(value->count() <= FixedString::DATA_SIZE);
-            FixedString fs{};
-            memcpy(fs.items, (U8 *) value->cstr(), value->count());
-            fs.count = (U8) value->count();
-            return Value::string(m_allocator, fs);
+            if (value->count() <= FixedString::DATA_SIZE) {
+                FixedString fs{};
+                memcpy(fs.items, (U8 *) value->cstr(), value->count());
+                fs.count = (U8) value->count();
+                return Value::string(m_allocator, fs);
+            } else {
+                XMDB_FIXME("eliminate copying of big strings");
+                return Value::big_string(m_allocator, value->view());
+            }
         }
         }
 
