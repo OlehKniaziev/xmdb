@@ -16,7 +16,7 @@ function App() {
 
   return (
     <>
-      {/* <ConnectionDialog /> */}
+      <ConnectionDialog />
       <Router>
         <Routes>
           <Route path="/" element={<MainLayout />}>

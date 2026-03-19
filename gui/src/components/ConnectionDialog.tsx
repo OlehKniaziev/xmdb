@@ -8,11 +8,13 @@ function ConnectionDialog() {
   // const [isConnected, setIsConnected] = useState(false);
   const [errorMessage, setErrorMessage] = useState("No error");
   const [isLoading, setIsLoading] = useState(false);
-  const { Hostname, Database, Username, setId, addInfo } = useConnectionStore();
+  const { ConnectionId, Hostname, Database, Username, setId, addInfo } = useConnectionStore();
 
   const dialogRef = useRef<HTMLDialogElement>(null);
   useEffect(() => {
-    dialogRef.current?.showModal();
+    if (ConnectionId === undefined) {
+      dialogRef.current?.showModal();
+    }
   }, []);
 
   async function handleSubmit(event: FormEvent) {
@@ -25,7 +27,7 @@ function ConnectionDialog() {
     const password = formData.get("password");
 
     setIsLoading(true);
-    
+
     if (!hostname || !database || !user || !password) {
       await new Promise((resolve) => setTimeout(resolve, 100));
       setIsLoading(false);
