@@ -1,2 +1,0 @@
-.. doxygenclass:: GroupedMembers
-    :members:

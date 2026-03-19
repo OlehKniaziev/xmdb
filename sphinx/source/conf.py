@@ -17,7 +17,7 @@ author = 'Oleh Kniaziev'
 
 root = os.environ["XMDB_ROOT"]
 
-sys.path.append(f"{root}/sphinx/ext/breathe-5.0.0a2")
+sys.path.append(f"{root}/third_party/breathe")
 
 extensions = ["breathe"]
 

@@ -1,2 +1,0 @@
-.. doxygenindex::
-   :allow-dot-graphs:

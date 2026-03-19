@@ -1,1 +1,0 @@
-WARN_IF_DOC_ERROR = NO

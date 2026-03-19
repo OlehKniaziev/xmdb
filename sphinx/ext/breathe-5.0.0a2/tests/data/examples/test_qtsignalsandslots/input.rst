@@ -1,1 +1,0 @@
-.. doxygenfile:: qtsignalsandslots.h
