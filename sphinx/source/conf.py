@@ -17,8 +17,6 @@ author = 'Oleh Kniaziev'
 
 root = os.environ["XMDB_ROOT"]
 
-sys.path.append(f"{root}/third_party/breathe")
-
 extensions = ["breathe"]
 
 templates_path = ['_templates']

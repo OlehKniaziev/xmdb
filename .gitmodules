@@ -1,6 +1,3 @@
 [submodule "third_party/libweb"]
 	path = third_party/libweb
 	url = https://github.com/OlehKniaziev/libweb
-[submodule "third_party/breathe"]
-	path = third_party/breathe
-	url = https://github.com/breathe-doc/breathe.git
