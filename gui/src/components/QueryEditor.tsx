@@ -2,12 +2,14 @@ import Editor, { useMonaco } from "@monaco-editor/react";
 import { useEffect } from "react";
 import BottomPanel from "./BottomPanel";
 import { Panel, PanelGroup, PanelResizeHandle } from "react-resizable-panels";
-import { useQueryStore } from "../data/global-states";
+import { useMultiTabQueryStore } from "../data/global-states";
 import "../styles/bars-style.css";
 
 function QueryEditor() {
   const monaco = useMonaco();
-  const { query, setQuery } = useQueryStore();
+  const { tabs, activeTabId, updateActiveTabQuery } = useMultiTabQueryStore();
+
+  const activeTab = tabs.find(t => t.id === activeTabId);
 
   useEffect(() => {
     if (monaco) {
@@ -80,6 +82,11 @@ function QueryEditor() {
       monaco.editor.setTheme("beige-theme");
     }
   }, [monaco]);
+
+  if (!activeTab) {
+      return <div className="p-4 text-center">No active query tab. Please create a new query.</div>;
+  }
+
   return (
     <>
       <PanelGroup direction="vertical">
@@ -87,10 +94,10 @@ function QueryEditor() {
           <Editor
             defaultLanguage="sql"
             defaultValue="-- start writing your code here"
-            value={query}
+            value={activeTab.query}
             theme="beige-theme"
             className="editor-style"
-            onChange={(val) => setQuery(val || "")}
+            onChange={(val) => updateActiveTabQuery(val || "")}
             options={{
               fontFamily: '"Fragment Mono", monospace',
             }}
@@ -98,7 +105,7 @@ function QueryEditor() {
         </Panel>
         <PanelResizeHandle />
         <Panel minSize={6} defaultSize={20}>
-          <BottomPanel />
+          <BottomPanel tabId={activeTab.id} />
         </Panel>
       </PanelGroup>
     </>

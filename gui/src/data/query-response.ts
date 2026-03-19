@@ -1,8 +1,8 @@
 export type QueryResponse =
   | {
       ok: true;
-      column_names: string[];
-      rows: { [columnName: string]: any }[];
+      column_names?: string[];
+      rows?: { [columnName: string]: any }[];
     }
   | {
       ok: false;

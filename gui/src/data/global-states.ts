@@ -46,6 +46,103 @@ export const useConnectionStore = create<ConnectionStore>()(
   )
 );
 
+export interface TabState {
+  id: string;
+  title: string;
+  query: string;
+  message: string;
+  response?: QueryResponse;
+  isLoading: boolean;
+  bottomPanelTab: "messages" | "results";
+}
+
+export type MultiTabQueryStore = {
+  tabs: TabState[];
+  activeTabId: string | null;
+  addTab: (title: string) => string;
+  closeTab: (id: string) => void;
+  setActiveTab: (id: string | null) => void;
+  updateActiveTabQuery: (query: string) => void;
+  updateTabResults: (id: string, message: string, response?: QueryResponse, isLoading?: boolean) => void;
+  updateTabBottomPanel: (id: string, tab: "messages" | "results") => void;
+  setTabLoading: (id: string, isLoading: boolean) => void;
+}
+
+export const useMultiTabQueryStore = create<MultiTabQueryStore>()(
+  devtools(
+    persist(
+      (set, get) => ({
+        tabs: [],
+        activeTabId: null,
+        addTab: (title) => {
+          const id = `query-${Date.now()}`;
+          const newTab: TabState = {
+            id,
+            title,
+            query: "-- start writing your code here",
+            message: "Output messages will be shown here",
+            isLoading: false,
+            bottomPanelTab: "messages",
+          };
+          set((state) => ({
+            tabs: [...state.tabs, newTab],
+            activeTabId: id,
+          }));
+          return id;
+        },
+        closeTab: (id) => {
+          set((state) => {
+            const newTabs = state.tabs.filter((t) => t.id !== id);
+            let newActiveTabId = state.activeTabId;
+            if (state.activeTabId === id) {
+              newActiveTabId = newTabs.length > 0 ? newTabs[newTabs.length - 1].id : null;
+            }
+            return {
+              tabs: newTabs,
+              activeTabId: newActiveTabId,
+            };
+          });
+        },
+        setActiveTab: (id) => set({ activeTabId: id }),
+        updateActiveTabQuery: (query) => {
+          set((state) => ({
+            tabs: state.tabs.map((t) =>
+              t.id === state.activeTabId ? { ...t, query } : t
+            ),
+          }));
+        },
+        updateTabResults: (id, message, response, isLoading = false) => {
+          set((state) => ({
+            tabs: state.tabs.map((t) =>
+              t.id === id ? { ...t, message, response, isLoading } : t
+            ),
+          }));
+        },
+        updateTabBottomPanel: (id, tab) => {
+          set((state) => ({
+            tabs: state.tabs.map((t) =>
+              t.id === id ? { ...t, bottomPanelTab: tab } : t
+            ),
+          }));
+        },
+        setTabLoading: (id, isLoading) => {
+          set((state) => ({
+            tabs: state.tabs.map((t) =>
+              t.id === id ? { ...t, isLoading } : t
+            ),
+          }));
+        }
+      }),
+      {
+        name: "multi-tab-query-storage",
+      }
+    )
+  )
+);
+
+// Keep these for backward compatibility during transition or if they are still needed elsewhere
+// but eventually we should remove them if they are only used for the query editor.
+
 export type QueryStore = {
   query: string;
   setQuery: (query: string) => void;
