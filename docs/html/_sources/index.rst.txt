@@ -8,5 +8,7 @@ It exposes a standard SQL interface via a network server and an interactive CLI 
    :maxdepth: 1
    :caption: Table of contents:
 
+   building
+   developing
    sql_syntax
    library_reference

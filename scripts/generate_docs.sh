@@ -2,7 +2,7 @@
 
 set -e
 
-if test "$@" -lt "1"; then
+if test "$#" -lt "1"; then
     echo "Not enough arguments"
     exit 1
 fi
