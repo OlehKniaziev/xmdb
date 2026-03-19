@@ -65,9 +65,9 @@ export default function Toolbar({ onAddTab }: ToolbarProps) {
         } else {
           updateTabResults(tabId, "Could not execute query. Network error.", undefined, false);
         }
-      } catch (e: any) {
+      } catch (e: unknown) {
         console.error(e);
-        updateTabResults(tabId, `${e.name}: ${e.message}`, undefined, false);
+        updateTabResults(tabId, `${(e as Error).name}: ${(e as Error).message}`, undefined, false);
       }
   }
 
