@@ -1,10 +1,7 @@
-SQL Syntax Reference
-====================
+SQL Reference
+=============
 
-This page describes the XMDB SQL grammar in BNF notation.
-Terminals in this grammar are written in ``UPPERCASE`` or quoted,
-for the sake of keeping the grammar description simple.
-In reality, the lexer is case-insensitive with regards to terminals.
+This page describes the XMDB SQL grammar and general usage of the language.
 
 
 .. contents:: Contents
@@ -15,6 +12,10 @@ In reality, the lexer is case-insensitive with regards to terminals.
 
 Grammar
 -------
+
+Terminals in the grammar are written in ``UPPERCASE`` or quoted,
+for the sake of keeping the grammar description simple.
+In reality, the lexer is case-insensitive with regards to terminals.
 
 .. code-block:: bnf
 
@@ -92,3 +93,52 @@ Grammar
    integer_literal    ::= INTEGER
    string_literal     ::= "'" <characters> "'"
                         | "\"" <characters> "\""
+
+----
+
+Built-in functions
+------------------
+
+``RGB(width, height, hex_data)``
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+.. code-block:: sql
+
+   RGB(width INTEGER, height INTEGER, hex_data TEXT) -> IMAGE_CHUNK
+
+Constructs an image chunk value from raw RGB pixel data supplied as a
+hexadecimal string.
+
+**Parameters**
+
+.. list-table::
+   :header-rows: 1
+
+   * - Parameter
+     - Type
+     - Description
+   * - ``width``
+     - ``INTEGER``
+     - Width of the image in pixels.
+   * - ``height``
+     - ``INTEGER``
+     - Height of the image in pixels.
+   * - ``hex_data``
+     - ``TEXT``
+     - Pixel data encoded as a hexadecimal string. Each pixel occupies 3
+       consecutive bytes in ``R``, ``G``, ``B`` order, so the string must
+       contain exactly ``width x height x 6`` hex characters.
+
+**Return type:** ``IMAGE_CHUNK``
+
+**Errors**
+
+The function fails at runtime if ``hex_data`` is not a valid hexadecimal
+string, or if the ``hex_data`` is of invalid size.
+
+**Example**
+
+.. code-block:: sql
+
+   -- Insert a 1x1 image with a single red pixel
+   INSERT INTO images (data) VALUES (RGB(1, 1, 'ff0000'));

@@ -10,5 +10,5 @@ It exposes a standard SQL interface via a network server and an interactive CLI 
 
    building
    developing
-   sql_syntax
+   sql
    library_reference
