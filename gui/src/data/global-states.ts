@@ -54,6 +54,9 @@ export interface TabState {
   response?: QueryResponse;
   isLoading: boolean;
   bottomPanelTab: "messages" | "results";
+  isDirty: boolean;
+  filePath?: string;
+  fileHandle?: FileSystemFileHandle;
 }
 
 export type MultiTabQueryStore = {
@@ -65,6 +68,7 @@ export type MultiTabQueryStore = {
   updateActiveTabQuery: (query: string) => void;
   updateTabResults: (id: string, message: string, response?: QueryResponse, isLoading?: boolean) => void;
   updateTabBottomPanel: (id: string, tab: "messages" | "results") => void;
+  updateTabSaveStatus: (id: string, isDirty: boolean, filePath?: string, fileHandle?: FileSystemFileHandle) => void;
   setTabLoading: (id: string, isLoading: boolean) => void;
 }
 
@@ -83,6 +87,7 @@ export const useMultiTabQueryStore = create<MultiTabQueryStore>()(
             message: "Output messages will be shown here",
             isLoading: false,
             bottomPanelTab: "messages",
+            isDirty: false,
           };
           set((state) => ({
             tabs: [...state.tabs, newTab],
@@ -107,7 +112,7 @@ export const useMultiTabQueryStore = create<MultiTabQueryStore>()(
         updateActiveTabQuery: (query) => {
           set((state) => ({
             tabs: state.tabs.map((t) =>
-              t.id === state.activeTabId ? { ...t, query } : t
+              t.id === state.activeTabId ? { ...t, query, isDirty: true } : t
             ),
           }));
         },
@@ -122,6 +127,13 @@ export const useMultiTabQueryStore = create<MultiTabQueryStore>()(
           set((state) => ({
             tabs: state.tabs.map((t) =>
               t.id === id ? { ...t, bottomPanelTab: tab } : t
+            ),
+          }));
+        },
+        updateTabSaveStatus: (id, isDirty, filePath, fileHandle) => {
+          set((state) => ({
+            tabs: state.tabs.map((t) =>
+              t.id === id ? { ...t, isDirty, filePath, fileHandle, title: filePath ? filePath.split(/[/\\]/).pop() || t.title : t.title } : t
             ),
           }));
         },

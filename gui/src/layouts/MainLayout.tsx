@@ -60,7 +60,7 @@ export default function MainLayout() {
   // Convert TabState to the format TabBar expects
   const tabBarTabs = tabs.map(t => ({
     id: t.id,
-    title: t.title,
+    title: t.isDirty ? `${t.title}*` : t.title,
     path: '/query'
   }));
 

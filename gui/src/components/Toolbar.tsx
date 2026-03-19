@@ -15,12 +15,45 @@ export default function Toolbar({ onAddTab }: ToolbarProps) {
   const location = useLocation();
   const navigate = useNavigate();
 
-  const { tabs, activeTabId, addTab, updateTabResults } = useMultiTabQueryStore();
+  const { tabs, activeTabId, addTab, updateTabResults, updateTabSaveStatus } = useMultiTabQueryStore();
   const { ConnectionId, Hostname, Database, Username } = useConnectionStore();
 
   const activeTab = tabs.find(t => t.id === activeTabId);
 
   const dialogRef = useRef<ConnectionEditHandle>(null);
+
+  async function saveQueryOnClick() {
+    if (!activeTab) return;
+
+    try {
+      let handle = activeTab.fileHandle;
+
+      if (!handle) {
+        // @ts-ignore - File System Access API
+        handle = await window.showSaveFilePicker({
+          suggestedName: activeTab.title.endsWith('.sql') ? activeTab.title : `${activeTab.title}.sql`,
+          types: [{
+            description: 'SQL Files',
+            accept: { 'text/plain': ['.sql'] },
+          }],
+        });
+      }
+
+      if (handle) {
+        const writable = await handle.createWritable();
+        await writable.write(activeTab.query);
+        await writable.close();
+        
+        const file = await handle.getFile();
+        updateTabSaveStatus(activeTab.id, false, file.name, handle);
+      }
+    } catch (err: any) {
+      if (err.name !== 'AbortError') {
+        console.error('Failed to save file:', err);
+        alert('Failed to save file: ' + err.message);
+      }
+    }
+  }
 
   function newQueryHomeOnClick() {
     if (onAddTab) {
@@ -36,14 +69,12 @@ export default function Toolbar({ onAddTab }: ToolbarProps) {
   }
 
   async function executeQuery() {
-    console.log(activeTab);
     if (!activeTab) return;
 
     const tabId = activeTab.id;
     const queryToExecute = activeTab.query;
 
-    console.log({ConnectionId, Hostname, Database, Username, queryToExecute});
-
+    if (ConnectionId && Hostname && Database && Username) {
       try {
         updateTabResults(tabId, activeTab.message, activeTab.response, true);
         const resp = await fetch(`${Hostname!.toString()}/run-query`, {
@@ -69,6 +100,7 @@ export default function Toolbar({ onAddTab }: ToolbarProps) {
         console.error(e);
         updateTabResults(tabId, `${e.name}: ${e.message}`, undefined, false);
       }
+    }
   }
 
   function newQueryOnClick() {
@@ -115,6 +147,22 @@ export default function Toolbar({ onAddTab }: ToolbarProps) {
             ></img>
           </button>
           <label htmlFor="newQueryBtn">New Query</label>
+        </div>
+
+        <div className="btn-label-container">
+          <button
+            name="saveQueryBtn"
+            className="toolbar-btn"
+            data-src="src/assets/icons/diskette.png"
+            data-hover="src/assets/icons/diskette-dark-outline.png"
+            onClick={saveQueryOnClick}
+          >
+            <img
+              alt="Save query icon"
+              src="src/assets/icons/diskette.png"
+            ></img>
+          </button>
+          <label htmlFor="saveQueryBtn">Save Query</label>
         </div>
 
         <div className="btn-label-container">
