@@ -1,16 +1,12 @@
-.. xmdb documentation master file, created by
-   sphinx-quickstart on Wed Mar 18 22:44:06 2026.
-   You can adapt this file completely to your liking, but it should at least
-   contain the root `toctree` directive.
-
-xmdb documentation
+XMDB Documentation
 ==================
 
-Foo bar
-
-.. doxygenindex::
+XMDB is a media-first relational database with built-in SQL support for image, video, and audio data.
+It exposes a standard SQL interface via a network server and an interactive CLI client.
 
 .. toctree::
-   :maxdepth: 2
-   :caption: Contents:
+   :maxdepth: 1
+   :caption: Table of contents:
 
+   sql_syntax
+   library_reference

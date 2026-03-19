@@ -8,9 +8,6 @@
 #include "ast.hpp"
 
 namespace xmdb::SQL {
-///
-/// Holds all parsing state.
-///
 /**
  * @brief Parses SQL source code into an Abstract Syntax Tree (AST).
  */
