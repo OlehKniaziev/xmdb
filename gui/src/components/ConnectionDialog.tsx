@@ -2,20 +2,21 @@ import { useEffect, useRef, useState, type FormEvent } from "react";
 import "../styles/bars-style.css";
 import "../styles/forms-style.css";
 import { useConnectionStore } from "../data/global-states";
-import { sha256HexDigest, toHexString } from "../data/util";
+import { sha256HexDigest } from "../data/util";
 
 function ConnectionDialog() {
   // const [isConnected, setIsConnected] = useState(false);
   const [errorMessage, setErrorMessage] = useState("No error");
   const [isLoading, setIsLoading] = useState(false);
-  const { ConnectionId, Hostname, Database, Username, setId, addInfo } = useConnectionStore();
+  const { ConnectionId, setId, addInfo } = useConnectionStore();
 
   const dialogRef = useRef<HTMLDialogElement>(null);
+
   useEffect(() => {
     if (ConnectionId === undefined) {
       dialogRef.current?.showModal();
     }
-  }, []);
+  }, [ConnectionId]);
 
   async function handleSubmit(event: FormEvent) {
     event.preventDefault();
