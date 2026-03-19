@@ -3,27 +3,32 @@ import { useLocation, useNavigate } from "react-router-dom";
 import ConnectionEdit, { type ConnectionEditHandle } from "./ConnectionEdit";
 import {
   useConnectionStore,
-  useOutputMessagesStore,
-  useQueryResponseStore,
-  useQueryStore,
+  useMultiTabQueryStore,
 } from "../data/global-states";
 import type { QueryResponse } from "../data/query-response";
 
-export default function Toolbar() {
+interface ToolbarProps {
+  onAddTab?: (path: string) => void;
+}
+
+export default function Toolbar({ onAddTab }: ToolbarProps) {
   const location = useLocation();
   const navigate = useNavigate();
 
-  const { query, setQuery } = useQueryStore();
-  const { setMessage } = useOutputMessagesStore();
+  const { tabs, activeTabId, addTab, updateTabResults } = useMultiTabQueryStore();
   const { ConnectionId, Hostname, Database, Username } = useConnectionStore();
-  const { setQueryResponse: setQueryResponce, setIsLoading } = useQueryResponseStore();
+
+  const activeTab = tabs.find(t => t.id === activeTabId);
 
   const dialogRef = useRef<ConnectionEditHandle>(null);
 
   function newQueryHomeOnClick() {
-    navigate("/query");
-    setQuery("-- start writing your code here");
-    setMessage("Output messages will be shown here");
+    if (onAddTab) {
+      onAddTab("/query");
+    } else {
+      addTab("SQL Query");
+      navigate("/query");
+    }
   }
 
   function editConnectionOnClick() {
@@ -31,14 +36,20 @@ export default function Toolbar() {
   }
 
   async function executeQuery() {
-    // console.log(query);
-    if (ConnectionId && Hostname && Database && Username) {
+    console.log(activeTab);
+    if (!activeTab) return;
+
+    const tabId = activeTab.id;
+    const queryToExecute = activeTab.query;
+
+    console.log({ConnectionId, Hostname, Database, Username, queryToExecute});
+
       try {
-        setIsLoading(true);
+        updateTabResults(tabId, activeTab.message, activeTab.response, true);
         const resp = await fetch(`${Hostname!.toString()}/run-query`, {
           method: "POST",
           body: JSON.stringify({
-            query,
+            query: queryToExecute,
             connection_id: ConnectionId,
           }),
         });
@@ -47,30 +58,23 @@ export default function Toolbar() {
           const body = await resp.json();
           const q = body as QueryResponse;
           if(q.ok === true) {
-            setMessage("Query executed successfully.");
-            console.log(q);
-            setQueryResponce(q);
+            updateTabResults(tabId, "Query executed successfully.", q, false);
           } else {
-            setQueryResponce(q);
-            setMessage(`Error: ${q.error_message}`);
+            updateTabResults(tabId, `Error: ${q.error_message}`, q, false);
           }
         } else {
-          setQueryResponce();
-          setMessage("Could not execute query. Network error.");
+          updateTabResults(tabId, "Could not execute query. Network error.", undefined, false);
         }
       } catch (e: any) {
         console.error(e);
-        setQueryResponce();
-        setMessage(`${e.name}: ${e.message}`);
-      } finally {
-        setIsLoading(false);
+        updateTabResults(tabId, `${e.name}: ${e.message}`, undefined, false);
       }
-    }
   }
 
   function newQueryOnClick() {
-    setQuery("-- start writing your code here");
-    setMessage("Output messages will be shown here");
+    const sqlTabs = tabs.filter(tab => tab.title.startsWith('SQL Query'));
+    const newTitle = sqlTabs.length === 0 ? 'SQL Query' : `SQL Query ${sqlTabs.length}`;
+    addTab(newTitle);
   }
 
   useEffect(() => {
@@ -113,35 +117,6 @@ export default function Toolbar() {
           <label htmlFor="newQueryBtn">New Query</label>
         </div>
 
-        {/* <div className="btn-label-container">
-          <button
-            name="openQueryBtn"
-            className="toolbar-btn"
-            data-src="src/assets/icons/open-file.png"
-            data-hover="src/assets/icons/open-file-dark-outline.png"
-          >
-            <img
-              alt="Open query icon"
-              src="src/assets/icons/open-file.png"
-            ></img>
-          </button>
-          <label htmlFor="openQueryBtn">Open Query</label>
-        </div>
-
-        <div className="btn-label-container">
-          <button
-            name="saveQueryBtn"
-            className="toolbar-btn"
-            data-src="src/assets/icons/diskette.png"
-            data-hover="src/assets/icons/diskette-dark-outline.png"
-          >
-            <img
-              alt="Save query icon"
-              src="src/assets/icons/diskette.png"
-            ></img>
-          </button>
-          <label htmlFor="saveQueryBtn">Save</label>
-        </div> */}
         <div className="btn-label-container">
           <button
             name="executeQueryBtn"
@@ -157,20 +132,6 @@ export default function Toolbar() {
           </button>
           <label htmlFor="executeQueryBtn">Execute</label>
         </div>
-        {/* <div className="btn-label-container">
-          <button
-            name="insertMediaBtn"
-            className="toolbar-btn"
-            data-src="src/assets/icons/paperclip.png"
-            data-hover="src/assets/icons/paperclip-dark.png"
-          >
-            <img
-              alt="Insert media icon"
-              src="src/assets/icons/paperclip.png"
-            ></img>
-          </button>
-          <label htmlFor="insertMediaBtn">Insert media</label>
-        </div> */}
       </>
     );
   } else if (location.pathname === "/settings") {

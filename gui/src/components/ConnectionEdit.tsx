@@ -1,16 +1,14 @@
 import {
   forwardRef,
-  useEffect,
   useImperativeHandle,
   useRef,
   useState,
-  type FormEvent,
   type SyntheticEvent,
 } from "react";
 import "../styles/bars-style.css";
 import "../styles/forms-style.css";
 import { useConnectionStore } from "../data/global-states";
-import { sha256HexDigest, toHexString } from "../data/util";
+import { sha256HexDigest } from "../data/util";
 
 export type ConnectionEditHandle = {
   open: () => void;
@@ -19,7 +17,6 @@ export type ConnectionEditHandle = {
 const ConnectionEdit = forwardRef<ConnectionEditHandle>((_, ref) => {
   // const [isConnected, setIsConnected] = useState(false);
   const {
-    ConnectionId,
     Hostname,
     Database,
     Username,

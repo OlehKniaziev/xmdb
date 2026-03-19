@@ -4,16 +4,8 @@ import QueryEditor from "./components/QueryEditor";
 import ConnectionDialog from "./components/ConnectionDialog";
 import "./styles/index.css";
 import HomePage from "./components/HomePage";
-import { loadWasmModule } from "./sql/sql";
-import { useEffect } from "react";
 
 function App() {
-  useEffect(
-    () => {
-      (async () => await loadWasmModule())()
-    }
-  );
-
   return (
     <>
       <ConnectionDialog />

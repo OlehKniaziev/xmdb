@@ -112,5 +112,6 @@ export async function loadWasmModule() {
     wasmMem = instance.exports.memory.buffer;
     wasmInstance = instance;
 
+    // @ts-expect-error
     instance.exports.__wasm_call_ctors();
 }

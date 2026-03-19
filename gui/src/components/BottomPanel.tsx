@@ -1,41 +1,43 @@
-import { useState } from "react";
-import { sampleData } from "../data/query-response";
 import QueryResponse from "./QueryResponse";
 import LoadingSpinner from "./LoadingSpinner";
-import { useOutputMessagesStore, useQueryResponseStore } from "../data/global-states";
+import { useMultiTabQueryStore } from "../data/global-states";
 
-function BottomPanel() {
-  const [activeTab, setActiveTab] = useState<"messages" | "results">(
-    "messages"
-  );
+interface BottomPanelProps {
+  tabId: string;
+}
 
-  const { message } = useOutputMessagesStore();
-  const { response, isLoading } = useQueryResponseStore();
+function BottomPanel({ tabId }: BottomPanelProps) {
+  const { tabs, updateTabBottomPanel } = useMultiTabQueryStore();
+  const currentTab = tabs.find(t => t.id === tabId);
+
+  if (!currentTab) return null;
+
+  const activeTab = currentTab.bottomPanelTab || "messages";
 
   return (
     <div className="bottom-panel">
       <div className="tab-header">
         <button
           className={activeTab === "messages" ? "active-tab-bottom" : ""}
-          onClick={() => setActiveTab("messages")}
+          onClick={() => updateTabBottomPanel(tabId, "messages")}
         >
           Messages
         </button>
         <button
           className={activeTab === "results" ? "active-tab-bottom" : ""}
-          onClick={() => setActiveTab("results")}
+          onClick={() => updateTabBottomPanel(tabId, "results")}
         >
           Results
         </button>
       </div>
 
       <div className="tab-content">
-        {isLoading ? (
+        {currentTab.isLoading ? (
           <LoadingSpinner />
         ) : activeTab === "messages" ? (
-          <div className="messages-style">{message}</div>
+          <div className="messages-style">{currentTab.message}</div>
         ) : (
-          <QueryResponse response={response} isLoading={isLoading} />
+          <QueryResponse response={currentTab.response} isLoading={currentTab.isLoading} />
         )}
       </div>
     </div>
