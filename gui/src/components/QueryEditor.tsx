@@ -3,6 +3,7 @@ import { useEffect } from "react";
 import BottomPanel from "./BottomPanel";
 import { Panel, PanelGroup, PanelResizeHandle } from "react-resizable-panels";
 import { useQueryStore } from "../data/global-states";
+import "../styles/bars-style.css";
 
 function QueryEditor() {
   const monaco = useMonaco();
@@ -10,28 +11,73 @@ function QueryEditor() {
 
   useEffect(() => {
     if (monaco) {
-      monaco.editor.defineTheme("warm-orange", {
+      monaco.editor.defineTheme("beige-theme", {
         base: "vs",
         inherit: true,
+        semanticHighlighting: true,
+
         rules: [
-          { token: "", background: "FBFEFB" },
-          { token: "comment", foreground: "a59f85" },
-          { token: "keyword", foreground: "f78c6c" },
-          { token: "string", foreground: "ecc48d" },
-          { token: "number", foreground: "ffcb6b" },
-          { token: "variable", foreground: "ffd580" },
+          { token: "", foreground: "210F04" },
+
+          { token: "comment", foreground: "A3B18A", fontStyle: "italic" },
+
+          { token: "keyword", foreground: "690500", fontStyle: "bold" },
+          { token: "operator", foreground: "b60900" },
+
+          { token: "string", foreground: "BB6B00" },
+          { token: "string.sql", foreground: "BB6B00" },
+
+          { token: "number", foreground: "934B00" },
+
+          { token: "function", foreground: "6B3A4B" },
+          { token: "type", foreground: "5C6B73" },
+          { token: "class", foreground: "5C6B73" },
+
+          { token: "variable", foreground: "210F04" },
+          { token: "constant", foreground: "6B7A3A" },
+
+          { token: "delimiter", foreground: "452103" },
         ],
+
+        semanticTokenColors: {
+          string: "#BB6B00",
+          variable: "#210F04",
+          parameter: "#452103",
+          function: "#6B3A4B",
+          class: "#5C6B73",
+          number: "#934B00",
+        },
+
         colors: {
           "editor.background": "#FBFEFB",
-          "editor.lineHighlightBackground": "#FBFEFB",
-          "editorCursor.foreground": "#ffcb6b",
-          "editorLineNumber.foreground": "#EFE5DC",
-          "editorLineNumber.activeForeground": "#D0B8AC",
-          "editor.selectionBackground": "#EFE5DC",
+          "editor.foreground": "#210F04",
+
+          "editorCursor.foreground": "#690500",
+
+          "editor.lineHighlightBackground": "#EFE5DC",
+
+          "editorLineNumber.foreground": "#D0B8AC",
+          "editorLineNumber.activeForeground": "#452103",
+
+          "editor.selectionBackground": "#D0B8AC",
           "editor.inactiveSelectionBackground": "#EFE5DC",
+
+          "editorBracketHighlight.foreground1": "#934B00",
+          "editorBracketHighlight.foreground2": "#6B3A4B",
+          "editorBracketHighlight.foreground3": "#5C6B73",
+          "editorBracketHighlight.foreground4": "#6B7A3A",
+
+          "editorBracketMatch.background": "#EFE5DC",
+          "editorBracketMatch.border": "#690500",
+
+          "scrollbar.shadow": "#d1d8c4",
+          "scrollbarSlider.background": "#c7d0b8cc",
+          "scrollbarSlider.hoverBackground": "#b5c0a1dd",
+          "scrollbarSlider.activeBackground": "#a3b18add",
+          "editorScrollbarCorner.background": "#FBFEFB",
         },
       });
-      monaco.editor.setTheme("warm-orange");
+      monaco.editor.setTheme("beige-theme");
     }
   }, [monaco]);
   return (
@@ -42,9 +88,12 @@ function QueryEditor() {
             defaultLanguage="sql"
             defaultValue="-- start writing your code here"
             value={query}
-            theme="warm-orange"
+            theme="beige-theme"
             className="editor-style"
             onChange={(val) => setQuery(val || "")}
+            options={{
+              fontFamily: '"Fragment Mono", monospace',
+            }}
           />
         </Panel>
         <PanelResizeHandle />

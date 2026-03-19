@@ -4,7 +4,7 @@ import ConnectionEdit, { type ConnectionEditHandle } from "./ConnectionEdit";
 import {
   useConnectionStore,
   useOutputMessagesStore,
-  useQueryResponceStore,
+  useQueryResponseStore,
   useQueryStore,
 } from "../data/global-states";
 import type { QueryResponse } from "../data/query-response";
@@ -16,7 +16,7 @@ export default function Toolbar() {
   const { query, setQuery } = useQueryStore();
   const { setMessage } = useOutputMessagesStore();
   const { ConnectionId, Hostname, Database, Username } = useConnectionStore();
-  const { setQueryResponce } = useQueryResponceStore();
+  const { setQueryResponse: setQueryResponce, setIsLoading } = useQueryResponseStore();
 
   const dialogRef = useRef<ConnectionEditHandle>(null);
 
@@ -34,6 +34,7 @@ export default function Toolbar() {
     // console.log(query);
     if (ConnectionId && Hostname && Database && Username) {
       try {
+        setIsLoading(true);
         const resp = await fetch(`${Hostname!.toString()}/run-query`, {
           method: "POST",
           body: JSON.stringify({
@@ -61,6 +62,8 @@ export default function Toolbar() {
         console.error(e);
         setQueryResponce();
         setMessage(`${e.name}: ${e.message}`);
+      } finally {
+        setIsLoading(false);
       }
     }
   }

@@ -10,6 +10,7 @@ import {
 import "../styles/bars-style.css";
 import "../styles/forms-style.css";
 import { useConnectionStore } from "../data/global-states";
+import { sha256HexDigest, toHexString } from "../data/util";
 
 export type ConnectionEditHandle = {
   open: () => void;
@@ -26,7 +27,10 @@ const ConnectionEdit = forwardRef<ConnectionEditHandle>((_, ref) => {
     addInfo,
     disconnect,
   } = useConnectionStore();
+
   const [errorMessage, setErrorMessage] = useState("No error");
+  const [isLoadingConnect, setIsLoadingConnect] = useState(false);
+  const [isLoadingDisconnect, setIsLoadingDisconnect] = useState(false);
 
   const dialogRef = useRef<HTMLDialogElement>(null);
 
@@ -52,22 +56,28 @@ const ConnectionEdit = forwardRef<ConnectionEditHandle>((_, ref) => {
       const user = formData.get("user");
       const password = formData.get("password");
 
+      setIsLoadingConnect(true);
+
       if (!hostname || !database || !user || !password) {
+        await new Promise((resolve) => setTimeout(resolve, 100));
+        setIsLoadingConnect(false);
         setErrorMessage("Please fill out all the fields!");
         return;
       }
 
       try {
+        setIsLoadingConnect(true);
         const resp = await fetch(hostname!.toString(), {
           method: "POST",
           body: JSON.stringify({
             db_name: database.toString(),
             username: user.toString(),
             // FIXME(liza): Replace by base64 encoding of SHA256 hash of the password.
-            password_hash: password.toString(),
+            password_hash: sha256HexDigest(password.toString()),
           }),
         });
 
+        await new Promise((resolve) => setTimeout(resolve, 100));
         if (resp.status === 200) {
           const body = await resp.text();
           const connectionId = parseInt(body);
@@ -76,15 +86,22 @@ const ConnectionEdit = forwardRef<ConnectionEditHandle>((_, ref) => {
           setId(connectionId);
           dialogRef.current?.close();
         } else {
+          const errorReason = await resp.text();
+          console.error("Status: %s, reason: %s", resp.statusText, errorReason);
           setErrorMessage("Wrong credentials! Try again!");
         }
       } catch (e: any) {
         setErrorMessage("Could not connect to the server. Try again!");
+      } finally {
+        setIsLoadingConnect(false);
       }
     }
 
     if (submitter?.innerText === "Disconnect") {
+      setIsLoadingDisconnect(true);
+      await new Promise((resolve) => setTimeout(resolve, 100));
       disconnect();
+      setIsLoadingDisconnect(false);
       dialogRef.current?.close();
     }
   }
@@ -122,14 +139,28 @@ const ConnectionEdit = forwardRef<ConnectionEditHandle>((_, ref) => {
           </div>
           <p
             className={
-              errorMessage === "No error" ? "error-message-hidden" : "error-message-dialog"
+              errorMessage === "No error"
+                ? "error-message-hidden"
+                : "error-message-dialog"
             }
           >
             {errorMessage}
           </p>
           <div className="horizontal-container">
-            <button>Reconnect</button>
-            <button className="button-danger">Disconnect</button>
+            <button className="connect-button">
+              {isLoadingConnect ? (
+                <img src="src/assets/loading.svg" alt="loading..."></img>
+              ) : (
+                <span>Reconnect</span>
+              )}
+            </button>
+            <button className="connect-button button-danger">
+              {isLoadingDisconnect ? (
+                <img src="src/assets/loading.svg" alt="loading..."></img>
+              ) : (
+                <span>Disconnect</span>
+              )}
+            </button>
           </div>
         </div>
       </form>

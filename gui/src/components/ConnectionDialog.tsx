@@ -2,11 +2,13 @@ import { useEffect, useRef, useState, type FormEvent } from "react";
 import "../styles/bars-style.css";
 import "../styles/forms-style.css";
 import { useConnectionStore } from "../data/global-states";
+import { sha256HexDigest, toHexString } from "../data/util";
 
 function ConnectionDialog() {
   // const [isConnected, setIsConnected] = useState(false);
   const [errorMessage, setErrorMessage] = useState("No error");
-  const { setId, addInfo } = useConnectionStore();
+  const [isLoading, setIsLoading] = useState(false);
+  const { Hostname, Database, Username, setId, addInfo } = useConnectionStore();
 
   const dialogRef = useRef<HTMLDialogElement>(null);
   useEffect(() => {
@@ -22,21 +24,28 @@ function ConnectionDialog() {
     const user = formData.get("user");
     const password = formData.get("password");
 
+    setIsLoading(true);
+    
     if (!hostname || !database || !user || !password) {
+      await new Promise((resolve) => setTimeout(resolve, 100));
+      setIsLoading(false);
       setErrorMessage("Please fill out all the fields!");
       return;
     }
 
     try {
+      setIsLoading(true);
       const resp = await fetch(`${hostname!.toString()}/connect`, {
         method: "POST",
         body: JSON.stringify({
           db_name: database.toString(),
           username: user.toString(),
-          // FIXME(liza): Replace by base64 encoding of SHA256 hash of the password.
-          password_hash: password.toString(),
+          // FIXME(liza): Replace by hex encoding of SHA256 hash of the password.
+          password_hash: sha256HexDigest(password.toString()),
         }),
       });
+
+      await new Promise((resolve) => setTimeout(resolve, 100));
 
       if (resp.status == 200) {
         const body = await resp.text();
@@ -46,10 +55,14 @@ function ConnectionDialog() {
         setId(connectionId);
         dialogRef.current?.close();
       } else {
+        const errorReason = await resp.text();
+        console.error("Status: %s, reason: %s", resp.statusText, errorReason);
         setErrorMessage("Wrong credentials! Try again!");
       }
     } catch (e: any) {
       setErrorMessage("Could not connect to the server. Try again!");
+    } finally {
+      setIsLoading(false);
     }
   }
 
@@ -59,11 +72,11 @@ function ConnectionDialog() {
       <form autoComplete="off" onSubmit={handleSubmit}>
         <div className="vertical-container">
           <div className="horizontal-container">
-            <label htmlFor="hostname">Hostname \ IP:</label>
+            <label htmlFor="hostname">Server URL:</label>
             <input
               name="hostname"
               type="text"
-              placeholder="Hostname \ IP..."
+              placeholder="Server URL..."
             ></input>
           </div>
           <div className="horizontal-container">
@@ -88,12 +101,20 @@ function ConnectionDialog() {
           </div>
           <p
             className={
-              errorMessage === "No error" ? "error-message-hidden" : "error-message-dialog"
+              errorMessage === "No error"
+                ? "error-message-hidden"
+                : "error-message-dialog"
             }
           >
             {errorMessage}
           </p>
-          <button>Connect</button>
+          <button className="connect-button">
+            {isLoading ? (
+              <img src="src/assets/loading.svg" alt="loading..."></img>
+            ) : (
+              <span>Connect</span>
+            )}
+          </button>
         </div>
       </form>
     </dialog>
