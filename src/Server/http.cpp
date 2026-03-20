@@ -8,6 +8,7 @@
 
 #include "connection.hpp"
 #include "http.hpp"
+#include "obj.hpp"
 
 namespace xmdb::server {
 #define DECLARE_HANDLER(name) web_http_response_status name(web_http_response_context *ctx)
@@ -296,6 +297,85 @@ DECLARE_HANDLER(run_query_handler) {
     return HTTP_STATUS_OK;
 }
 
+DECLARE_HANDLER(get_db_objects_handler) {
+    if (ctx->Request.Method != HTTP_POST) {
+        return HTTP_STATUS_METHOD_NOT_ALLOWED;
+    }
+
+    web_json_value json;
+    if (!WebHttpContextParseJsonBody(ctx, &json) || json.Type != JSON_OBJECT) {
+        FAIL(BAD_REQUEST, "request body is not a valid JSON object");
+    }
+
+    web_json_object json_obj = json.Object;
+
+    ConnectionId connection_id;
+    if (!WebJsonObjectGetU64(&json_obj, WEB_SV_LIT("connection_id"), &connection_id)) {
+        FAIL(BAD_REQUEST, "'connection_id' field not present in the request body");
+    }
+
+    Optional<ConnectionData> connection_data_opt = get_connection_data(connection_id);
+    if (!connection_data_opt.has_value()) {
+        FAIL(BAD_REQUEST, "connection with requested id was not found");
+    }
+
+    ConnectionData connection_data = connection_data_opt.get();
+    connection_data.temp_arena.reset();
+
+    DBDescriptor *db = connection_data.connection->db;
+    ok::Slice<TableObject> table_objects = get_db_table_objects(&connection_data.temp_arena, db);
+
+    WebJsonBegin(&ctx->Arena);
+    WebJsonBeginObject();
+
+    WebJsonPutKey(WEB_SV_LIT("ok"));
+    WebJsonPutTrue();
+
+    WebJsonPutKey(WEB_SV_LIT("tables"));
+    WebJsonBeginArray();
+
+    for (UZ table_idx = 0; table_idx < table_objects.count; ++table_idx) {
+        TableObject &table = table_objects.items[table_idx];
+
+        WebJsonPrepareArrayElement();
+        WebJsonBeginObject();
+
+        WebJsonPutKey(WEB_SV_LIT("name"));
+        WebJsonPutString((web_string_view){.Items = (u8 *) table.name.data, .Count = table.name.count});
+
+        WebJsonPutKey(WEB_SV_LIT("column_names"));
+        WebJsonBeginArray();
+        for (UZ col_idx = 0; col_idx < table.column_names.count; ++col_idx) {
+            ok::StringView col_name = table.column_names.items[col_idx];
+            WebJsonPrepareArrayElement();
+            WebJsonPutString((web_string_view){.Items = (u8 *) col_name.data, .Count = col_name.count});
+        }
+        WebJsonEndArray();
+
+        WebJsonPutKey(WEB_SV_LIT("column_types"));
+        WebJsonBeginArray();
+        for (UZ col_idx = 0; col_idx < table.column_types.count; ++col_idx) {
+            xmdb::SQL::ColumnType col_type = table.column_types.items[col_idx];
+            const char *col_type_str = xmdb::SQL::column_type_to_string(col_type);
+            WebJsonPrepareArrayElement();
+            WebJsonPutString((web_string_view){.Items = (u8 *) col_type_str, .Count = strlen(col_type_str)});
+        }
+        WebJsonEndArray();
+
+        WebJsonEndObject();
+    }
+
+    WebJsonEndArray();
+
+    WebJsonEndObject();
+
+    web_string_view json_response = WebJsonEnd();
+    ctx->Content = json_response;
+
+    WebHttpContextAddHeader(ctx, WEB_SV_LIT("Content-Type"), WEB_SV_LIT("application/json"));
+    return HTTP_STATUS_OK;
+}
+
 void run_http_server(U16 port) {
     web_http_server server{};
     web_http_server_config config{
@@ -308,6 +388,7 @@ void run_http_server(U16 port) {
 
     WebHttpServerAttachHandler(&server, "/connect", connect_handler);
     WebHttpServerAttachHandler(&server, "/run-query", run_query_handler);
+    WebHttpServerAttachHandler(&server, "/get-db-objects", get_db_objects_handler);
 
     WebHttpServerStart(&server, port);
 }
