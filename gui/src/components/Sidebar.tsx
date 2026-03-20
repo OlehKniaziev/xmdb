@@ -7,8 +7,8 @@ import type { DBTable, DBObjectsResponse } from "../data/objects";
 export default function Sidebar() {
   const [isOpen, setIsOpen] = useState(true);
   const [tables, setTables] = useState<DBTable[]>([]);
-  const { ConnectionId, Hostname } = useConnectionStore();
-  const { addObjectTab } = useMultiTabQueryStore();
+  const { ConnectionId, Hostname, dbObjectsVersion } = useConnectionStore();
+  const { addObjectTab, updateObjectTabs } = useMultiTabQueryStore();
   const navigate = useNavigate();
 
   const isConnected = ConnectionId !== undefined;
@@ -26,6 +26,7 @@ export default function Sidebar() {
             const data = await resp.json() as DBObjectsResponse;
             if (data.ok) {
               setTables(data.tables);
+              updateObjectTabs(data.tables);
             }
           } else {
             console.error("Failed to fetch database objects");
@@ -41,7 +42,8 @@ export default function Sidebar() {
     }
 
     fetchTables();
-  }, [isConnected, ConnectionId, Hostname]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isConnected, ConnectionId, Hostname, dbObjectsVersion]);
 
   return (
       <div className="sidebar-container">

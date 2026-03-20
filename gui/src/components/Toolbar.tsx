@@ -25,7 +25,7 @@ export default function Toolbar({ onAddTab }: ToolbarProps) {
     updateTabResults,
     updateTabSaveStatus,
   } = useMultiTabQueryStore();
-  const { ConnectionId, Hostname, Database, Username } = useConnectionStore();
+  const { ConnectionId, Hostname, Database, Username, bumpDbObjectsVersion } = useConnectionStore();
 
   const activeTab = tabs.find((t) => t.id === activeTabId);
 
@@ -54,6 +54,7 @@ export default function Toolbar({ onAddTab }: ToolbarProps) {
           } else {
             updateTabResults(tabId, `Error: ${q.error_message}`, q, false);
           }
+          bumpDbObjectsVersion();
         } else {
           updateTabResults(
             tabId,
@@ -207,7 +208,6 @@ export default function Toolbar({ onAddTab }: ToolbarProps) {
   async function executeQuery() {
     if (!activeTab) return;
     await runQuery(activeTab.id, activeTab.query);
-    window.location.reload();
   }
 
   function newQueryOnClick() {
