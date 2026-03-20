@@ -1,15 +1,44 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { ChevronDown, ChevronRight } from "lucide-react";
 import { useConnectionStore } from "../data/global-states";
+import type { DBTable, DBObjectsResponse } from "../data/objects";
 
 export default function Sidebar() {
   const [isOpen, setIsOpen] = useState(true);
-  const { ConnectionId } = useConnectionStore();
+  const [tables, setTables] = useState<DBTable[]>([]);
+  const { ConnectionId, Hostname } = useConnectionStore();
 
   const isConnected = ConnectionId !== undefined;
 
-  // Уявний список файлів з бази даних
-  const tables = ["users", "orders", "products", "invoices"];
+  useEffect(() => {
+    async function fetchTables() {
+      if (isConnected && Hostname) {
+        try {
+          const resp = await fetch(`${Hostname}/get-db-objects`, {
+            method: "POST",
+            body: JSON.stringify({ connection_id: ConnectionId }),
+          });
+
+          if (resp.ok) {
+            const data = await resp.json() as DBObjectsResponse;
+            if (data.ok) {
+              setTables(data.tables);
+            }
+          } else {
+            console.error("Failed to fetch database objects");
+            setTables([]);
+          }
+        } catch (error) {
+          console.error("Error fetching database objects:", error);
+          setTables([]);
+        }
+      } else {
+        setTables([]);
+      }
+    }
+
+    fetchTables();
+  }, [isConnected, ConnectionId, Hostname]);
 
   return (
       <div className="sidebar-container">
@@ -23,16 +52,18 @@ export default function Sidebar() {
         }}>
           {isConnected ? "Connected to the server" : "Not connected to the server"}
         </div>
+
         <div className="sidebar">
-          <button onClick={() => setIsOpen(!isOpen)}>
-            {isOpen ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
+          <button onClick={() => setIsOpen(!isOpen)} style={{fontWeight: "bold", cursor: "pointer"}}>
+            {isOpen ? <ChevronDown size={16} style={{marginRight: "6px"}}/> : <ChevronRight size={16} style={{marginRight: "6px"}} />}
             <span className="ml-2">Tables</span>
+            <span style={{color: "var(--color-grey)", marginLeft: "6px"}}>({tables.length})</span>
           </button>
 
           {isOpen && (
-            <ul>
+            <ul style={{ listStyle: 'none', paddingLeft: '40px', marginTop: '8px' }}>
               {tables.map((table) => (
-                <li key={table}>{table}</li>
+                <li key={table.name} style={{ padding: '2px 0', fontFamily: 'var(--font-main)' }}>{table.name}</li>
               ))}
             </ul>
           )}

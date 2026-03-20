@@ -25,7 +25,7 @@ export default function Topbar() {
           SQL
         </NavLink>
         {isGalleryActive && (
-          <div className="nav-link-active">
+          <div className="nav-link-active" style={{backgroundColor: "#96504c"}}>
             Gallery
           </div>
         )}

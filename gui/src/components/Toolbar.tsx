@@ -152,6 +152,7 @@ export default function Toolbar({ onAddTab }: ToolbarProps) {
   async function executeQuery() {
     if (!activeTab) return;
     await runQuery(activeTab.id, activeTab.query);
+    window.location.reload();
   }
 
   function newQueryOnClick() {
