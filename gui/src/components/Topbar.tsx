@@ -1,7 +1,10 @@
-import { NavLink } from "react-router-dom";
+import { NavLink, useLocation } from "react-router-dom";
 import "../styles/bars-style.css";
 
 export default function Topbar() {
+  const location = useLocation();
+  const isGalleryActive = location.pathname === "/gallery";
+
   return (
     <div className="topbar-bg">
       <nav className="topbar-container">
@@ -21,6 +24,11 @@ export default function Topbar() {
         >
           SQL
         </NavLink>
+        {isGalleryActive && (
+          <div className="nav-link-active">
+            Gallery
+          </div>
+        )}
       </nav>
     </div>
   );

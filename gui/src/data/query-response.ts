@@ -1,8 +1,24 @@
+export type ImageChunk = {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  data: string; // Hex-encoded RGB data
+}
+
+export type ColumnType =
+  | "INTEGER"
+  | "FLOAT"
+  | "TEXT"
+  | "BOOLEAN"
+  | "PNG";
+
 export type QueryResponse =
   | {
       ok: true;
       column_names?: string[];
-      rows?: { [columnName: string]: any }[];
+      column_types?: ColumnType[];
+      rows?: { [columnName: string]: unknown }[];
     }
   | {
       ok: false;

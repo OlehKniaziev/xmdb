@@ -46,14 +46,20 @@ export const useConnectionStore = create<ConnectionStore>()(
   )
 );
 
+export interface GalleryInfo {
+  columnName: string;
+}
+
 export interface TabState {
   id: string;
   title: string;
+  type: "query" | "gallery";
   query: string;
   message: string;
   response?: QueryResponse;
   isLoading: boolean;
-  bottomPanelTab: "messages" | "results";
+  bottomPanelTab: "messages" | "results" | "gallery";
+  galleryInfo?: GalleryInfo;
   isDirty: boolean;
   filePath?: string;
   fileHandle?: FileSystemFileHandle;
@@ -63,12 +69,13 @@ export type MultiTabQueryStore = {
   tabs: TabState[];
   activeTabId: string | null;
   addTab: (title: string) => string;
+  addGalleryTab: (title: string, response: QueryResponse, columnName: string, query: string) => string;
   openTab: (title: string, query: string, fileHandle: FileSystemFileHandle) => string;
   closeTab: (id: string) => void;
   setActiveTab: (id: string | null) => void;
   updateActiveTabQuery: (query: string) => void;
   updateTabResults: (id: string, message: string, response?: QueryResponse, isLoading?: boolean) => void;
-  updateTabBottomPanel: (id: string, tab: "messages" | "results") => void;
+  updateTabBottomPanel: (id: string, tab: "messages" | "results" | "gallery", galleryInfo?: GalleryInfo) => void;
   updateTabSaveStatus: (id: string, isDirty: boolean, filePath?: string, fileHandle?: FileSystemFileHandle) => void;
   setTabLoading: (id: string, isLoading: boolean) => void;
 }
@@ -84,10 +91,31 @@ export const useMultiTabQueryStore = create<MultiTabQueryStore>()(
           const newTab: TabState = {
             id,
             title,
+            type: "query",
             query: "-- start writing your code here",
             message: "Output messages will be shown here",
             isLoading: false,
             bottomPanelTab: "messages",
+            isDirty: false,
+          };
+          set((state) => ({
+            tabs: [...state.tabs, newTab],
+            activeTabId: id,
+          }));
+          return id;
+        },
+        addGalleryTab: (title, response, columnName, query) => {
+          const id = `gallery-${Date.now()}`;
+          const newTab: TabState = {
+            id,
+            title,
+            type: "gallery",
+            query: query,
+            response: response,
+            message: "",
+            isLoading: false,
+            bottomPanelTab: "gallery",
+            galleryInfo: { columnName },
             isDirty: false,
           };
           set((state) => ({
@@ -101,6 +129,7 @@ export const useMultiTabQueryStore = create<MultiTabQueryStore>()(
           const newTab: TabState = {
             id,
             title,
+            type: "query",
             query,
             message: "Output messages will be shown here",
             isLoading: false,
@@ -143,10 +172,10 @@ export const useMultiTabQueryStore = create<MultiTabQueryStore>()(
             ),
           }));
         },
-        updateTabBottomPanel: (id, tab) => {
+        updateTabBottomPanel: (id, tab, galleryInfo) => {
           set((state) => ({
             tabs: state.tabs.map((t) =>
-              t.id === id ? { ...t, bottomPanelTab: tab } : t
+              t.id === id ? { ...t, bottomPanelTab: tab, galleryInfo: galleryInfo || t.galleryInfo } : t
             ),
           }));
         },

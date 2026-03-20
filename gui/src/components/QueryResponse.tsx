@@ -1,12 +1,36 @@
-import type { QueryResponse } from "../data/query-response";
+import type {
+  ImageChunk,
+  QueryResponse as QueryResponseType,
+} from "../data/query-response";
 import LoadingSpinner from "./LoadingSpinner";
+import { useMemo } from "react";
+import { imageHexToDataUrl } from "../data/util";
+
+function ImageDisplay({ chunk }: { chunk: ImageChunk }) {
+  const src = useMemo(
+    () => imageHexToDataUrl(chunk.data, chunk.width, chunk.height),
+    [chunk.data, chunk.width, chunk.height],
+  );
+
+  return (
+    <img
+      src={src}
+      alt="PNG data"
+      width={chunk.width}
+      height={chunk.height}
+      style={{ maxWidth: "200px", maxHeight: "200px" }}
+    />
+  );
+}
 
 function QueryResponse({
   response,
   isLoading,
+  onGalleryView,
 }: {
-  response: QueryResponse;
+  response: QueryResponseType | undefined;
   isLoading: boolean;
+  onGalleryView?: (columnName: string) => void;
 }) {
   if (isLoading) {
     return <LoadingSpinner />;
@@ -22,8 +46,25 @@ function QueryResponse({
           <table className="query-response-table">
             <thead>
               <tr>
-                {response.column_names.map((name) => {
-                  return <th>{name}</th>;
+                {response.column_names.map((name, index) => {
+                  const isImage = response.column_types?.[index] === "PNG";
+                  return (
+                    <th
+                      key={name}
+                      onClick={() => isImage && onGalleryView?.(name)}
+                      style={{ cursor: isImage ? "pointer" : "default" }}
+                      title={isImage ? "Click to view as gallery" : ""}
+                    >
+                      {name}
+                      {isImage && (
+                        <span>
+                          <img style={{height: "20px", marginLeft: "5px"}}
+                            src="src/assets/icons/image.png"
+                          ></img>
+                        </span>
+                      )}
+                    </th>
+                  );
                 })}
               </tr>
             </thead>
@@ -31,9 +72,27 @@ function QueryResponse({
               {response.rows.map((row) => {
                 return (
                   <tr>
-                    {response.column_names.map((columnName) => (
-                      <td>{row[columnName]}</td>
-                    ))}
+                    {response.column_names?.map((columnName, columnIndex) => {
+                      if (typeof row[columnName] === "object") {
+                        if (response.column_types?.[columnIndex] === "PNG") {
+                          const chunk = row[columnName] as ImageChunk;
+
+                          return (
+                            <td>
+                              <ImageDisplay chunk={chunk} />
+                            </td>
+                          );
+                        } else {
+                          return <td>{JSON.stringify(row[columnName])}</td>;
+                        }
+                      } else {
+                        return (
+                          <td>
+                            {row[columnName] as string | number | boolean}
+                          </td>
+                        );
+                      }
+                    })}
                   </tr>
                 );
               })}

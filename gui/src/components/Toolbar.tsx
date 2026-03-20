@@ -29,6 +29,49 @@ export default function Toolbar({ onAddTab }: ToolbarProps) {
 
   const dialogRef = useRef<ConnectionEditHandle>(null);
 
+  async function runQuery(tabId: string, queryToExecute: string) {
+    if (ConnectionId && Hostname && Database && Username) {
+      try {
+        const tab = tabs.find(t => t.id === tabId);
+        if (!tab) return;
+
+        updateTabResults(tabId, tab.message, tab.response, true);
+        const resp = await fetch(`${Hostname!.toString()}/run-query`, {
+          method: "POST",
+          body: JSON.stringify({
+            query: queryToExecute,
+            connection_id: ConnectionId,
+          }),
+        });
+
+        if (resp.status == 200) {
+          const body = await resp.json();
+          const q = body as QueryResponse;
+          if (q.ok === true) {
+            updateTabResults(tabId, "Query executed successfully.", q, false);
+          } else {
+            updateTabResults(tabId, `Error: ${q.error_message}`, q, false);
+          }
+        } else {
+          updateTabResults(
+            tabId,
+            "Could not execute query. Network error.",
+            undefined,
+            false,
+          );
+        }
+      } catch (e: any) {
+        console.error(e);
+        updateTabResults(
+          tabId,
+          `${e.name}: ${e.message}`,
+          undefined,
+          false,
+        );
+      }
+    }
+  }
+
   async function openQueryOnClick() {
     try {
       // @ts-expect-error - File System Access API
@@ -108,47 +151,7 @@ export default function Toolbar({ onAddTab }: ToolbarProps) {
 
   async function executeQuery() {
     if (!activeTab) return;
-
-    const tabId = activeTab.id;
-    const queryToExecute = activeTab.query;
-
-    if (ConnectionId && Hostname && Database && Username) {
-      try {
-        updateTabResults(tabId, activeTab.message, activeTab.response, true);
-        const resp = await fetch(`${Hostname!.toString()}/run-query`, {
-          method: "POST",
-          body: JSON.stringify({
-            query: queryToExecute,
-            connection_id: ConnectionId,
-          }),
-        });
-
-        if (resp.status == 200) {
-          const body = await resp.json();
-          const q = body as QueryResponse;
-          if (q.ok === true) {
-            updateTabResults(tabId, "Query executed successfully.", q, false);
-          } else {
-            updateTabResults(tabId, `Error: ${q.error_message}`, q, false);
-          }
-        } else {
-          updateTabResults(
-            tabId,
-            "Could not execute query. Network error.",
-            undefined,
-            false,
-          );
-        }
-      } catch (e: any) {
-        console.error(e);
-        updateTabResults(
-          tabId,
-          `${e.name}: ${e.message}`,
-          undefined,
-          false,
-        );
-      }
-    }
+    await runQuery(activeTab.id, activeTab.query);
   }
 
   function newQueryOnClick() {
@@ -177,6 +180,32 @@ export default function Toolbar({ onAddTab }: ToolbarProps) {
       });
     });
   }, [location]);
+
+  if (location.pathname === "/gallery") {
+    return (
+      <div className="toolbar">
+        <div className="btn-label-container">
+          <button
+            name="refreshGalleryBtn"
+            className="toolbar-btn"
+            data-src="src/assets/icons/refresh.png"
+            data-hover="src/assets/icons/refresh-dark-outline.png"
+            onClick={async () => {
+              if (activeTab && activeTab.type === "gallery") {
+                await runQuery(activeTab.id, activeTab.query);
+              }
+            }}
+          >
+            <img
+              alt="Refresh gallery icon"
+              src="src/assets/icons/refresh.png"
+            ></img>
+          </button>
+          <label htmlFor="refreshGalleryBtn">Refresh</label>
+        </div>
+      </div>
+    );
+  }
 
   let buttons;
   if (location.pathname === "/query") {

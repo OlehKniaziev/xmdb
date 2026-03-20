@@ -11,6 +11,7 @@
     --color-accent-middle: #934B00;
     --color-accent-bright: #BB6B00;
     --color-accent-bright-red: #b60900;
+    --color-accent-green: #6B7A3A;
 
     --font-main: "Fragment Mono", sans-serif;
     --font-header: "Azeret Mono", sans-serif;
@@ -44,4 +45,18 @@ body {
 
 button:focus {
     outline: none;
+}
+
+p {
+    font-family: var(--font-main);
+    color: var(--color-black);
+    margin: 0;
+    padding: 0;
+}
+
+h1, h2, h3, h4, h5, h6 {
+    font-family: var(--font-header);
+    color: var(--color-black);
+    margin: 0;
+    padding: 0;
 }

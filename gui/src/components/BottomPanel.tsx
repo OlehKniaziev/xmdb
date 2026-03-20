@@ -1,18 +1,28 @@
 import QueryResponse from "./QueryResponse";
 import LoadingSpinner from "./LoadingSpinner";
 import { useMultiTabQueryStore } from "../data/global-states";
+import { useNavigate } from "react-router-dom";
 
 interface BottomPanelProps {
   tabId: string;
 }
 
-function BottomPanel({ tabId }: BottomPanelProps) {
-  const { tabs, updateTabBottomPanel } = useMultiTabQueryStore();
+export default function BottomPanel({ tabId }: BottomPanelProps) {
+  const { tabs, updateTabBottomPanel, addGalleryTab } = useMultiTabQueryStore();
   const currentTab = tabs.find(t => t.id === tabId);
+  const navigate = useNavigate();
 
   if (!currentTab) return null;
 
   const activeTab = currentTab.bottomPanelTab || "messages";
+
+  const handleGalleryView = (columnName: string) => {
+    if (currentTab.response) {
+      const title = `Gallery - ${columnName}`;
+      addGalleryTab(title, currentTab.response, columnName, currentTab.query);
+      navigate("/gallery");
+    }
+  };
 
   return (
     <div className="bottom-panel">
@@ -37,11 +47,13 @@ function BottomPanel({ tabId }: BottomPanelProps) {
         ) : activeTab === "messages" ? (
           <div className="messages-style">{currentTab.message}</div>
         ) : (
-          <QueryResponse response={currentTab.response} isLoading={currentTab.isLoading} />
+          <QueryResponse
+            response={currentTab.response}
+            isLoading={currentTab.isLoading}
+            onGalleryView={handleGalleryView}
+          />
         )}
       </div>
     </div>
   );
 }
-
-export default BottomPanel;
