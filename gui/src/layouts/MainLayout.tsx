@@ -8,24 +8,56 @@ import { Panel, PanelGroup, PanelResizeHandle } from "react-resizable-panels";
 import { useMultiTabQueryStore } from "../data/global-states";
 
 export default function MainLayout() {
-  const { tabs, activeTabId, addTab, closeTab, setActiveTab } = useMultiTabQueryStore();
+  const { tabs, activeTabId, addTab, addObjectsOverviewTab, closeTab, setActiveTab } = useMultiTabQueryStore();
   const location = useLocation();
   const navigate = useNavigate();
 
   useEffect(() => {
     const currentPath = location.pathname;
+    const activeTab = tabs.find((tab) => tab.id === activeTabId);
 
-    if (currentPath === '/') {
-      setActiveTab(null);
-    } else if (currentPath === '/query' || currentPath === '/gallery') {
-      if (tabs.length === 0 && currentPath === '/query') {
-        addTab('SQL Query');
-      } else if (!activeTabId) {
-        const lastTab = tabs[tabs.length - 1];
-        if (lastTab) setActiveTab(lastTab.id);
+    if (currentPath === "/query") {
+      if (!activeTab || activeTab.type !== "query") {
+        const lastQueryTab = [...tabs].reverse().find((t) => t.type === "query");
+        if (lastQueryTab) {
+          setActiveTab(lastQueryTab.id);
+        } else if (tabs.length === 0) {
+          addTab("SQL Query");
+        }
+      }
+    } else if (currentPath === "/gallery") {
+      if (!activeTab || activeTab.type !== "gallery") {
+        const lastGalleryTab = [...tabs].reverse().find((t) => t.type === "gallery");
+        if (lastGalleryTab) {
+          setActiveTab(lastGalleryTab.id);
+        } else {
+          navigate("/query");
+        }
+      }
+    } else if (currentPath === "/object") {
+      if (!activeTab || activeTab.type !== "object") {
+        const lastObjectTab = [...tabs].reverse().find((t) => t.type === "object");
+        if (lastObjectTab) {
+          setActiveTab(lastObjectTab.id);
+        } else {
+          navigate("/query");
+        }
+      }
+    } else if (currentPath === "/objects") {
+      if (!activeTab || activeTab.type !== "objects-overview") {
+        const overviewTab = tabs.find((t) => t.type === "objects-overview");
+        if (overviewTab) {
+          setActiveTab(overviewTab.id);
+        } else {
+          addObjectsOverviewTab();
+        }
+      }
+    } else if (currentPath === "/") {
+      if (activeTabId !== null) {
+        setActiveTab(null);
       }
     }
-  }, [location.pathname, activeTabId, tabs.length]);
+  }, [location.pathname, tabs, activeTabId, setActiveTab, addTab, addObjectsOverviewTab, navigate]);
 
   const addTabHandler = (path: string) => {
     if (path === '/query') {
@@ -43,6 +75,10 @@ export default function MainLayout() {
     setActiveTab(tabId);
     if (tab.type === 'gallery') {
       navigate('/gallery');
+    } else if (tab.type === 'object') {
+      navigate('/object');
+    } else if (tab.type === 'objects-overview') {
+      navigate('/objects');
     } else {
       navigate('/query');
     }
@@ -68,6 +104,10 @@ export default function MainLayout() {
       setActiveTab(nextTab.id);
       if (nextTab.type === 'gallery') {
         navigate('/gallery');
+      } else if (nextTab.type === 'object') {
+        navigate('/object');
+      } else if (nextTab.type === 'objects-overview') {
+        navigate('/objects');
       } else {
         navigate('/query');
       }
@@ -77,7 +117,7 @@ export default function MainLayout() {
   const tabBarTabs = tabs.map(t => ({
     id: t.id,
     title: t.isDirty ? `${t.title}*` : t.title,
-    path: t.type === 'gallery' ? '/gallery' : '/query'
+    path: t.type === 'gallery' ? '/gallery' : t.type === 'object' ? '/object' : t.type === 'objects-overview' ? '/objects' : '/query'
   }));
 
   return (

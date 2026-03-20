@@ -182,6 +182,10 @@ export default function Toolbar({ onAddTab }: ToolbarProps) {
     });
   }, [location]);
 
+  if (location.pathname === "/objects" || location.pathname === "/object") {
+    return <div className="toolbar"></div>;
+  }
+
   if (location.pathname === "/gallery") {
     return (
       <div className="toolbar">

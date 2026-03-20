@@ -1,12 +1,15 @@
 import { useState, useEffect } from "react";
 import { ChevronDown, ChevronRight } from "lucide-react";
-import { useConnectionStore } from "../data/global-states";
+import { useConnectionStore, useMultiTabQueryStore } from "../data/global-states";
+import { useNavigate } from "react-router-dom";
 import type { DBTable, DBObjectsResponse } from "../data/objects";
 
 export default function Sidebar() {
   const [isOpen, setIsOpen] = useState(true);
   const [tables, setTables] = useState<DBTable[]>([]);
   const { ConnectionId, Hostname } = useConnectionStore();
+  const { addObjectTab } = useMultiTabQueryStore();
+  const navigate = useNavigate();
 
   const isConnected = ConnectionId !== undefined;
 
@@ -63,7 +66,11 @@ export default function Sidebar() {
           {isOpen && (
             <ul style={{ listStyle: 'none', paddingLeft: '40px', marginTop: '8px' }}>
               {tables.map((table) => (
-                <li key={table.name} style={{ padding: '2px 0', fontFamily: 'var(--font-main)' }}>{table.name}</li>
+                <li
+                  key={table.name}
+                  style={{ padding: '2px 0', fontFamily: 'var(--font-main)', cursor: 'pointer' }}
+                  onClick={() => { addObjectTab(table); navigate('/object'); }}
+                >{table.name}</li>
               ))}
             </ul>
           )}
