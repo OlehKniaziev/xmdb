@@ -2,7 +2,7 @@ import Sidebar from "../components/Sidebar";
 import Topbar from "../components/Topbar";
 import Toolbar from "../components/Toolbar";
 import { Outlet, useLocation, useNavigate } from "react-router-dom";
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import TabBar from "../components/TabBar";
 import { Panel, PanelGroup, PanelResizeHandle } from "react-resizable-panels";
 import { useMultiTabQueryStore } from "../data/global-states";
@@ -12,22 +12,32 @@ export default function MainLayout() {
   const location = useLocation();
   const navigate = useNavigate();
 
+  // Keep refs so the pathname-only effect always reads latest values without
+  // re-running when activeTabId or tabs change (which would cause race conditions
+  // when setActiveTab and navigate are called together in tab click handlers).
+  const tabsRef = useRef(tabs);
+  tabsRef.current = tabs;
+  const activeTabIdRef = useRef(activeTabId);
+  activeTabIdRef.current = activeTabId;
+
   useEffect(() => {
     const currentPath = location.pathname;
-    const activeTab = tabs.find((tab) => tab.id === activeTabId);
+    const currentTabs = tabsRef.current;
+    const currentActiveTabId = activeTabIdRef.current;
+    const activeTab = currentTabs.find((tab) => tab.id === currentActiveTabId);
 
     if (currentPath === "/query") {
       if (!activeTab || activeTab.type !== "query") {
-        const lastQueryTab = [...tabs].reverse().find((t) => t.type === "query");
+        const lastQueryTab = [...currentTabs].reverse().find((t) => t.type === "query");
         if (lastQueryTab) {
           setActiveTab(lastQueryTab.id);
-        } else if (tabs.length === 0) {
+        } else if (currentTabs.length === 0) {
           addTab("SQL Query");
         }
       }
     } else if (currentPath === "/gallery") {
       if (!activeTab || activeTab.type !== "gallery") {
-        const lastGalleryTab = [...tabs].reverse().find((t) => t.type === "gallery");
+        const lastGalleryTab = [...currentTabs].reverse().find((t) => t.type === "gallery");
         if (lastGalleryTab) {
           setActiveTab(lastGalleryTab.id);
         } else {
@@ -36,7 +46,7 @@ export default function MainLayout() {
       }
     } else if (currentPath === "/object") {
       if (!activeTab || activeTab.type !== "object") {
-        const lastObjectTab = [...tabs].reverse().find((t) => t.type === "object");
+        const lastObjectTab = [...currentTabs].reverse().find((t) => t.type === "object");
         if (lastObjectTab) {
           setActiveTab(lastObjectTab.id);
         } else {
@@ -45,7 +55,7 @@ export default function MainLayout() {
       }
     } else if (currentPath === "/objects") {
       if (!activeTab || activeTab.type !== "objects-overview") {
-        const overviewTab = tabs.find((t) => t.type === "objects-overview");
+        const overviewTab = currentTabs.find((t) => t.type === "objects-overview");
         if (overviewTab) {
           setActiveTab(overviewTab.id);
         } else {
@@ -53,11 +63,12 @@ export default function MainLayout() {
         }
       }
     } else if (currentPath === "/") {
-      if (activeTabId !== null) {
+      if (currentActiveTabId !== null) {
         setActiveTab(null);
       }
     }
-  }, [location.pathname, tabs, activeTabId, setActiveTab, addTab, addObjectsOverviewTab, navigate]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [location.pathname]);
 
   const addTabHandler = (path: string) => {
     if (path === '/query') {
