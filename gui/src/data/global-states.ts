@@ -104,6 +104,13 @@ export const useMultiTabQueryStore = create<MultiTabQueryStore>()(
           }));
           return id;
         },
+        updateTabSaveStatus: (id, isDirty, filePath, fileHandle) => {
+          set((state) => ({
+            tabs: state.tabs.map((t) =>
+              t.id === id ? { ...t, isDirty, filePath, fileHandle } : t
+            ),
+          }));
+        },
         addGalleryTab: (title, response, columnName, query) => {
           const id = `gallery-${Date.now()}`;
           const newTab: TabState = {
@@ -176,13 +183,6 @@ export const useMultiTabQueryStore = create<MultiTabQueryStore>()(
           set((state) => ({
             tabs: state.tabs.map((t) =>
               t.id === id ? { ...t, bottomPanelTab: tab, galleryInfo: galleryInfo || t.galleryInfo } : t
-            ),
-          }));
-        },
-        updateTabSaveStatus: (id, isDirty, filePath, fileHandle) => {
-          set((state) => ({
-            tabs: state.tabs.map((t) =>
-              t.id === id ? { ...t, isDirty, filePath, fileHandle, title: filePath ? filePath.split(/[/\\]/).pop() || t.title : t.title } : t
             ),
           }));
         },
