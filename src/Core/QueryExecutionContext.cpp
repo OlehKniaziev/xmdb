@@ -77,9 +77,15 @@ void QueryExecutionContext::create_table(StringView table_name, SQL::TableSchema
         }
     }
 
+    DBTable::Flags table_flags = DBTable::F_PERSIST;
+
+#ifdef XMDB_TEST
+    table_flags |= DBTable::F_EPHEMERAL;
+#endif // XMDB_TEST
+
     DBTable *new_table = current_db->create_new_table(allocator,
                                                       table_name,
-                                                      DBTable::F_EPHEMERAL | DBTable::F_PERSIST,
+                                                      table_flags,
                                                       column_types.count,
                                                       column_names,
                                                       column_types.slice());

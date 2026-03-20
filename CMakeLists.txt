@@ -44,6 +44,8 @@ foreach(test_file ${test_files})
     ${test_file}
   )
 
+  target_compile_definitions(${test_exe_name} PRIVATE XMDB_TEST)
+
   target_link_libraries(
     ${test_exe_name}
     GTest::gtest_main
@@ -51,7 +53,7 @@ foreach(test_file ${test_files})
 
   target_link_libraries(
     ${test_exe_name}
-    LibCore
+    LibCore_test
     LibSQL::shared
   )
 
@@ -72,9 +74,11 @@ foreach(snap_file ${snap_files})
   add_executable(${snap_exe_name} ${snap_file})
   add_test(NAME ${snap_exe_name} COMMAND ${snap} "-f" "-d" ${snapdir} ${snap_exe_name})
 
+  target_compile_definitions(${snap_exe_name} PRIVATE XMDB_TEST)
+
   target_link_libraries(
     ${snap_exe_name}
-    LibCore
+    LibCore_test
     LibSQL::shared
   )
 endforeach()
