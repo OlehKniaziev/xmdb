@@ -5,6 +5,7 @@
 #include <Core/ok.hpp>
 
 #include <http.h>
+#include <log.h>
 
 #include "connection.hpp"
 #include "http.hpp"
@@ -377,6 +378,8 @@ DECLARE_HANDLER(get_db_objects_handler) {
 }
 
 void run_http_server(U16 port) {
+    WebLogSetDestination(stdout);
+
     web_http_server server{};
     web_http_server_config config{
         // TODO(oleh): Make this configurable for user.
