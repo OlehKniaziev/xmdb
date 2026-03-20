@@ -16,7 +16,6 @@ function QueryEditor() {
       monaco.editor.defineTheme("beige-theme", {
         base: "vs",
         inherit: true,
-        semanticHighlighting: true,
 
         rules: [
           { token: "", foreground: "210F04" },
@@ -40,15 +39,6 @@ function QueryEditor() {
 
           { token: "delimiter", foreground: "452103" },
         ],
-
-        semanticTokenColors: {
-          string: "#BB6B00",
-          variable: "#210F04",
-          parameter: "#452103",
-          function: "#6B3A4B",
-          class: "#5C6B73",
-          number: "#934B00",
-        },
 
         colors: {
           "editor.background": "#FBFEFB",

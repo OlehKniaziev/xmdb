@@ -12,26 +12,20 @@ export default function MainLayout() {
   const location = useLocation();
   const navigate = useNavigate();
 
-  // Handle navigation changes - don't automatically create tabs
   useEffect(() => {
     const currentPath = location.pathname;
 
     if (currentPath === '/') {
-      // On home page, no tabs should be active
       setActiveTab(null);
-    } else if (currentPath === '/query') {
-      // On SQL page, ensure a tab exists and set it as active
-      if (tabs.length === 0) {
-        // Create a new SQL query tab if none exists
+    } else if (currentPath === '/query' || currentPath === '/gallery') {
+      if (tabs.length === 0 && currentPath === '/query') {
         addTab('SQL Query');
       } else if (!activeTabId) {
-        // If there are tabs but none active, activate the last one
-        setActiveTab(tabs[tabs.length - 1].id);
+        const lastTab = tabs[tabs.length - 1];
+        if (lastTab) setActiveTab(lastTab.id);
       }
-    } else {
-       // For other paths, we don't have tab support yet, but we could add it
     }
-  }, [location.pathname]);
+  }, [location.pathname, activeTabId, tabs.length]);
 
   const addTabHandler = (path: string) => {
     if (path === '/query') {
@@ -43,25 +37,47 @@ export default function MainLayout() {
   };
 
   const handleTabClick = (tabId: string) => {
+    const tab = tabs.find(t => t.id === tabId);
+    if (!tab) return;
+    
     setActiveTab(tabId);
-    // Since all query tabs share the same '/query' path, we just navigate there
-    navigate('/query');
+    if (tab.type === 'gallery') {
+      navigate('/gallery');
+    } else {
+      navigate('/query');
+    }
   };
 
   const handleTabClose = (tabId: string) => {
     closeTab(tabId);
     
-    // If we closed the last tab, go home
-    if (tabs.length === 1 && tabs[0].id === tabId) {
+    const tabIndex = tabs.findIndex(t => t.id === tabId);
+    let nextTab = null;
+    
+    if (tabs.length > 1) {
+      if (activeTabId === tabId) {
+        nextTab = tabs[tabs.length - 1].id === tabId ? tabs[tabs.length - 2] : tabs[tabs.length - 1];
+      } else {
+        return;
+      }
+    }
+
+    if (!nextTab) {
       navigate('/');
+    } else {
+      setActiveTab(nextTab.id);
+      if (nextTab.type === 'gallery') {
+        navigate('/gallery');
+      } else {
+        navigate('/query');
+      }
     }
   };
 
-  // Convert TabState to the format TabBar expects
   const tabBarTabs = tabs.map(t => ({
     id: t.id,
     title: t.isDirty ? `${t.title}*` : t.title,
-    path: '/query'
+    path: t.type === 'gallery' ? '/gallery' : '/query'
   }));
 
   return (

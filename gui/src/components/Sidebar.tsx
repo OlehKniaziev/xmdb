@@ -19,7 +19,7 @@ export default function Sidebar() {
           fontWeight: "bold",
           fontFamily: 'var(--font-main)',
           backgroundColor: 'var(--color-darker)',
-          color: isConnected ? "#6B7A3A" : "#690500"
+          color: isConnected ? "var(--color-accent-green)" : "var(--color-accent-dark)",
         }}>
           {isConnected ? "Connected to the server" : "Not connected to the server"}
         </div>
