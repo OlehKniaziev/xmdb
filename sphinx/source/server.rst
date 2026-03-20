@@ -22,8 +22,18 @@ weird, unconventional or unsafe, but there are some advantages of using it.
 
 ----
 
+Deployment
+----------
+
+System requirements
+~~~~~~~~~~~~~~~~~~~
+
+* A POSIX-compatible operating system (only Linux tested)
+* OpenSSL -- required as a transitive dependency from ``libweb``, even when
+  not using HTTPS
+
 Running the server
-------------------
+~~~~~~~~~~~~~~~~~~
 
 After building the project, start the server with:
 
@@ -32,6 +42,57 @@ After building the project, start the server with:
                 ./build/src/Server/xmdb_server
 
 The server listens for HTTP connections on its configured port.
+
+Storage
+~~~~~~~
+
+Each persistent table is stored as a set of files in the working directory
+from which the server was launched:
+
+* **`<hash>.sdb`** - record data. Contains table records.
+* **`<hash>.xdb`** - B-Tree index. A page-based file that
+  stores the primary-key index for the table.
+* **`<table>-<column>.idb`** - image data (one per image column).
+  Stores image chunks.
+
+``<hash>`` is the hex-encoded SHA-256 digest of the table name.
+
+All files are written relative to the current working directory. There is
+currently no configuration option to change the storage path, so make sure to
+always start the server from the same directory.
+
+Backups
+~~~~~~~
+
+XMDB does not provide a built-in backup mechanism. Backups are fully the
+user's responsibility. A few approaches to consider:
+
+* **Filesystem snapshots** - if the underlying filesystem supports snapshots
+  (ZFS, Btrfs, LVM), take a snapshot of the directory that contains the
+  ``.sdb``, ``.xdb``, and ``.idb`` files. This is the fastest and most
+  consistent option.
+* **File copy** - stop the server and copy all ``.sdb``, ``.xdb``, and
+  ``.idb`` files to a backup location. Stopping the server first avoids
+  copying partially-written files.
+* **Periodic rsync** - use ``rsync`` to mirror the storage directory to a
+  remote host on a schedule. Combining this with a brief server stop ensures
+  consistency; without stopping, you may capture an inconsistent state.
+* **Block-level replication** - replicate the entire block device or partition
+  with tools like DRBD for real-time redundancy.
+
+Regardless of the approach, verify your backups periodically by restoring them
+into a test environment.
+
+Scaling
+~~~~~~~
+
+XMDB does not support horizontal scaling or replication. The only way to
+scale the server is vertically - by adding more CPU, memory, or faster
+storage to the machine it runs on.
+
+If the application that talks to the database is bottlenecked by query
+latency, consider placing a caching layer (e.g. Redis or Memcached) between
+the application and the server to avoid repeated queries for the same data.
 
 ----
 
