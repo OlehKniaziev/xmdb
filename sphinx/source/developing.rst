@@ -107,3 +107,31 @@ mismatch, which is the mode used in CI.
       cd build && ../tests/snap.py -d ../tests/snaps ./MyTest-snap
 
 4. Commit both ``MyTest.cpp`` and the generated ``MyTest-snap.json``.
+
+----
+
+Development process
+--------------------
+
+All changes go through the following workflow:
+
+1. **Issue** - create a GitHub issue describing the bug, feature, or task.
+2. **Pull request** - open a PR against the ``development`` branch with the
+   proposed changes. Reference the issue in the PR description.
+3. **Review** - at least one other contributor reviews the PR and leaves
+   feedback or approval.
+4. **Merge to development** - once approved, the PR is merged into
+   ``development``.
+5. **Merge to production** - after the features on ``development`` have been
+   tested, ``development`` is merged into ``production``.
+
+----
+
+Release process
+---------------
+
+XMDB uses `Semantic Versioning <https://semver.org/>`_ (SemVer) for version
+numbers.
+
+There is no fixed release schedule. A new release is cut when enough
+important changes or fixes have accumulated to justify one.
