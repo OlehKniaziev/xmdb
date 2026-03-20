@@ -1,6 +1,7 @@
 import { create } from "zustand";
 import { devtools, persist } from "zustand/middleware";
 import type { QueryResponse } from "./query-response";
+import type { DBTable } from "./objects";
 
 export type ConnectionStore = {
   ConnectionId?: number;
@@ -53,10 +54,11 @@ export interface GalleryInfo {
 export interface TabState {
   id: string;
   title: string;
-  type: "query" | "gallery";
+  type: "query" | "gallery" | "object" | "objects-overview";
   query: string;
   message: string;
   response?: QueryResponse;
+  tableInfo?: DBTable;
   isLoading: boolean;
   bottomPanelTab: "messages" | "results" | "gallery";
   galleryInfo?: GalleryInfo;
@@ -70,6 +72,8 @@ export type MultiTabQueryStore = {
   activeTabId: string | null;
   addTab: (title: string) => string;
   addGalleryTab: (title: string, response: QueryResponse, columnName: string, query: string) => string;
+  addObjectTab: (table: DBTable) => string;
+  addObjectsOverviewTab: () => string;
   openTab: (title: string, query: string, fileHandle: FileSystemFileHandle) => string;
   closeTab: (id: string) => void;
   setActiveTab: (id: string | null) => void;
@@ -104,13 +108,6 @@ export const useMultiTabQueryStore = create<MultiTabQueryStore>()(
           }));
           return id;
         },
-        updateTabSaveStatus: (id, isDirty, filePath, fileHandle) => {
-          set((state) => ({
-            tabs: state.tabs.map((t) =>
-              t.id === id ? { ...t, isDirty, filePath, fileHandle } : t
-            ),
-          }));
-        },
         addGalleryTab: (title, response, columnName, query) => {
           const id = `gallery-${Date.now()}`;
           const newTab: TabState = {
@@ -123,6 +120,55 @@ export const useMultiTabQueryStore = create<MultiTabQueryStore>()(
             isLoading: false,
             bottomPanelTab: "gallery",
             galleryInfo: { columnName },
+            isDirty: false,
+          };
+          set((state) => ({
+            tabs: [...state.tabs, newTab],
+            activeTabId: id,
+          }));
+          return id;
+        },
+        addObjectTab: (table) => {
+          const id = `object-${table.name}`;
+          // Check if tab for this table already exists
+          const existingTab = get().tabs.find(t => t.type === 'object' && t.tableInfo?.name === table.name);
+          if (existingTab) {
+            set({ activeTabId: existingTab.id });
+            return existingTab.id;
+          }
+
+          const newTab: TabState = {
+            id,
+            title: table.name,
+            type: "object",
+            query: "",
+            message: "",
+            tableInfo: table,
+            isLoading: false,
+            bottomPanelTab: "messages",
+            isDirty: false,
+          };
+          set((state) => ({
+            tabs: [...state.tabs, newTab],
+            activeTabId: id,
+          }));
+          return id;
+        },
+        addObjectsOverviewTab: () => {
+          const existing = get().tabs.find(t => t.type === 'objects-overview');
+          if (existing) {
+            set({ activeTabId: existing.id });
+            return existing.id;
+          }
+          const id = 'objects-overview';
+          const newTab: TabState = {
+            id,
+            title: "Object View",
+            type: "objects-overview",
+            query: "",
+            message: "",
+            isLoading: false,
+            bottomPanelTab: "messages",
             isDirty: false,
           };
           set((state) => ({
@@ -183,6 +229,13 @@ export const useMultiTabQueryStore = create<MultiTabQueryStore>()(
           set((state) => ({
             tabs: state.tabs.map((t) =>
               t.id === id ? { ...t, bottomPanelTab: tab, galleryInfo: galleryInfo || t.galleryInfo } : t
+            ),
+          }));
+        },
+        updateTabSaveStatus: (id, isDirty, filePath, fileHandle) => {
+          set((state) => ({
+            tabs: state.tabs.map((t) =>
+              t.id === id ? { ...t, isDirty, filePath, fileHandle } : t
             ),
           }));
         },

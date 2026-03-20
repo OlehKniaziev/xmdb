@@ -4,6 +4,7 @@ import "../styles/bars-style.css";
 export default function Topbar() {
   const location = useLocation();
   const isGalleryActive = location.pathname === "/gallery";
+  const isObjectTabActive = location.pathname === "/object";
 
   return (
     <div className="topbar-bg">
@@ -23,6 +24,14 @@ export default function Topbar() {
           }
         >
           SQL
+        </NavLink>
+        <NavLink
+          to="/objects"
+          className={({ isActive }) =>
+            isActive || isObjectTabActive ? "nav-link-active" : "nav-link"
+          }
+        >
+          Objects
         </NavLink>
         {isGalleryActive && (
           <div className="nav-link-active" style={{backgroundColor: "#96504c"}}>

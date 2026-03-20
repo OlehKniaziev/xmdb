@@ -5,6 +5,8 @@ import ConnectionDialog from "./components/ConnectionDialog";
 import "./styles/index.css";
 import HomePage from "./components/HomePage";
 import GalleryView from "./components/GalleryView";
+import ObjectView from "./components/ObjectView";
+import ObjectsOverview from "./components/ObjectsOverview";
 import { useMultiTabQueryStore } from "./data/global-states";
 
 function GalleryViewWrapper() {
@@ -36,6 +38,8 @@ function App() {
             <Route index element={<HomePage />} />
             <Route path="query" element={<QueryEditor />} />
             <Route path="gallery" element={<GalleryViewWrapper />} />
+            <Route path="object" element={<ObjectView />} />
+            <Route path="objects" element={<ObjectsOverview />} />
           </Route>
         </Routes>
       </Router>
