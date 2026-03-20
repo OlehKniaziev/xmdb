@@ -1,0 +1,73 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*.*.*"
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+
+    env:
+      ARCHIVE_NAME: xmdb-${{ github.ref_name }}-linux-x86_64
+
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+
+    - name: Clone dependencies
+      run: git submodule init && git submodule update --recursive
+
+    - name: Generate changelog
+      id: changelog
+      run: |
+        PREVIOUS_TAG=$(git tag --sort=-v:refname | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' | sed -n '2p')
+        if [ -n "$PREVIOUS_TAG" ]; then
+          RANGE="$PREVIOUS_TAG..${{ github.ref_name }}"
+        else
+          RANGE="${{ github.ref_name }}"
+        fi
+        CHANGELOG=$(git log "$RANGE" --merges --oneline | sed -n 's/.*Merge pull request #\([0-9]*\) from [^ ]* \(.*\)/- \2 (#\1)/p')
+        {
+          echo "body<<CHANGELOG_EOF"
+          echo "$CHANGELOG"
+          echo "CHANGELOG_EOF"
+        } >> "$GITHUB_OUTPUT"
+
+    - name: Setup build directory
+      run: cmake -Bbuild -GNinja -DCMAKE_BUILD_TYPE=RelWithDebInfo
+
+    - name: Build C++ binaries
+      run: cmake --build build
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: 22
+
+    - name: Build GUI
+      working-directory: gui
+      run: npm install && npm run build
+
+    - name: Assemble release directory
+      run: |
+        mkdir -p "$ARCHIVE_NAME/bin" "$ARCHIVE_NAME/gui"
+        cp build/src/Server/xmdb_server "$ARCHIVE_NAME/bin/"
+        cp build/src/CLI/xmdb "$ARCHIVE_NAME/bin/"
+        cp -r gui/dist/* "$ARCHIVE_NAME/gui/"
+
+    - name: Create .tar.gz archive
+      run: tar -czf "$ARCHIVE_NAME.tar.gz" "$ARCHIVE_NAME"
+
+    - name: Create .zip archive
+      run: zip -r "$ARCHIVE_NAME.zip" "$ARCHIVE_NAME"
+
+    - name: Create GitHub release
+      uses: softprops/action-gh-release@v2
+      with:
+        body: ${{ steps.changelog.outputs.body }}
+        files: |
+          ${{ env.ARCHIVE_NAME }}.tar.gz
+          ${{ env.ARCHIVE_NAME }}.zip
