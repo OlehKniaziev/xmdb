@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { use, useEffect, useRef } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import ConnectionEdit, { type ConnectionEditHandle } from "./ConnectionEdit";
 import {
@@ -6,6 +6,8 @@ import {
   useMultiTabQueryStore,
 } from "../data/global-states";
 import type { QueryResponse } from "../data/query-response";
+import { useMonaco } from "@monaco-editor/react";
+import { fileToHexDataString } from "../data/util";
 
 interface ToolbarProps {
   onAddTab?: (path: string) => void;
@@ -32,7 +34,7 @@ export default function Toolbar({ onAddTab }: ToolbarProps) {
   async function runQuery(tabId: string, queryToExecute: string) {
     if (ConnectionId && Hostname && Database && Username) {
       try {
-        const tab = tabs.find(t => t.id === tabId);
+        const tab = tabs.find((t) => t.id === tabId);
         if (!tab) return;
 
         updateTabResults(tabId, tab.message, tab.response, true);
@@ -62,41 +64,66 @@ export default function Toolbar({ onAddTab }: ToolbarProps) {
         }
       } catch (e: any) {
         console.error(e);
-        updateTabResults(
-          tabId,
-          `${e.name}: ${e.message}`,
-          undefined,
-          false,
-        );
+        updateTabResults(tabId, `${e.name}: ${e.message}`, undefined, false);
       }
     }
   }
 
-  async function openQueryOnClick() {
+  async function loadFile({
+    description,
+    accept,
+    multiple,
+  }: {
+    description: string;
+    accept: { [mimeType: string]: string[] };
+    multiple: boolean;
+  }): Promise<
+    | {
+        content: string;
+        fileName: string;
+        fileHandle: FileSystemFileHandle;
+      }
+    | undefined
+  > {
     try {
       // @ts-expect-error - File System Access API
       const [handle] = await window.showOpenFilePicker({
         types: [
           {
-            description: "SQL Files",
-            accept: { "text/plain": [".sql"] },
+            description,
+            accept,
           },
         ],
-        multiple: false,
+        multiple,
       });
 
       if (handle) {
         const file = await handle.getFile();
         const content = await file.text();
-        openTab(file.name, content, handle);
-        navigate("/query");
+        return {
+          content,
+          fileName: file.name,
+          fileHandle: handle,
+        };
       }
     } catch (err: unknown) {
-      if (err instanceof Error && err.name !== "AbortError") {
-        console.error("Failed to open file:", err);
-        alert("Failed to open file: " + err.message);
-      }
+      console.error("Failed to open file: %s", err);
     }
+  }
+
+  async function openQueryOnClick() {
+    const result = await loadFile({
+      description: "SQL Files",
+      accept: { "text/plain": [".sql"] },
+      multiple: false,
+    });
+
+    if (!result) return;
+
+    const { content, fileName, fileHandle } = result;
+
+    openTab(fileName, content, fileHandle);
+    navigate("/query");
   }
 
   async function saveQueryOnClick() {
@@ -134,6 +161,34 @@ export default function Toolbar({ onAddTab }: ToolbarProps) {
         alert("Failed to save file: " + err.message);
       }
     }
+  }
+
+  const monaco = useMonaco();
+
+  async function insertMedia() {
+    if (!monaco) return;
+
+    const result = await loadFile({
+      description: "Image Files",
+      accept: { "image/*": [".png", ".jpg", ".jpeg", ".gif", ".bmp"] },
+      multiple: false,
+    });
+
+    if (!result) return;
+
+    const { fileHandle } = result;
+
+    const file = await fileHandle.getFile();
+    const hexData = await fileToHexDataString(file);
+
+    const editor = monaco.editor.getEditors()[0];
+    editor.executeEdits("insert-media", [
+      {
+        range: editor.getSelection()!,
+        text: `RGB(${hexData.width}, ${hexData.height}, "${hexData.data}")`,
+      },
+    ]);
+    if (!editor) return;
   }
 
   function newQueryHomeOnClick() {
@@ -278,6 +333,22 @@ export default function Toolbar({ onAddTab }: ToolbarProps) {
             ></img>
           </button>
           <label htmlFor="executeQueryBtn">Execute</label>
+        </div>
+
+        <div className="btn-label-container">
+          <button
+            name="insertBtn"
+            className="toolbar-btn"
+            data-src="src/assets/icons/paperclip.png"
+            data-hover="src/assets/icons/paperclip-dark.png"
+            onClick={insertMedia}
+          >
+            <img
+              alt="Insert media icon"
+              src="src/assets/icons/paperclip.png"
+            ></img>
+          </button>
+          <label htmlFor="insertBtn">Insert Media</label>
         </div>
       </>
     );
