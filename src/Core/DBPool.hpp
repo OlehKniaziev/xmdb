@@ -62,7 +62,7 @@ struct DBPool {
      * @return true if the F_EPHEMERAL flag is set, false otherwise
      */
     bool ephemeral() const {
-        return (flags & F_EPHEMERAL) == 1;
+        return (flags & F_EPHEMERAL) != 0;
     }
 
     ok::Allocator *allocator;               ///< The allocator for the pool.
