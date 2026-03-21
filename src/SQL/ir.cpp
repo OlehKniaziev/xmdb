@@ -274,6 +274,18 @@ static inline bool compile_create_stmt(CreateStmt *stmt, IrContext *ctx) {
     case CreateStmt::Target::TABLE: {
         auto *create_table_stmt = static_cast<CreateTableStmt *>(stmt);
 
+        DBSchema *db = ctx->active_db_schema();
+
+        OK_TABLE_FOREACH(db->table_schemas_index, schema_name, _, {
+            if (schema_name == create_table_stmt->name) {
+                ok::String error_message = ok::String::format(ctx->allocator,
+                                                              "table '%s' already exists",
+                                                              schema_name.cstr());
+                ctx->error_on(create_table_stmt->token, error_message);
+                return false;
+            }
+        });
+
         TableSchema *table_schema = ctx->alloc_table_schema(ctx->active_db_id, stmt->name, true);
         OK_ASSERT(table_schema->columns_types.has_value());
 
