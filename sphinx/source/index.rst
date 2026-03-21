@@ -13,3 +13,5 @@ It exposes a standard SQL interface via a network server and an interactive CLI 
    sql
    server
    library_reference
+
+* :download:`GUI User Manual <User Manual.pdf>`
