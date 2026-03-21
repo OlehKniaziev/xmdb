@@ -1,5 +1,6 @@
 #include "state.hpp"
 #include "Logger.hpp"
+#include "Result.hpp"
 
 namespace xmdb {
 bool db_state_create(ok::File file, DBState *out_state) {
@@ -47,6 +48,34 @@ bool db_state_reset(DBState *state) {
     return db_state_sync(state);
 }
 
+Result<DBState, ok::String> db_state_load(ok::Allocator *allocator, ok::File file) {
+    DBStateHeader header{};
+
+    file.seek_start();
+
+    UZ n_read = 0;
+    ok::Optional<ok::File::ReadError> read_err = file.read(reinterpret_cast<U8 *>(&header), sizeof(header), &n_read);
+    if (read_err) {
+        ok::String error_desc = ok::File::error_string(allocator, read_err.get());
+        return ok::String::format(allocator, "Failed to read state file header: %s", error_desc.cstr());
+    }
+
+    if (n_read != sizeof(header)) {
+        return ok::String::alloc(allocator, "State file is too small to contain a valid header");
+    }
+
+    if (header.magic != DB_STATE_HEADER_MAGIC) {
+        return ok::String::alloc(allocator, "Invalid state file magic number");
+    }
+
+    DBState state = {
+        .header = header,
+        .file = file,
+    };
+
+    return state;
+}
+
 bool image_state_create(ok::File file, ImageColumnState *out_state) {
     ImageColumnStateHeader header = {
         .magic = COLUMN_STATE_HEADER_MAGIC,
@@ -69,6 +98,34 @@ bool image_state_create(ok::File file, ImageColumnState *out_state) {
     out_state->file = file;
 
     return true;
+}
+
+Result<ImageColumnState, ok::String> image_state_load(ok::Allocator *allocator, ok::File file) {
+    ImageColumnStateHeader header{};
+
+    file.seek_start();
+
+    UZ n_read = 0;
+    ok::Optional<ok::File::ReadError> read_err = file.read(reinterpret_cast<U8 *>(&header), sizeof(header), &n_read);
+    if (read_err) {
+        ok::String error_desc = ok::File::error_string(allocator, read_err.get());
+        return ok::String::format(allocator, "Failed to read image state file header: %s", error_desc.cstr());
+    }
+
+    if (n_read != sizeof(header)) {
+        return ok::String::alloc(allocator, "Image state file is too small to contain a valid header");
+    }
+
+    if (header.magic != COLUMN_STATE_HEADER_MAGIC) {
+        return ok::String::alloc(allocator, "Invalid image state file magic number");
+    }
+
+    ImageColumnState state = {
+        .header = header,
+        .file = file,
+    };
+
+    return state;
 }
 
 bool image_state_sync(ImageColumnState *state) {

@@ -246,6 +246,9 @@ static void execute_instruction(TypedCompiledQuery *query, UZ i, QueryExecutionC
         }
 
         OK_ASSERT(deleted);
+
+        ctx->sync_state();
+
         break;
     }
     case IRInstructionOperator_DropDatabase: {
@@ -277,6 +280,9 @@ static void execute_instruction(TypedCompiledQuery *query, UZ i, QueryExecutionC
         }
 
         OK_ASSERT(deleted);
+
+        ctx->sync_state();
+
         break;
     }
     case IRInstructionOperator_Arg: {
@@ -296,40 +302,6 @@ static void execute_instruction(TypedCompiledQuery *query, UZ i, QueryExecutionC
 
         break;
     }
-#if 0
-    case IRInstructionOperator_RGB: {
-        Triple<ok::String, S64, ok::StringView> operands = operands_of_RGB(&query->untyped, i);
-
-        U32 w = (U64)operands.op2 >> 32;
-        U32 h = (U64)operands.op2 & ~(U32)0;
-
-        ok::StringView input = operands.op3;
-
-        ok::Optional<ok::Slice<U8>> input_data_opt = from_hex_string(ctx->allocator, input);
-
-        if (!input_data_opt.has_value()) {
-            XMDB_FAIL(ctx,
-                      "Failed to parse the 'data' argument as a valid hex string");
-        }
-
-        ok::Slice<U8> input_data = input_data_opt.get();
-        UZ expected_data_count = w * h * format_pixel_size_in_bytes(PixelFormat::RGB);
-        if (input_data.count != expected_data_count) {
-            XMDB_FAIL_FMT(ctx,
-                          "Expected the 'data' argument to be of length %zu (width * height * pixel size), got %zu bytes instead",
-                          expected_data_count,
-                          input_data.count);
-        }
-
-        auto *value = new (ctx->allocator) ImageDataDBValue{w, h, input_data, PixelFormat::RGB};
-
-        ok::StringView var_name = operands.op1.view();
-
-        ctx->put_var(i, var_name, value);
-
-        break;
-    }
-#endif // 0
     }
 }
 
@@ -610,6 +582,8 @@ static void run_single_node(QueryExecutionContext *ctx, QueryGraph::Node *node) 
             break;
         }
         }
+
+        ctx->sync_state();
 
         break;
     }

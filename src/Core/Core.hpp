@@ -18,4 +18,13 @@ bool compile_and_execute_source(ok::ArenaAllocator *arena,
                                 StringView source,
                                 QueryResults *results,
                                 String *error);
+
+/**
+ * @brief Populates the provided IrContext from a DBPool, providing information
+   about existing databases, users and tables.
+ * @param ctx The IR context.
+ * @param pool The database pool.
+ */
+void populate_ir_context_from_pool(SQL::IrContext *ctx,
+                                   DBPool *pool);
 } // namespace xmdb

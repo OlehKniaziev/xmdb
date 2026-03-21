@@ -28,6 +28,8 @@
     } while (false)
 
 namespace xmdb {
+struct DBPool;
+
 /**
  * @brief Context for executing a database query, managing variables, tables, and operations.
  * Note that the execution context does not actually perform any work (despite it's name) besides setting up all
@@ -179,6 +181,13 @@ struct QueryExecutionContext {
      */
     DBValue *call(StringView fn_name, U64 args_count);
 
+    /**
+     * @brief Syncs changed state (DBPool) to disk.
+     * @warning If the call to DBPool::sync_to_disk fails, this method
+     * will use 'longjmp' to transfer control to a safe point.
+     */
+    void sync_state();
+
     QueryExecutionContext *next;             ///< Pointer to the next context in a pool.
     StaticStorage *static_storage;           ///< Pointer to global static storage.
     QueryGraph query_graph;                  ///< The graph of operations to perform.
@@ -192,6 +201,7 @@ struct QueryExecutionContext {
     ok::MultiList<StringView, DBValue *, DBTable *> emitted_columns; ///< Columns emitted for the result.
     ok::MultiList<StringView, DBValue *> columns_to_update; ///< Columns pending update.
     Optional<QueryGraph::AtomicNode *> alter_user_atomic_node; ///< Atomic node for user alterations.
+    DBPool *db_pool;                         ///< The database pool in use.
     DBDescriptor *current_db;                ///< The database being queried.
     Optional<DBTable *> table_to_insert;     ///< Target table for insertion.
     Optional<DBTable *> table_to_update;     ///< Target table for update.

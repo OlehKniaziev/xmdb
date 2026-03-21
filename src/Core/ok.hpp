@@ -263,6 +263,9 @@ constexpr T min(T x, Rest... xs) {
     return x < xs_min ? x : xs_min;
 }
 
+template <typename T>
+struct Slice;
+
 struct Allocator {
     // required methods
     virtual void* raw_alloc(UZ size) = 0;
@@ -302,6 +305,9 @@ struct Allocator {
         result[len] = '\0';
         return result;
     }
+
+    template <typename T>
+    Slice<T> alloc_slice(UZ);
 };
 
 Allocator *temp_allocator();
@@ -381,9 +387,6 @@ struct ArenaAllocator : public Allocator {
 };
 
 // templates
-template <typename T>
-struct Slice;
-
 template <typename Self, typename T>
 struct ArrayBase {
     Slice<T> slice(UZ start, UZ end);
@@ -566,6 +569,12 @@ struct Slice : public ArrayBase<Slice<T>, T> {
     T* items;
     UZ count;
 };
+
+template <typename T>
+Slice<T> Allocator::alloc_slice(UZ count) {
+    T* ptr = alloc<T>(count);
+    return Slice<T>{ptr, count};
+}
 
 template <typename T>
 struct MultiListBase {
@@ -1638,6 +1647,9 @@ struct File {
     static Optional<OpenError> open(File* out, const char* path);
     static Optional<OpenError> open(File* out, StringView path);
 
+    static bool exists(const char* path);
+    static bool exists(StringView path);
+
 #if OK_UNIX
     static File from_fd(int fd, const char *path) {
         return File{
@@ -1663,7 +1675,7 @@ struct File {
     Optional<ReadError> read(U8* buf, UZ count, UZ* n_read);
     Optional<ReadError> read_full(Allocator* a, List<U8>* out);
 
-    Optional<WriteError> write(U8 *data, UZ count, UZ *n_written);
+    Optional<WriteError> write(const U8 *data, UZ count, UZ *n_written);
 
     inline Optional<WriteError> write(Slice<U8> data) {
         return write(data.items, data.count, nullptr);
@@ -1993,7 +2005,7 @@ String StringView::to_string(Allocator* a) const {
 // FILESYSTEM API IMPLEMENTATION
 Optional<File::OpenError> File::open(File* out, const char* path) {
 #if OK_UNIX
-    int fd = ::open(path, O_RDWR | O_CREAT);
+    int fd = ::open(path, O_RDWR | O_CREAT, 0666);
     int error = errno;
 
     if (fd < 0) {
@@ -2055,6 +2067,24 @@ Optional<File::OpenError> File::open(File* out, StringView path) {
     memcpy(path_cstr, path.data, path.count);
     path_cstr[path.count] = '\0';
     return File::open(out, path_cstr);
+}
+
+bool File::exists(const char* path) {
+#if OK_UNIX
+    return ::access(path, F_OK) == 0;
+#elif OK_WINDOWS
+    DWORD attrs = GetFileAttributesA(path);
+    return attrs != INVALID_FILE_ATTRIBUTES;
+#else
+    OK_TODO();
+#endif
+}
+
+bool File::exists(StringView path) {
+    char* path_cstr = temp_allocator()->alloc<char>(path.count + 1);
+    memcpy(path_cstr, path.data, path.count);
+    path_cstr[path.count] = '\0';
+    return File::exists(path_cstr);
 }
 
 #if OK_UNIX
@@ -2238,7 +2268,7 @@ Optional<File::CloseError> File::close() const {
 #endif // Platform check.
 }
 
-Optional<File::WriteError> File::write(U8* data, UZ count, UZ *n_written) {
+Optional<File::WriteError> File::write(const U8* data, UZ count, UZ *n_written) {
 #if OK_UNIX
     OK_VERIFY(data != nullptr);
 
@@ -2249,7 +2279,6 @@ Optional<File::WriteError> File::write(U8* data, UZ count, UZ *n_written) {
             *n_written = (UZ) ret;
         }
 
-        this->seek_to(this->offset);
         return {};
     }
 

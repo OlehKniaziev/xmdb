@@ -1,6 +1,7 @@
 #pragma once
 
 #include "ok.hpp"
+#include "Result.hpp"
 
 namespace xmdb {
 using namespace ok::literals;
@@ -44,18 +45,26 @@ struct DBState {
 bool db_state_create(ok::File file, DBState *out);
 
 /**
+ * @brief Tries to load a DBState from an open file.
+ * @param allocator The allocator to use for error strings.
+ * @param file The file to use.
+ * @return A loaded DBState on success, an error string otherwise.
+ */
+Result<DBState, ok::String> db_state_load(ok::Allocator *allocator, ok::File file);
+
+/**
  * @brief Synchronizes the table state to disk.
  * @param state Pointer to the state to sync.
  * @return true if successful, false otherwise.
  */
-bool db_state_sync  (DBState *state);
+bool db_state_sync(DBState *state);
 
 /**
  * @brief Resets the table state.
  * @param state Pointer to the state to reset.
  * @return true if successful, false otherwise.
  */
-bool db_state_reset (DBState *state);
+bool db_state_reset(DBState *state);
 
 constexpr U64 COLUMN_STATE_HEADER_MAGIC = gen_magic("ixmdb"_sv);
 
@@ -86,9 +95,17 @@ struct ImageColumnState {
 bool image_state_create(ok::File file, ImageColumnState *out);
 
 /**
+ * @brief Loads an existing image column state from an open file.
+ * @param allocator The allocator to use for error strings.
+ * @param file The file to use.
+ * @return Loaded ImageColumnState on success, an error string otherwise.
+ */
+Result<ImageColumnState, ok::String> image_state_load(ok::Allocator *allocator, ok::File file);
+
+/**
  * @brief Synchronizes the image column state to disk.
  * @param state Pointer to the state to sync.
  * @return true if successful, false otherwise.
  */
-bool image_state_sync  (ImageColumnState *state);
+bool image_state_sync(ImageColumnState *state);
 } // namespace xmdb

@@ -5,6 +5,7 @@
 #include <Core/ok.hpp>
 
 #include <http.h>
+#include <log.h>
 
 #include "connection.hpp"
 #include "http.hpp"
@@ -55,7 +56,9 @@ DECLARE_HANDLER(connect_handler) {
     ok::StringView db_name_sv{(const char *) db_name.Items, db_name.Count};
     xmdb::DBDescriptor *requested_db = nullptr;
 
-    for (xmdb::DBDescriptor *db = shared_db_pool.db_descriptors; db != nullptr; db = db->next) {
+    DBPool *shared_db_pool = get_shared_db_pool();
+
+    for (xmdb::DBDescriptor *db = shared_db_pool->db_descriptors; db != nullptr; db = db->next) {
         if (db->name == db_name_sv) {
             requested_db = db;
             break;
@@ -134,6 +137,10 @@ DECLARE_HANDLER(run_query_handler) {
     ok::StringView source_sv = {(const char *) query.Items, query.Count};
     xmdb::QueryResults query_results{};
     ok::String error{};
+
+    DBPool *shared_db_pool = get_shared_db_pool();
+
+    populate_ir_context_from_pool(&connection_data.connection->ir_ctx, shared_db_pool);
 
     bool ok = xmdb::compile_and_execute_source(&connection_data.temp_arena, connection_data.connection, source_sv,
                                                &query_results, &error);
@@ -377,6 +384,8 @@ DECLARE_HANDLER(get_db_objects_handler) {
 }
 
 void run_http_server(U16 port) {
+    WebLogSetDestination(stdout);
+
     web_http_server server{};
     web_http_server_config config{
         // TODO(oleh): Make this configurable for user.

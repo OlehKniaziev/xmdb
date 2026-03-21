@@ -789,14 +789,12 @@ Optional<Slice<U32>> compile_graph_node(StmtGraph *g, U32 node_id, IrContext *ct
                 U32 edge_id = node->edges[i];
 
                 StmtGraphNode *expr_node = &g->nodes[edge_id];
-                Optional<Slice<U32>> expr_node_ids = compile_graph_node(g, edge_id, ctx);
-                TRY(expr_node_ids);
+                Optional<Slice<U32>> expr_node_ids_opt = compile_graph_node(g, edge_id, ctx);
+                TRY(expr_node_ids_opt);
 
-                columns_count += expr_node_ids.value.count;
+                Slice<U32> expr_node_ids = expr_node_ids_opt.get();
 
-                // NOTE(oleh): If we outputted more than 1 value, it means that we already have called
-                // the emit column procedure.
-                if (expr_node_ids.value.count > 1) continue;
+                columns_count += expr_node_ids.count;
 
                 StringView column_name = ""_sv;
 
@@ -805,8 +803,10 @@ Optional<Slice<U32>> compile_graph_node(StmtGraph *g, U32 node_id, IrContext *ct
                     column_name = ident->value.view();
                 }
 
-                U32 id = expr_node_ids.value[0];
-                emit_EmitColumn(&ctx->ir_emitter, expr_node->up.expr->token, table_node_id.value, id, column_name);
+                for (UZ expr_idx = 0; expr_idx < expr_node_ids.count; ++expr_idx) {
+                    U32 id = expr_node_ids[expr_idx];
+                    emit_EmitColumn(&ctx->ir_emitter, expr_node->up.expr->token, table_node_id.value, id, column_name);
+                }
             }
         }
         ctx->pop_namespace();

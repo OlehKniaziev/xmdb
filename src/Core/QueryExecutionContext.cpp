@@ -18,6 +18,17 @@ XMDB_ENUM_USER_PERMISSIONS
 
 #undef X
 
+Result<UZ, ok::String> sync_db_pool(DBPool *);
+
+void QueryExecutionContext::sync_state() {
+    auto result = sync_db_pool(db_pool);
+    if (!result.ok()) {
+        XMDB_FAIL_FMT(this,
+                      "Failed to write database state to disk: %s",
+                      result.error().cstr());
+    }
+}
+
 DBValue *QueryExecutionContext::fetch_var(U32 ip) {
     CHECK_READ(this);
     Optional<DBValue *> value = vars.get(ip);
@@ -65,6 +76,8 @@ void QueryExecutionContext::create_table(StringView table_name, SQL::TableSchema
         OK_TODO();
     }
 
+    XMDB_FIXME("Add 'CREATE TABLE' node to the query graph");
+
     UZ columns_count = table_schema->columns_names.count;
     List<SQL::ColumnType> column_types = table_schema->columns_types.value;
     ok::StringView *column_names_ptr = allocator->alloc<ok::StringView>(columns_count);
@@ -77,9 +90,15 @@ void QueryExecutionContext::create_table(StringView table_name, SQL::TableSchema
         }
     }
 
+    DBTable::Flags table_flags = DBTable::F_PERSIST;
+
+#ifdef XMDB_TEST
+    table_flags |= DBTable::F_EPHEMERAL;
+#endif // XMDB_TEST
+
     DBTable *new_table = current_db->create_new_table(allocator,
                                                       table_name,
-                                                      DBTable::F_EPHEMERAL | DBTable::F_PERSIST,
+                                                      table_flags,
                                                       column_types.count,
                                                       column_names,
                                                       column_types.slice());
@@ -89,6 +108,8 @@ void QueryExecutionContext::create_table(StringView table_name, SQL::TableSchema
                       "Failed to create table '" OK_SV_FMT "', see the log for details",
                       OK_SV_ARG(table_name));
     }
+
+    sync_state();
 }
 
 void QueryExecutionContext::emit_column(DBTable *table, DBValue *column_value, StringView column_name) {
@@ -159,9 +180,6 @@ void QueryExecutionContext::commit_insert(DBTable *table) {
                        rows_to_insert.count);
 
     rows_to_insert.count = 0;
-
-#if 0
-#endif // 0
 }
 
 void QueryExecutionContext::update_column(DBTable *table, StringView column_name, DBValue *column_value) {
@@ -219,6 +237,8 @@ void QueryExecutionContext::create_user(StringView name) {
     DBUser *user = allocator->alloc<DBUser>();
     *user = {name, ""_sv, PERM_READ | PERM_WRITE};
     current_db->add_user(user);
+
+    sync_state();
 }
 
 void QueryExecutionContext::alter_user_property(StringView user_name, StringView property_name, DBValue *value) {
