@@ -132,6 +132,7 @@ struct BTreeState {
             OK_VERIFY(read_count == buffer_count);
 
             state = allocator->alloc<BTreeState>();
+            state->state_file = state_file;
             state->flags = 0;
             state->allocator = allocator;
             state->header = (DiskHeader *) buffer;

@@ -45,7 +45,7 @@ struct DBDescriptor {
      * @param allocator The allocator to use for the table.
      * @param name The name of the table.
      * @param flags The table flags (e.g., storage type).
-     * @param columns_count The number of columns in the table.
+     * @param column_count The number of columns in the table.
      * @param column_names The names of the columns.
      * @param column_types The types of the columns.
      * @return A pointer to the newly created table.
@@ -53,16 +53,26 @@ struct DBDescriptor {
     DBTable *create_new_table(ok::Allocator *allocator,
                               ok::StringView name,
                               DBTable::Flags flags,
-                              UZ columns_count,
+                              UZ column_count,
                               ok::Slice<ok::StringView> column_names,
                               ok::Slice<SQL::ColumnType> column_types);
 
     /**
-     * @brief Loads an existing table by name.
-     * @param name The name of the table to load.
-     * @return An optional containing the table if found, or empty otherwise.
+     * @brief Loads an existing table from disk.
+     * @param allocator The allocator to use for the table.
+     * @param name The name of the table.
+     * @param flags The table flags (e.g., storage type).
+     * @param column_count The number of columns in the table.
+     * @param column_names The names of the columns.
+     * @param column_types The types of the columns.
+     * @return A result with an allocated table on success, an error string otherwise.
      */
-    ok::Optional<DBTable *> load_existing_table(ok::StringView name);
+    Result<DBTable *, ok::String> load_existing_table(ok::Allocator *allocator,
+                                                      ok::StringView name,
+                                                      DBTable::Flags flags,
+                                                      UZ column_count,
+                                                      ok::Slice<ok::StringView> column_names,
+                                                      ok::Slice<SQL::ColumnType> column_types);
 
     DBDescriptor *next;             ///< Pointer to the next database descriptor in a list.
     ok::StringView name;            ///< The name of the database.

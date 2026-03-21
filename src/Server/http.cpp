@@ -56,7 +56,9 @@ DECLARE_HANDLER(connect_handler) {
     ok::StringView db_name_sv{(const char *) db_name.Items, db_name.Count};
     xmdb::DBDescriptor *requested_db = nullptr;
 
-    for (xmdb::DBDescriptor *db = shared_db_pool.db_descriptors; db != nullptr; db = db->next) {
+    DBPool *shared_db_pool = get_shared_db_pool();
+
+    for (xmdb::DBDescriptor *db = shared_db_pool->db_descriptors; db != nullptr; db = db->next) {
         if (db->name == db_name_sv) {
             requested_db = db;
             break;

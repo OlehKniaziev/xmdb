@@ -8,6 +8,19 @@
 using namespace ok::literals;
 
 namespace xmdb {
+ok::Optional<ColumnAttribute> get_attribute_for_column_type(SQL::ColumnType column_type) {
+    if (column_type == SQL::ColumnType::PNG) {
+        return ColumnAttribute{
+            .flags = ColumnAttribute::F_IMAGE,
+            .u = {
+                .image_state = {},
+            },
+        };
+    } else {
+        return {};
+    }
+}
+
 struct TypeLayout {
     static constexpr UZ MAX_ALIGNMENT = sizeof(UZ);
 
@@ -119,6 +132,61 @@ DBTable::DBTable(ok::Allocator *allocator,
 
         m_column_attributes[i] = attribute;
     }
+}
+
+DBTable::DBTable(ok::Allocator *allocator,
+                 DBTable::Flags flags,
+                 ok::StringView name,
+                 UZ columns_count,
+                 ok::StringView *columns_names,
+                 SQL::ColumnType *columns_types,
+                 ColumnAttribute *column_attributes) : m_name{name},
+                                                       m_flags{flags},
+                                                       m_columns_count{columns_count},
+                                                       m_columns_names{columns_names},
+                                                       m_columns_types{columns_types} {
+    ColumnLayout *columns_layout = compute_columns_layout(allocator, columns_count, columns_types);
+
+    UZ id_column_index = (UZ)-1;
+    for (UZ col_idx = 0; col_idx < columns_count; ++col_idx) {
+        if (columns_names[col_idx] == "id"_sv) {
+            id_column_index = col_idx;
+            break;
+        }
+    }
+
+    if (id_column_index == (UZ)-1) {
+        OK_VERIFY(columns_count > 0);
+        id_column_index = 0;
+    }
+
+    XMDB_FIXME("DBTable constructor searches for a column with name 'id' and sets it as a primary key column");
+
+    m_layout.primary_key_index = id_column_index;
+    m_layout.columns.items = columns_layout;
+    m_layout.columns.count = columns_count;
+
+    if (flags & F_PROXY) {
+        OK_ASSERT(flags & F_ANON);
+
+        m_proxy_columns_values = allocator->alloc<DBValue *>(m_columns_count);
+        for (UZ col_idx = 0; col_idx < m_columns_count; ++col_idx) {
+            m_proxy_columns_values[col_idx] = new (allocator) NoneDBValue{};
+        }
+    }
+
+    if (flags & F_EPHEMERAL) {
+        OK_ASSERT(flags & F_PERSIST);
+    }
+
+    for (UZ col_idx = 0; col_idx < m_columns_count; ++col_idx) {
+        SQL::Type ty = SQL::column_type_to_type(m_columns_types[col_idx]);
+        bool type_is_image = is_image(ty);
+        bool attr_is_image = column_attributes[col_idx].flags & ColumnAttribute::F_IMAGE;
+        OK_VERIFY(type_is_image == attr_is_image);
+    }
+
+    m_column_attributes = column_attributes;
 }
 
 struct StreamPair {

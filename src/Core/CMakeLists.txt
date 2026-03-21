@@ -20,6 +20,7 @@ add_library(LibCore
   state.cpp
   image.cpp
   StaticStorage.cpp
+  catalog.cpp
 )
 
 set_property(TARGET LibCore PROPERTY POSITION_INDEPENDENT_CODE 1)

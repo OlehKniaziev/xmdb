@@ -26,6 +26,13 @@ struct ColumnAttribute {
 };
 
 /**
+ * @brief Gets an attribute for a column type, if any.
+ * @param column_type The column type.
+ * @return An Optional ColumnAttribute
+ */
+ok::Optional<ColumnAttribute> get_attribute_for_column_type(SQL::ColumnType column_type);
+
+/**
  * @brief Represents a database table, managing its metadata and data.
  */
 class DBTable {
@@ -56,6 +63,24 @@ public:
             UZ column_count,
             ok::StringView *column_names,
             SQL::ColumnType *column_types);
+
+    /**
+     * @brief Constructs a new DBTable.
+     * @param allocator The allocator to use.
+     * @param flags The table flags.
+     * @param name The name of the table.
+     * @param column_count The number of columns.
+     * @param column_names The names of the columns.
+     * @param column_types The types of the columns.
+     * @param column_attributes The attributes of the columns.
+     */
+    DBTable(ok::Allocator *allocator,
+            Flags flags,
+            ok::StringView name,
+            UZ column_count,
+            ok::StringView *column_names,
+            SQL::ColumnType *column_types,
+            ColumnAttribute *column_attributes);
 
     /**
      * @brief Gets the table flags.

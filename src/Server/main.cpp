@@ -6,6 +6,7 @@
 
 #include <SQL/global_state.hpp>
 
+#include "connection.hpp"
 #include "http.hpp"
 #include "Config.hpp"
 
@@ -15,6 +16,8 @@ int main(int argc, char **argv) {
     Config config = Config::parse(argc, argv);
 
     xmdb::SQL::init_global_state();
+
+    init_connection_state();
 
     switch (config.protocol) {
     case Protocol::HTTP: {
