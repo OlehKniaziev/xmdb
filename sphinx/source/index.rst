@@ -12,6 +12,7 @@ It exposes a standard SQL interface via a network server and an interactive CLI 
    developing
    sql
    server
+   gui
    library_reference
 
 * :download:`GUI User Manual <User Manual.pdf>`
