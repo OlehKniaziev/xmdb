@@ -142,6 +142,15 @@ DECLARE_HANDLER(run_query_handler) {
 
     populate_ir_context_from_pool(&connection_data.connection->ir_ctx, shared_db_pool);
 
+    // NOTE(oleh): We need to set this manually, since the IrContext is reset by the
+    // populate_ir_context_from_pool call above.
+    for (UZ db_idx = 0; db_idx < connection_data.connection->ir_ctx.database_schemas.count; ++db_idx) {
+        if (connection_data.connection->ir_ctx.database_schemas[db_idx].name == connection_data.connection->db->name) {
+            connection_data.connection->ir_ctx.active_db_id = db_idx;
+            break;
+        }
+    }
+
     bool ok = xmdb::compile_and_execute_source(&connection_data.temp_arena, connection_data.connection, source_sv,
                                                &query_results, &error);
 
