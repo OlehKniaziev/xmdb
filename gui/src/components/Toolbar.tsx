@@ -25,23 +25,26 @@ export default function Toolbar({ onAddTab }: ToolbarProps) {
     updateTabResults,
     updateTabSaveStatus,
   } = useMultiTabQueryStore();
-  const { ConnectionId, Hostname, Database, Username, bumpDbObjectsVersion } = useConnectionStore();
+  const { ConnectionId, Hostname, Database, Username, bumpDbObjectsVersion } =
+    useConnectionStore();
 
   const activeTab = tabs.find((t) => t.id === activeTabId);
 
   const dialogRef = useRef<ConnectionEditHandle>(null);
 
   async function runQuery(tabId: string, queryToExecute: string) {
+    let resp: Response = new Response();
+
     if (ConnectionId && Hostname && Database && Username) {
       try {
         const tab = tabs.find((t) => t.id === tabId);
         if (!tab) return;
 
         updateTabResults(tabId, tab.message, tab.response, true);
-        const resp = await fetch(`${Hostname!.toString()}/run-query`, {
+        resp = await fetch(`${Hostname!.toString()}/run-query`, {
           method: "POST",
           body: JSON.stringify({
-            query: queryToExecute,
+            query: queryToExecute.replace(/\n/g, " "),
             connection_id: ConnectionId,
           }),
         });
@@ -64,7 +67,11 @@ export default function Toolbar({ onAddTab }: ToolbarProps) {
           );
         }
       } catch (e: any) {
-        console.error(e);
+        console.log(
+          "Failed to execute query. Status code: %s (%s)",
+          resp.status,
+          resp.statusText,
+        );
         updateTabResults(tabId, `${e.name}: ${e.message}`, undefined, false);
       }
     }
@@ -186,7 +193,7 @@ export default function Toolbar({ onAddTab }: ToolbarProps) {
     editor.executeEdits("insert-media", [
       {
         range: editor.getSelection()!,
-        text: `RGB(${hexData.width}, ${hexData.height}, "${hexData.data}")`,
+        text: `RGB(${hexData.width}, ${hexData.height},\n"${hexData.data}"\n)`,
       },
     ]);
     if (!editor) return;

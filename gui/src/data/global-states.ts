@@ -1,7 +1,49 @@
 import { create } from "zustand";
-import { devtools, persist } from "zustand/middleware";
+import { devtools, persist, createJSONStorage } from "zustand/middleware";
 import type { QueryResponse } from "./query-response";
 import type { DBTable } from "./objects";
+
+const indexedDBStorage = (() => {
+  const dbName = "xmdb-zustand";
+  const storeName = "keyval";
+
+  function openDB(): Promise<IDBDatabase> {
+    return new Promise((resolve, reject) => {
+      const req = indexedDB.open(dbName, 1);
+      req.onupgradeneeded = () => req.result.createObjectStore(storeName);
+      req.onsuccess = () => resolve(req.result);
+      req.onerror = () => reject(req.error);
+    });
+  }
+
+  return {
+    getItem: async (name: string): Promise<string | null> => {
+      const db = await openDB();
+      return new Promise((resolve) => {
+        const tx = db.transaction(storeName, "readonly");
+        const req = tx.objectStore(storeName).get(name);
+        req.onsuccess = () => resolve(req.result ?? null);
+        req.onerror = () => resolve(null);
+      });
+    },
+    setItem: async (name: string, value: string): Promise<void> => {
+      const db = await openDB();
+      return new Promise((resolve) => {
+        const tx = db.transaction(storeName, "readwrite");
+        tx.objectStore(storeName).put(value, name);
+        tx.oncomplete = () => resolve();
+      });
+    },
+    removeItem: async (name: string): Promise<void> => {
+      const db = await openDB();
+      return new Promise((resolve) => {
+        const tx = db.transaction(storeName, "readwrite");
+        tx.objectStore(storeName).delete(name);
+        tx.oncomplete = () => resolve();
+      });
+    },
+  };
+})();
 
 export type ConnectionStore = {
   ConnectionId?: number;
@@ -265,6 +307,16 @@ export const useMultiTabQueryStore = create<MultiTabQueryStore>()(
       }),
       {
         name: "multi-tab-query-storage",
+        storage: createJSONStorage(() => indexedDBStorage),
+        partialize: (state) => ({
+          ...state,
+          tabs: state.tabs.map((t) => ({
+            ...t,
+            response: undefined,
+            isLoading: false,
+            fileHandle: undefined,
+          })),
+        }),
       }
     )
   )

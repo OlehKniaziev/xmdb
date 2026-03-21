@@ -70,6 +70,30 @@ function QueryEditor() {
         },
       });
       monaco.editor.setTheme("beige-theme");
+
+      monaco.languages.registerFoldingRangeProvider("sql", {
+        provideFoldingRanges(model) {
+          const ranges: { start: number; end: number; kind: typeof monaco.languages.FoldingRangeKind.Region }[] = [];
+          const lineCount = model.getLineCount();
+          for (let i = 1; i <= lineCount; i++) {
+            if (/\bRGB\s*\(/.test(model.getLineContent(i))) {
+              for (let j = i + 1; j <= lineCount; j++) {
+                if (model.getLineContent(j).trim().startsWith(")")) {
+                  if (j - 1 > i) {
+                    ranges.push({
+                      start: i,
+                      end: j - 1,
+                      kind: monaco.languages.FoldingRangeKind.Region,
+                    });
+                  }
+                  break;
+                }
+              }
+            }
+          }
+          return ranges;
+        },
+      });
     }
   }, [monaco]);
 
@@ -91,6 +115,9 @@ function QueryEditor() {
             options={{
               fontFamily: '"Fragment Mono", monospace',
               wordWrap: "on",
+              folding: true,
+              foldingStrategy: "auto",
+              showFoldingControls: "always",
             }}
           />
         </Panel>
