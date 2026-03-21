@@ -41,9 +41,10 @@ bool ArgParser::parse() {
     char **args = m_argv + 1;
 
     ok::List<FlagSpec> flag_specs = m_flag_specs.copy(m_allocator);
-    UZ flag_specs_starting_count = flag_specs.count;
 
     for (UZ i = 0; i < arg_count; ) {
+        UZ flag_specs_starting_count = flag_specs.count;
+
         const char *arg = args[i];
         if (arg[0] != '-') {
             m_positionals.push(arg);
