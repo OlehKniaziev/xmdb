@@ -60,6 +60,7 @@ bool Expr::operator==(const Expr &other) const {
     if (type != other.type) return false;
 
     switch (type) {
+    case Expr::STAR:
     case Expr::NULL_LIT:
     case Expr::TRUE_LIT:
     case Expr::FALSE_LIT:   return true;
@@ -101,8 +102,23 @@ bool Expr::operator==(const Expr &other) const {
 
         return true;
     }
-    default: OK_UNREACHABLE();
+    case Expr::CALL: {
+        auto *this_call = static_cast<const CallExpr *>(this);
+        auto &other_call = static_cast<const CallExpr &>(other);
+
+        if (this_call->fn != other_call.fn) return false;
+
+        if (this_call->args.count != other_call.args.count) return false;
+
+        for (UZ i = 0; i < this_call->args.count; ++i) {
+            if (this_call->args[i] != other_call.args[i]) return false;
+        }
+
+        return true;
     }
+    }
+
+    OK_UNREACHABLE();
 }
 
 ok::String Expr::to_string(ok::Allocator *allocator) const {
