@@ -9,7 +9,7 @@ using namespace ok::literals;
 namespace xmdb {
 #define X(p, _unused)                                                                                                  \
     void CHECK_##p(QueryExecutionContext *ctx) {                                                                       \
-        if ((ctx->user->perm & PERM_##p) == 0) {                                                                       \
+        if ((ctx->user->perm & PERM_##p) != PERM_##p) {                                                                       \
             XMDB_FAIL_FMT(ctx, "user " OK_SV_FMT " does not have " #p " permissions", OK_SV_ARG(ctx->user->name));          \
         }                                                                                                              \
     }
@@ -234,6 +234,16 @@ void QueryExecutionContext::delete_table(DBTable *table) {
 }
 
 void QueryExecutionContext::create_user(StringView name) {
+    CHECK_ADMIN(this);
+
+    for (DBUser *user = current_db->users; user != nullptr; user = user->next) {
+        if (user->name == name) {
+            XMDB_FAIL_FMT(this,
+                          "user '" OK_SV_FMT "' already exists",
+                          OK_SV_ARG(name));
+        }
+    }
+
     DBUser *user = allocator->alloc<DBUser>();
     *user = {name, ""_sv, PERM_READ | PERM_WRITE};
     current_db->add_user(user);

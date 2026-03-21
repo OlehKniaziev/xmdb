@@ -10,7 +10,7 @@ namespace xmdb {
 #define XMDB_ENUM_USER_PERMISSIONS                                                                                     \
     X(READ, 1 << 0)                                                                                                    \
     X(WRITE, 1 << 1)                                                                                                   \
-    X(ADMIN, PERM_READ | PERM_WRITE)
+    X(ADMIN, (1 << 2) | PERM_READ | PERM_WRITE)
 
 #define X(name, value) PERM_##name = value,
 
