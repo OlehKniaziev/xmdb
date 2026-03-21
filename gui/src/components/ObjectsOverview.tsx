@@ -5,7 +5,7 @@ import type { DBTable, DBObjectsResponse } from "../data/objects";
 
 export default function ObjectsOverview() {
   const [tables, setTables] = useState<DBTable[]>([]);
-  const { ConnectionId, Hostname } = useConnectionStore();
+  const { ConnectionId, Hostname, dbObjectsVersion } = useConnectionStore();
   const { addObjectTab } = useMultiTabQueryStore();
   const navigate = useNavigate();
 
@@ -29,7 +29,7 @@ export default function ObjectsOverview() {
       }
     }
     fetchTables();
-  }, [ConnectionId, Hostname]);
+  }, [ConnectionId, Hostname, dbObjectsVersion]);
 
   function handleTableClick(table: DBTable) {
     addObjectTab(table);

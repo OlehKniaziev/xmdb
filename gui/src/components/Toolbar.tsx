@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { use, useEffect, useRef } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import ConnectionEdit, { type ConnectionEditHandle } from "./ConnectionEdit";
 import {
@@ -6,6 +6,8 @@ import {
   useMultiTabQueryStore,
 } from "../data/global-states";
 import type { QueryResponse } from "../data/query-response";
+import { useMonaco } from "@monaco-editor/react";
+import { fileToHexDataString } from "../data/util";
 
 interface ToolbarProps {
   onAddTab?: (path: string) => void;
@@ -23,23 +25,26 @@ export default function Toolbar({ onAddTab }: ToolbarProps) {
     updateTabResults,
     updateTabSaveStatus,
   } = useMultiTabQueryStore();
-  const { ConnectionId, Hostname, Database, Username } = useConnectionStore();
+  const { ConnectionId, Hostname, Database, Username, bumpDbObjectsVersion } =
+    useConnectionStore();
 
   const activeTab = tabs.find((t) => t.id === activeTabId);
 
   const dialogRef = useRef<ConnectionEditHandle>(null);
 
   async function runQuery(tabId: string, queryToExecute: string) {
+    let resp: Response = new Response();
+
     if (ConnectionId && Hostname && Database && Username) {
       try {
-        const tab = tabs.find(t => t.id === tabId);
+        const tab = tabs.find((t) => t.id === tabId);
         if (!tab) return;
 
         updateTabResults(tabId, tab.message, tab.response, true);
-        const resp = await fetch(`${Hostname!.toString()}/run-query`, {
+        resp = await fetch(`${Hostname!.toString()}/run-query`, {
           method: "POST",
           body: JSON.stringify({
-            query: queryToExecute,
+            query: queryToExecute.replace(/\n/g, " "),
             connection_id: ConnectionId,
           }),
         });
@@ -52,6 +57,7 @@ export default function Toolbar({ onAddTab }: ToolbarProps) {
           } else {
             updateTabResults(tabId, `Error: ${q.error_message}`, q, false);
           }
+          bumpDbObjectsVersion();
         } else {
           updateTabResults(
             tabId,
@@ -61,42 +67,71 @@ export default function Toolbar({ onAddTab }: ToolbarProps) {
           );
         }
       } catch (e: any) {
-        console.error(e);
-        updateTabResults(
-          tabId,
-          `${e.name}: ${e.message}`,
-          undefined,
-          false,
+        console.log(
+          "Failed to execute query. Status code: %s (%s)",
+          resp.status,
+          resp.statusText,
         );
+        updateTabResults(tabId, `${e.name}: ${e.message}`, undefined, false);
       }
     }
   }
 
-  async function openQueryOnClick() {
+  async function loadFile({
+    description,
+    accept,
+    multiple,
+  }: {
+    description: string;
+    accept: { [mimeType: string]: string[] };
+    multiple: boolean;
+  }): Promise<
+    | {
+        content: string;
+        fileName: string;
+        fileHandle: FileSystemFileHandle;
+      }
+    | undefined
+  > {
     try {
       // @ts-expect-error - File System Access API
       const [handle] = await window.showOpenFilePicker({
         types: [
           {
-            description: "SQL Files",
-            accept: { "text/plain": [".sql"] },
+            description,
+            accept,
           },
         ],
-        multiple: false,
+        multiple,
       });
 
       if (handle) {
         const file = await handle.getFile();
         const content = await file.text();
-        openTab(file.name, content, handle);
-        navigate("/query");
+        return {
+          content,
+          fileName: file.name,
+          fileHandle: handle,
+        };
       }
     } catch (err: unknown) {
-      if (err instanceof Error && err.name !== "AbortError") {
-        console.error("Failed to open file:", err);
-        alert("Failed to open file: " + err.message);
-      }
+      console.error("Failed to open file: %s", err);
     }
+  }
+
+  async function openQueryOnClick() {
+    const result = await loadFile({
+      description: "SQL Files",
+      accept: { "text/plain": [".sql"] },
+      multiple: false,
+    });
+
+    if (!result) return;
+
+    const { content, fileName, fileHandle } = result;
+
+    openTab(fileName, content, fileHandle);
+    navigate("/query");
   }
 
   async function saveQueryOnClick() {
@@ -136,6 +171,34 @@ export default function Toolbar({ onAddTab }: ToolbarProps) {
     }
   }
 
+  const monaco = useMonaco();
+
+  async function insertMedia() {
+    if (!monaco) return;
+
+    const result = await loadFile({
+      description: "Image Files",
+      accept: { "image/*": [".png", ".jpg", ".jpeg", ".gif", ".bmp"] },
+      multiple: false,
+    });
+
+    if (!result) return;
+
+    const { fileHandle } = result;
+
+    const file = await fileHandle.getFile();
+    const hexData = await fileToHexDataString(file);
+
+    const editor = monaco.editor.getEditors()[0];
+    editor.executeEdits("insert-media", [
+      {
+        range: editor.getSelection()!,
+        text: `RGB(${hexData.width}, ${hexData.height},\n"${hexData.data}"\n)`,
+      },
+    ]);
+    if (!editor) return;
+  }
+
   function newQueryHomeOnClick() {
     if (onAddTab) {
       onAddTab("/query");
@@ -152,7 +215,6 @@ export default function Toolbar({ onAddTab }: ToolbarProps) {
   async function executeQuery() {
     if (!activeTab) return;
     await runQuery(activeTab.id, activeTab.query);
-    window.location.reload();
   }
 
   function newQueryOnClick() {
@@ -278,6 +340,22 @@ export default function Toolbar({ onAddTab }: ToolbarProps) {
             ></img>
           </button>
           <label htmlFor="executeQueryBtn">Execute</label>
+        </div>
+
+        <div className="btn-label-container">
+          <button
+            name="insertBtn"
+            className="toolbar-btn"
+            data-src="src/assets/icons/paperclip.png"
+            data-hover="src/assets/icons/paperclip-dark.png"
+            onClick={insertMedia}
+          >
+            <img
+              alt="Insert media icon"
+              src="src/assets/icons/paperclip.png"
+            ></img>
+          </button>
+          <label htmlFor="insertBtn">Insert Media</label>
         </div>
       </>
     );

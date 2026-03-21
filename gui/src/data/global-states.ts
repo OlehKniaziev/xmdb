@@ -1,13 +1,56 @@
 import { create } from "zustand";
-import { devtools, persist } from "zustand/middleware";
+import { devtools, persist, createJSONStorage } from "zustand/middleware";
 import type { QueryResponse } from "./query-response";
 import type { DBTable } from "./objects";
+
+const indexedDBStorage = (() => {
+  const dbName = "xmdb-zustand";
+  const storeName = "keyval";
+
+  function openDB(): Promise<IDBDatabase> {
+    return new Promise((resolve, reject) => {
+      const req = indexedDB.open(dbName, 1);
+      req.onupgradeneeded = () => req.result.createObjectStore(storeName);
+      req.onsuccess = () => resolve(req.result);
+      req.onerror = () => reject(req.error);
+    });
+  }
+
+  return {
+    getItem: async (name: string): Promise<string | null> => {
+      const db = await openDB();
+      return new Promise((resolve) => {
+        const tx = db.transaction(storeName, "readonly");
+        const req = tx.objectStore(storeName).get(name);
+        req.onsuccess = () => resolve(req.result ?? null);
+        req.onerror = () => resolve(null);
+      });
+    },
+    setItem: async (name: string, value: string): Promise<void> => {
+      const db = await openDB();
+      return new Promise((resolve) => {
+        const tx = db.transaction(storeName, "readwrite");
+        tx.objectStore(storeName).put(value, name);
+        tx.oncomplete = () => resolve();
+      });
+    },
+    removeItem: async (name: string): Promise<void> => {
+      const db = await openDB();
+      return new Promise((resolve) => {
+        const tx = db.transaction(storeName, "readwrite");
+        tx.objectStore(storeName).delete(name);
+        tx.oncomplete = () => resolve();
+      });
+    },
+  };
+})();
 
 export type ConnectionStore = {
   ConnectionId?: number;
   Hostname?: string;
   Database?: string;
   Username?: string;
+  dbObjectsVersion: number;
   setId: (id: number) => void;
   addInfo: (
     hostname: string,
@@ -15,6 +58,7 @@ export type ConnectionStore = {
     username: string,
   ) => void;
   disconnect: () => void;
+  bumpDbObjectsVersion: () => void;
 };
 
 export const useConnectionStore = create<ConnectionStore>()(
@@ -25,6 +69,7 @@ export const useConnectionStore = create<ConnectionStore>()(
         Hostname: undefined,
         Database: undefined,
         Username: undefined,
+        dbObjectsVersion: 0,
         setId: (id) => set({ ConnectionId: id }),
         addInfo: (hostname, database, username) =>
           set({
@@ -39,6 +84,8 @@ export const useConnectionStore = create<ConnectionStore>()(
             Database: undefined,
             Username: undefined,
           }),
+        bumpDbObjectsVersion: () =>
+          set((state) => ({ dbObjectsVersion: state.dbObjectsVersion + 1 })),
       }),
       {
         name: "connection-info-storage",
@@ -82,6 +129,7 @@ export type MultiTabQueryStore = {
   updateTabBottomPanel: (id: string, tab: "messages" | "results" | "gallery", galleryInfo?: GalleryInfo) => void;
   updateTabSaveStatus: (id: string, isDirty: boolean, filePath?: string, fileHandle?: FileSystemFileHandle) => void;
   setTabLoading: (id: string, isLoading: boolean) => void;
+  updateObjectTabs: (tables: DBTable[]) => void;
 }
 
 export const useMultiTabQueryStore = create<MultiTabQueryStore>()(
@@ -245,10 +293,30 @@ export const useMultiTabQueryStore = create<MultiTabQueryStore>()(
               t.id === id ? { ...t, isLoading } : t
             ),
           }));
+        },
+        updateObjectTabs: (tables) => {
+          set((state) => ({
+            tabs: state.tabs.map((t) => {
+              if (t.type !== "object" || !t.tableInfo) return t;
+              const updated = tables.find((tbl) => tbl.name === t.tableInfo!.name);
+              if (updated) return { ...t, tableInfo: updated };
+              return t;
+            }),
+          }));
         }
       }),
       {
         name: "multi-tab-query-storage",
+        storage: createJSONStorage(() => indexedDBStorage),
+        partialize: (state) => ({
+          ...state,
+          tabs: state.tabs.map((t) => ({
+            ...t,
+            response: undefined,
+            isLoading: false,
+            fileHandle: undefined,
+          })),
+        }),
       }
     )
   )
