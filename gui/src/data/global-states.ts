@@ -111,7 +111,6 @@ export interface TabState {
   galleryInfo?: GalleryInfo;
   isDirty: boolean;
   filePath?: string;
-  fileHandle?: FileSystemFileHandle;
 }
 
 export type MultiTabQueryStore = {
@@ -121,13 +120,13 @@ export type MultiTabQueryStore = {
   addGalleryTab: (title: string, response: QueryResponse, columnName: string, query: string) => string;
   addObjectTab: (table: DBTable) => string;
   addObjectsOverviewTab: () => string;
-  openTab: (title: string, query: string, fileHandle: FileSystemFileHandle) => string;
+  openTab: (title: string, query: string) => string;
   closeTab: (id: string) => void;
   setActiveTab: (id: string | null) => void;
   updateActiveTabQuery: (query: string) => void;
   updateTabResults: (id: string, message: string, response?: QueryResponse, isLoading?: boolean) => void;
   updateTabBottomPanel: (id: string, tab: "messages" | "results" | "gallery", galleryInfo?: GalleryInfo) => void;
-  updateTabSaveStatus: (id: string, isDirty: boolean, filePath?: string, fileHandle?: FileSystemFileHandle) => void;
+  updateTabSaveStatus: (id: string, isDirty: boolean, filePath?: string) => void;
   setTabLoading: (id: string, isLoading: boolean) => void;
   updateObjectTabs: (tables: DBTable[]) => void;
 }
@@ -225,7 +224,7 @@ export const useMultiTabQueryStore = create<MultiTabQueryStore>()(
           }));
           return id;
         },
-        openTab: (title, query, fileHandle) => {
+        openTab: (title, query) => {
           const id = `query-${Date.now()}`;
           const newTab: TabState = {
             id,
@@ -237,7 +236,6 @@ export const useMultiTabQueryStore = create<MultiTabQueryStore>()(
             bottomPanelTab: "messages",
             isDirty: false,
             filePath: title,
-            fileHandle: fileHandle,
           };
           set((state) => ({
             tabs: [...state.tabs, newTab],
@@ -280,10 +278,10 @@ export const useMultiTabQueryStore = create<MultiTabQueryStore>()(
             ),
           }));
         },
-        updateTabSaveStatus: (id, isDirty, filePath, fileHandle) => {
+        updateTabSaveStatus: (id, isDirty, filePath) => {
           set((state) => ({
             tabs: state.tabs.map((t) =>
-              t.id === id ? { ...t, isDirty, filePath, fileHandle } : t
+              t.id === id ? { ...t, isDirty, filePath } : t
             ),
           }));
         },
@@ -314,7 +312,6 @@ export const useMultiTabQueryStore = create<MultiTabQueryStore>()(
             ...t,
             response: undefined,
             isLoading: false,
-            fileHandle: undefined,
           })),
         }),
       }

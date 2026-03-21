@@ -1,3 +1,40 @@
+export function pickFile(accept: string): Promise<File | null> {
+  return new Promise((resolve) => {
+    const input = document.createElement("input");
+    input.type = "file";
+    input.accept = accept;
+    input.onchange = () => resolve(input.files?.[0] ?? null);
+    input.oncancel = () => resolve(null);
+    input.click();
+  });
+}
+
+export async function saveFile(content: string, fileName: string, mimeType = "text/plain") {
+  const blob = new Blob([content], { type: mimeType });
+
+  if ("showSaveFilePicker" in window) {
+    try {
+      // @ts-expect-error - File System Access API not in all TS libs
+      const handle = await window.showSaveFilePicker({
+        suggestedName: fileName,
+      });
+      const writable = await handle.createWritable();
+      await writable.write(blob);
+      await writable.close();
+      return;
+    } catch (err: unknown) {
+      if (err instanceof Error && err.name === "AbortError") return;
+    }
+  }
+
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = fileName;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
 export function toHexString(s: string): string {
   let out = "";
   for (const c of s) {

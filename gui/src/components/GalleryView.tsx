@@ -1,5 +1,5 @@
 import type { ImageChunk, QueryResponse as QueryResponseType } from "../data/query-response";
-import { imageHexToDataUrl } from "../data/util";
+import { imageHexToDataUrl, saveFile } from "../data/util";
 import { useMemo, useState } from "react";
 
 function ImageDisplay({ chunk }: { chunk: ImageChunk }) {
@@ -17,32 +17,9 @@ Height: ${chunk.height}px
 Data (first 16 chars): ${chunk.data.substring(0, 16)}...`;
   }, [chunk]);
 
-  const saveInfoAsText = async (e: React.MouseEvent) => {
+  const saveInfoAsText = (e: React.MouseEvent) => {
     e.stopPropagation();
-
-    try {
-      // @ts-expect-error - File System Access API
-      const handle = await window.showSaveFilePicker({
-        suggestedName: `image-data-${Date.now()}.txt`,
-        types: [
-          {
-            description: "Text Files",
-            accept: { "text/plain": [".txt"] },
-          },
-        ],
-      });
-
-      if (handle) {
-        const writable = await handle.createWritable();
-        await writable.write(chunk.data);
-        await writable.close();
-      }
-    } catch (err: unknown) {
-      if (err instanceof Error && err.name !== "AbortError") {
-        console.error("Failed to save image data:", err);
-        alert("Failed to save image data: " + err.message);
-      }
-    }
+    saveFile(chunk.data, `image-data-${Date.now()}.txt`);
   };
 
   return (
