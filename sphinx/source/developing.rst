@@ -110,6 +110,36 @@ mismatch, which is the mode used in CI.
 
 ----
 
+Integration tests
+-----------------
+
+Integration tests verify that the major components of XMDB work correctly
+together. Unlike unit tests, which exercise individual functions in isolation,
+integration tests operate against a fully initialised system - writing to disk,
+spawning the server, and communicating over the network.
+
+**C++ integration tests** (``tests/*-integration-test.cpp``)
+
+These use GoogleTest and follow the same conventions as unit tests. The key
+difference is that they are linked against ``LibCore`` instead of
+``LibCore_test``, so the ``XMDB_TEST`` define is absent and the database
+writes to disk. To add a new C++ integration test, create a file matching the
+``*-integration-test.cpp`` pattern in ``tests/`` - CMake picks it up
+automatically.
+
+**Python integration tests** (``tests/integration/``)
+
+These start a real server process and exercise it through the HTTP API and the
+CLI. Test scenarios are defined as data in ``tests/integration/scenarios.py``;
+both the HTTP and CLI test suites consume them, so adding a new scenario to
+that file automatically creates tests for both interfaces.
+
+To add a scenario, append a dictionary to the ``SCENARIOS`` list in
+``scenarios.py``. Each scenario has a name, a list of SQL queries to execute,
+and optional expected rows. See the existing entries for the format.
+
+----
+
 Development process
 --------------------
 
@@ -135,3 +165,8 @@ numbers.
 
 There is no fixed release schedule. A new release is cut when enough
 important changes or fixes have accumulated to justify one.
+
+Developing the GUI
+------------------
+
+See the :doc:`gui` docs for instructions.
