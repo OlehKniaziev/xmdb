@@ -305,7 +305,7 @@ void QueryExecutionContext::prepare_call_arg(DBValue *arg_value) {
 DBValue *QueryExecutionContext::call(ok::StringView fn_name, U64 arg_count) {
     OK_ASSERT(call_args.count == arg_count);
 
-    Slice<DBValue *> args = call_args.slice();
+    Slice<DBValue *> args = call_args.copy(allocator).slice();
     call_args.count = 0;
 
     QueryGraph::CallNode *call_node = query_graph.call(allocator, fn_name, args);
