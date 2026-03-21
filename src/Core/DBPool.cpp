@@ -114,6 +114,10 @@ void DBPool::return_execution_context(QueryExecutionContext *ctx) {
 }
 
 Result<UZ, ok::String> sync_db_pool(DBPool *pool) {
-    return catalog_save(pool->allocator, pool, pool->catalog_file_name);
+    if (!pool->ephemeral()) {
+        return catalog_save(pool->allocator, pool, pool->catalog_file_name);
+    } else {
+        return 0;
+    }
 }
 } // namespace xmdb
