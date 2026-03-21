@@ -303,6 +303,8 @@ static inline bool type_check_ir_instruction(U32 ip, CompiledQuery *ir_emitter, 
             }
         }
 
+        ctx->call_args.count = 0;
+
         ctx->ir_instruction_types.put(ip, signature.return_type);
 
         return true;
