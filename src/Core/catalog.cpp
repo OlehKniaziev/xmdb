@@ -186,7 +186,8 @@ Result<UZ, ok::String> catalog_load(ok::Allocator *allocator, DBPool *pool, ok::
                 U8 col_type_raw = 0;
                 read(&file, &col_type_raw);
 
-                column_names[col_idx] = col_name_fs.view();
+                column_names[col_idx] = col_name_fs.view().to_string(allocator).view();
+                // TODO(oleh): Verify that the column type is valid.
                 column_types[col_idx] = static_cast<SQL::ColumnType>(col_type_raw);
             }
 
