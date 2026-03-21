@@ -1131,9 +1131,10 @@ String stringify_ir(Allocator *allocator, CompiledQuery *emitter) {
 
 bool ir_compile_query(Query *q, IrContext *ctx, CompiledQuery *out_query) {
     ctx->table_stack.count = 0;
-    // NOTE(oleh): We always aren in the NS_GLOBAL namespace.
+    // NOTE(oleh): We always are in the NS_GLOBAL namespace.
     ctx->namespace_stack.count = 1;
-    ctx->active_db_id = 0;
+    // NOTE(oleh): active_db_id is NOT reset here so that USE DATABASE persists
+    // across separate query executions. The caller is responsible for setting it correctly.
     ctx->error = {};
 
     ctx->ir_emitter.instructions.count = 0;
