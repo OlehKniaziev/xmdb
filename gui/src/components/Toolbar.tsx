@@ -7,7 +7,7 @@ import {
 } from "../data/global-states";
 import type { QueryResponse } from "../data/query-response";
 import { useMonaco } from "@monaco-editor/react";
-import { fileToHexDataString } from "../data/util";
+import { fileToHexDataString, pickFile, saveFile } from "../data/util";
 
 interface ToolbarProps {
   onAddTab?: (path: string) => void;
@@ -77,98 +77,24 @@ export default function Toolbar({ onAddTab }: ToolbarProps) {
     }
   }
 
-  async function loadFile({
-    description,
-    accept,
-    multiple,
-  }: {
-    description: string;
-    accept: { [mimeType: string]: string[] };
-    multiple: boolean;
-  }): Promise<
-    | {
-        content: string;
-        fileName: string;
-        fileHandle: FileSystemFileHandle;
-      }
-    | undefined
-  > {
-    try {
-      // @ts-expect-error - File System Access API
-      const [handle] = await window.showOpenFilePicker({
-        types: [
-          {
-            description,
-            accept,
-          },
-        ],
-        multiple,
-      });
-
-      if (handle) {
-        const file = await handle.getFile();
-        const content = await file.text();
-        return {
-          content,
-          fileName: file.name,
-          fileHandle: handle,
-        };
-      }
-    } catch (err: unknown) {
-      console.error("Failed to open file: %s", err);
-    }
-  }
-
   async function openQueryOnClick() {
-    const result = await loadFile({
-      description: "SQL Files",
-      accept: { "text/plain": [".sql"] },
-      multiple: false,
-    });
+    const file = await pickFile(".sql");
+    if (!file) return;
 
-    if (!result) return;
-
-    const { content, fileName, fileHandle } = result;
-
-    openTab(fileName, content, fileHandle);
+    const content = await file.text();
+    openTab(file.name, content);
     navigate("/query");
   }
 
-  async function saveQueryOnClick() {
+  function saveQueryOnClick() {
     if (!activeTab) return;
 
-    try {
-      let handle = activeTab.fileHandle;
+    const fileName = activeTab.title.endsWith(".sql")
+      ? activeTab.title.replace(/\*$/, "")
+      : `${activeTab.title.replace(/\*$/, "")}.sql`;
 
-      if (!handle) {
-        // @ts-expect-error - File System Access API
-        handle = await window.showSaveFilePicker({
-          suggestedName: activeTab.title.endsWith(".sql")
-            ? activeTab.title.replace(/\*$/, "")
-            : `${activeTab.title.replace(/\*$/, "")}.sql`,
-          types: [
-            {
-              description: "SQL Files",
-              accept: { "text/plain": [".sql"] },
-            },
-          ],
-        });
-      }
-
-      if (handle) {
-        const writable = await handle.createWritable();
-        await writable.write(activeTab.query);
-        await writable.close();
-
-        const file = await handle.getFile();
-        updateTabSaveStatus(activeTab.id, false, file.name, handle);
-      }
-    } catch (err: unknown) {
-      if (err instanceof Error && err.name !== "AbortError") {
-        console.error("Failed to save file:", err);
-        alert("Failed to save file: " + err.message);
-      }
-    }
+    saveFile(activeTab.query, fileName);
+    updateTabSaveStatus(activeTab.id, false, fileName);
   }
 
   const monaco = useMonaco();
@@ -176,17 +102,9 @@ export default function Toolbar({ onAddTab }: ToolbarProps) {
   async function insertMedia() {
     if (!monaco) return;
 
-    const result = await loadFile({
-      description: "Image Files",
-      accept: { "image/*": [".png", ".jpg", ".jpeg", ".gif", ".bmp"] },
-      multiple: false,
-    });
+    const file = await pickFile("image/png,image/jpeg,image/gif,image/bmp");
+    if (!file) return;
 
-    if (!result) return;
-
-    const { fileHandle } = result;
-
-    const file = await fileHandle.getFile();
     const hexData = await fileToHexDataString(file);
 
     const editor = monaco.editor.getEditors()[0];
