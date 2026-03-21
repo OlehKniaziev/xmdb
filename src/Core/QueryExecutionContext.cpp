@@ -78,6 +78,15 @@ void QueryExecutionContext::create_table(StringView table_name, SQL::TableSchema
 
     XMDB_FIXME("Add 'CREATE TABLE' node to the query graph");
 
+    for (UZ tab_idx = 0; tab_idx < current_db->tables.count; ++tab_idx) {
+        DBTable *table = current_db->tables[tab_idx];
+        if (table->name() == table_name) {
+            XMDB_FAIL_FMT(this,
+                          "table '" OK_SV_FMT "' already exists",
+                          OK_SV_ARG(table_name));
+        }
+    }
+
     UZ columns_count = table_schema->columns_names.count;
     List<SQL::ColumnType> column_types = table_schema->columns_types.value;
     ok::StringView *column_names_ptr = allocator->alloc<ok::StringView>(columns_count);

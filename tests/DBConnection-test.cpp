@@ -395,6 +395,26 @@ TEST(DBConnection, insert_and_select_multiple_rows) {
     ASSERT_FALSE(stream.next());
 }
 
+TEST(DBConnection, create_duplicate_table_fails) {
+    ok::ArenaAllocator arena{};
+    StringView source = R"sql(
+    CREATE TABLE Dup (x int);
+    CREATE TABLE Dup (y int);)sql"_sv;
+
+    String error{};
+    QueryResults query_results{};
+
+    DBUser admin = DBUser::admin();
+    DBPool db_pool{&arena};
+    DBDescriptor *default_db = db_pool.get_db("default"_sv);
+    DBConnection db_conn{&db_pool, default_db, &admin};
+
+    bool ok = compile_and_execute_source(&arena, &db_conn, source, &query_results, &error);
+
+    ASSERT_FALSE(ok);
+    ASSERT_TRUE(error.ends_with("already exists"));
+}
+
 TEST(DBConnection, create_and_drop_empty_table) {
     ok::ArenaAllocator arena{};
     StringView source = R"sql(
