@@ -113,9 +113,12 @@ def _make_cli_test(scenario):
                         actual_stripped = actual.strip('"')
                         self.assertEqual(actual_stripped, expected,
                                          f"Row {row_idx}, col {col_idx}: expected {expected!r}, got {actual!r}")
-                    # NOTE: Integer value comparison is skipped because the CLI
-                    # has a pre-existing bug where numbers > 9 display
-                    # incorrectly. The HTTP tests verify exact integer values.
+                    elif isinstance(expected, int):
+                        actual_int = int(actual)
+                        self.assertEqual(actual_int, expected,
+                                         f"Row {row_idx}, col {col_idx}: expected {expected}, got {actual}")
+                    else:
+                        raise RuntimeError(f"Unsupported type of 'expected' value '{type(expected)}'")
 
     test_method.__doc__ = scenario.get("description", scenario["name"])
     return test_method
