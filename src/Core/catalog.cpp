@@ -5,19 +5,19 @@
 #include "Logger.hpp"
 
 namespace xmdb {
-struct CatalogDBEntry {
+struct [[gnu::packed]] CatalogDBEntry {
     FixedString name;
     U64 user_count;
     U64 table_count;
 };
 
-struct CatalogUserEntry {
+struct [[gnu::packed]] CatalogUserEntry {
     FixedString name;
-    SHA256Digest sha256_password_digest;
+    U8 sha256_password_digest[SHA256Digest::SIZE];
     U8 perm;
 };
 
-struct CatalogTableEntry {
+struct [[gnu::packed]] CatalogTableEntry {
     FixedString name;
     DBTable::Flags flags;
     U64 column_count;
@@ -76,9 +76,13 @@ Result<UZ, ok::String> catalog_save(ok::Allocator *allocator,
         for (DBUser *user = db->users; user != nullptr; user = user->next) {
             CatalogUserEntry user_entry = {
                 .name = create_fixed_string(user->name),
-                .sha256_password_digest = user->sha256_password_digest,
+                .sha256_password_digest = {},
                 .perm = user->perm,
             };
+
+            memcpy(&user_entry.sha256_password_digest,
+                   user->sha256_password_digest.bytes.items,
+                   sizeof(user_entry.sha256_password_digest));
 
             write(&file, &user_entry);
         }
@@ -160,7 +164,10 @@ Result<UZ, ok::String> catalog_load(ok::Allocator *allocator, DBPool *pool, ok::
             user->next = nullptr;
             user->name = user_entry.name.view().to_string(allocator).view();
             user->perm = user_entry.perm;
-            user->sha256_password_digest = user_entry.sha256_password_digest;
+
+            memcpy(user->sha256_password_digest.bytes.items,
+                   user_entry.sha256_password_digest,
+                   sizeof(user_entry.sha256_password_digest));
 
             db->add_user(user);
         }
