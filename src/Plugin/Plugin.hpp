@@ -6,6 +6,23 @@
 #include "NativeLibrary.hpp"
 
 namespace xmdb::plugin {
+class PluginCapability {
+public:
+    PluginCapability(ok::StringView name, NativeSymbol symbol) : m_name{name}, m_symbol{symbol} {}
+
+    ok::StringView name() const {
+        return m_name;
+    }
+
+    NativeSymbol symbol() const {
+        return m_symbol;
+    }
+
+private:
+    ok::StringView m_name;
+    NativeSymbol m_symbol;
+};
+
 /**
  * @brief A representation of a dynamic library with specific
  * exported functions and structure.
@@ -21,7 +38,10 @@ public:
 
     ok::StringView get_last_error();
 
-    ok::Optional<NativeSymbol> get_capability(ok::StringView name) const;
+    ok::Optional<PluginCapability> get_capability(ok::StringView name) const;
+
+    template <typename T, typename... Args>
+    T use_capability(PluginCapability capability, Args&&... args);
 
 private:
     using LoadHook = int (*)(void *);
@@ -56,4 +76,11 @@ private:
     CapabilitiesList m_capabilities;
     bool m_installed{};
 };
+
+template <typename T, typename... Args>
+T Plugin::use_capability(PluginCapability capability, Args&&... args) {
+    auto fn_ptr = capability.symbol().cast<T (*)(void *, Args...)>();
+    T result = fn_ptr(m_plugin_state, args...);
+    return result;
+}
 } // namespace xmdb::plugin

@@ -91,12 +91,12 @@ void Plugin::unload() {
     }
 }
 
-ok::Optional<NativeSymbol> Plugin::get_capability(ok::StringView name) const {
+ok::Optional<PluginCapability> Plugin::get_capability(ok::StringView name) const {
     for (UZ cap_idx = 0; cap_idx < m_capabilities.count; ++cap_idx) {
         const ok::Pair<ok::StringView, NativeSymbol> *cap = &m_capabilities[cap_idx];
-        if (cap->a == name) return cap->b;
+        if (cap->a == name) return PluginCapability{cap->a, cap->b};
     }
 
-    return {};
+    return ok::Optional<PluginCapability>::empty();
 }
 } // namespace xmdb::plugin
