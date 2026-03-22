@@ -1193,6 +1193,16 @@ struct Table {
         return (U8)((double)(count * 100) / (double)capacity);
     }
 
+    void dealloc() {
+        if (allocator == nullptr) return;
+
+        allocator->dealloc(meta, capacity);
+        allocator->dealloc(keys, capacity);
+        allocator->dealloc(values, capacity);
+
+        memset(this, 0, sizeof(this));
+    }
+
     TKey* keys;
     TValue* values;
     U8* meta;
