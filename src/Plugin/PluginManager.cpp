@@ -1,5 +1,7 @@
 #include "PluginManager.hpp"
 
+#include <Core/new.hpp>
+
 namespace xmdb::plugin {
 PluginManager::PluginManager(ok::Allocator *allocator) : m_allocator{allocator},
                                                          m_loaded_plugins{ok::Table<ok::StringView, Plugin *>::alloc(allocator)} {
@@ -36,7 +38,7 @@ Result<Plugin *, ok::String> PluginManager::get_or_load(ok::StringView path) {
 PluginManager::~PluginManager() {
     OK_TABLE_FOREACH(m_loaded_plugins, plug_path, plug, {
         (void)plug_path;
-        plug->unload();
+        delete plug;
     });
 
     m_loaded_plugins.dealloc();

@@ -43,6 +43,12 @@ public:
     template <typename T, typename... Args>
     T use_capability(PluginCapability capability, Args&&... args);
 
+    static void operator delete(void *ptr) {
+        auto *plug = reinterpret_cast<Plugin *>(ptr);
+        plug->unload();
+        plug->m_allocator->dealloc(plug, 1);
+    }
+
 private:
     using LoadHook = int (*)(void *);
     using UnloadHook = void (*)(void *);
@@ -55,12 +61,14 @@ private:
 
     using CapabilitiesList = ok::List<ok::Pair<ok::StringView, NativeSymbol>>;
 
-    Plugin(const NativeLibrary *native_lib,
+    Plugin(ok::Allocator *allocator,
+           const NativeLibrary *native_lib,
            void *plugin_state,
            UnloadHook unload_hook,
            InstallHook install_hook,
            GetLastErrorHook get_last_error_hook,
-           CapabilitiesList capabilities) : m_native_lib{native_lib},
+           CapabilitiesList capabilities) : m_allocator{allocator},
+                                            m_native_lib{native_lib},
                                             m_plugin_state{plugin_state},
                                             m_unload_hook{unload_hook},
                                             m_install_hook{install_hook},
@@ -68,6 +76,7 @@ private:
                                             m_capabilities{capabilities} {
     }
 
+    ok::Allocator *m_allocator;
     const NativeLibrary *m_native_lib;
     void *m_plugin_state;
     ok::Optional<UnloadHook> m_unload_hook;

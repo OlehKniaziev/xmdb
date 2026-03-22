@@ -52,6 +52,7 @@ Result<Plugin *, ok::String> Plugin::load(ok::Allocator *allocator,
     UnloadHook unload_hook = unload_sym.or_else({}).cast<UnloadHook>();
 
     return new (allocator) Plugin{
+        allocator,
         native_lib,
         plugin_state,
         unload_hook,
