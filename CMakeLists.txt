@@ -66,6 +66,19 @@ endforeach()
 # NOT defined and DBPool is non-ephemeral.
 file(GLOB integration_test_files "tests/*-integration-test.cpp")
 
+# Plugin integration test is self-contained: the same source file is compiled
+# as a shared library (the plugin under test) and as the GTest executable.
+list(REMOVE_ITEM integration_test_files "${CMAKE_SOURCE_DIR}/tests/Plugin-integration-test.cpp")
+
+add_library(PluginIntegrationTestPlugin SHARED tests/Plugin-integration-test.cpp)
+target_compile_definitions(PluginIntegrationTestPlugin PRIVATE XMDB_BUILDING_TEST_PLUGIN)
+
+add_executable(Plugin-integration-test tests/Plugin-integration-test.cpp)
+target_compile_definitions(Plugin-integration-test PRIVATE
+    XMDB_TEST_PLUGIN_PATH="$<TARGET_FILE:PluginIntegrationTestPlugin>")
+target_link_libraries(Plugin-integration-test GTest::gtest_main LibPlugin LibCore)
+gtest_discover_tests(Plugin-integration-test)
+
 foreach(test_file ${integration_test_files})
   string(REGEX REPLACE "^.*/tests/(.*)\\.cpp$" "\\1" test_exe_name ${test_file})
 
