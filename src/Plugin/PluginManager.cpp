@@ -34,7 +34,8 @@ Result<Plugin *, ok::String> PluginManager::get_or_load(ok::StringView path) {
 }
 
 PluginManager::~PluginManager() {
-    OK_TABLE_FOREACH(m_loaded_plugins, _, plug, {
+    OK_TABLE_FOREACH(m_loaded_plugins, plug_path, plug, {
+        (void)plug_path;
         plug->unload();
     });
 
