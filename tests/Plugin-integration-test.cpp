@@ -5,6 +5,10 @@
 //     shared library and tests the Plugin workflow.
 
 constexpr const char *SAY_HELLO_RESULT = "hello from test plugin";
+constexpr const char *PLUGIN_NAME = "test-plugin";
+constexpr const char *CAP_SAY_HELLO = "say_hello";
+constexpr const char *CAP_ADD = "add";
+constexpr const char *CAP_WAS_LOADED = "was_loaded";
 
 #ifdef XMDB_BUILDING_TEST_PLUGIN
 
@@ -26,7 +30,7 @@ static int was_loaded(void *state) {
     return reinterpret_cast<TestPluginState *>(state)->loaded;
 }
 
-static const char *g_cap_names[] = {"say_hello", "add", "was_loaded"};
+static const char *g_cap_names[] = {CAP_SAY_HELLO, CAP_ADD, CAP_WAS_LOADED};
 static void *g_cap_syms[] = {reinterpret_cast<void *>(say_hello),
                              reinterpret_cast<void *>(add),
                              reinterpret_cast<void *>(was_loaded)};
@@ -90,9 +94,9 @@ TEST_F(PluginIntegrationFixture, load_plugin_succeeds) {
 
     Plugin *plug = result.unwrap();
 
-    plug->install("test-plugin"_sv);
+    plug->install(ok::StringView{PLUGIN_NAME});
 
-    PluginCapability was_loaded_cap = plug->get_capability("was_loaded"_sv).get();
+    PluginCapability was_loaded_cap = plug->get_capability(ok::StringView{CAP_WAS_LOADED}).get();
     int was_loaded = plug->use_capability<int>(was_loaded_cap);
     ASSERT_TRUE(was_loaded);
 }
@@ -112,10 +116,10 @@ TEST_F(PluginIntegrationFixture, install_hook_registers_capabilities) {
     ASSERT_TRUE(result.ok()) << result.error().cstr();
 
     Plugin *plugin = result.unwrap();
-    plugin->install("test-plugin"_sv);
+    plugin->install(ok::StringView{PLUGIN_NAME});
 
-    ASSERT_TRUE(plugin->get_capability("say_hello"_sv).has_value());
-    ASSERT_TRUE(plugin->get_capability("add"_sv).has_value());
+    ASSERT_TRUE(plugin->get_capability(ok::StringView{CAP_SAY_HELLO}).has_value());
+    ASSERT_TRUE(plugin->get_capability(ok::StringView{CAP_ADD}).has_value());
 }
 
 TEST_F(PluginIntegrationFixture, missing_capability_returns_empty) {
@@ -123,7 +127,7 @@ TEST_F(PluginIntegrationFixture, missing_capability_returns_empty) {
     ASSERT_TRUE(result.ok()) << result.error().cstr();
 
     Plugin *plugin = result.unwrap();
-    plugin->install("test-plugin"_sv);
+    plugin->install(ok::StringView{PLUGIN_NAME});
 
     ASSERT_FALSE(plugin->get_capability("nonexistent"_sv).has_value());
 }
@@ -133,14 +137,14 @@ TEST_F(PluginIntegrationFixture, capabilities_are_callable) {
     ASSERT_TRUE(result.ok()) << result.error().cstr();
 
     Plugin *plugin = result.unwrap();
-    plugin->install("test-plugin"_sv);
+    plugin->install(ok::StringView{PLUGIN_NAME});
 
-    ok::Optional<PluginCapability> say_hello_cap = plugin->get_capability("say_hello"_sv);
+    ok::Optional<PluginCapability> say_hello_cap = plugin->get_capability(ok::StringView{CAP_SAY_HELLO});
     ASSERT_TRUE(say_hello_cap.has_value());
     const char *say_hello_res = plugin->use_capability<const char *>(say_hello_cap.get());
     ASSERT_STREQ(say_hello_res, SAY_HELLO_RESULT);
 
-    ok::Optional<PluginCapability> add_cap = plugin->get_capability("add"_sv);
+    ok::Optional<PluginCapability> add_cap = plugin->get_capability(ok::StringView{CAP_ADD});
     ASSERT_TRUE(add_cap.has_value());
     int add_res = plugin->use_capability<int>(add_cap.get(), 3, 4);
     ASSERT_EQ(add_res, 7);
@@ -151,10 +155,10 @@ TEST_F(PluginIntegrationFixture, install_is_idempotent) {
     ASSERT_TRUE(result.ok()) << result.error().cstr();
 
     Plugin *plugin = result.unwrap();
-    plugin->install("test-plugin"_sv);
-    plugin->install("test-plugin"_sv);
+    plugin->install(ok::StringView{PLUGIN_NAME});
+    plugin->install(ok::StringView{PLUGIN_NAME});
 
-    ASSERT_TRUE(plugin->get_capability("say_hello"_sv).has_value());
+    ASSERT_TRUE(plugin->get_capability(ok::StringView{CAP_SAY_HELLO}).has_value());
 }
 
 #endif // XMDB_BUILDING_TEST_PLUGIN
