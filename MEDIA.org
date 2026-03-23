@@ -1,0 +1,9 @@
+* Video
+** Single stream for a single row
+** Streams can be polled concurently
+** No special syntax (for now)
+** As simple as ~select vid from vid_table;~
+** Can get the full video by ~select full_func_name(vid) from vid_table;~
+** Raw frame data vs container
+*** By default: raw uncompressed frames
+*** Container: only by using ~full*~ in select
