@@ -60,7 +60,7 @@ def save_snapshot(path: str, snapshot: dict) -> None:
     with open(path, "w") as f:
         json.dump(snapshot, f)
 
-def record_snapshot(executable: str) -> None:
+def record_snapshot(executable: str) -> dict:
     proc = subprocess.run([executable], capture_output=True)
     snapshot = {
         "code": proc.returncode,
@@ -70,17 +70,20 @@ def record_snapshot(executable: str) -> None:
     return snapshot
 
 def print_diff(expected: str, actual: str) -> None:
-    print("Expected:")
-    print(expected)
+    env = os.environ.copy()
+    env["EXPECTED_SNAPSHOT"] = expected
+    env["ACTUAL_SNAPSHOT"] = actual
+    subprocess.run([
+        "bash",
+        "-lc",
+        "diff -u --label expected <(printf '%s' \"$EXPECTED_SNAPSHOT\") --label actual <(printf '%s' \"$ACTUAL_SNAPSHOT\")",
+    ], env=env, check=False)
 
-    print("Actual:")
-    print(actual)
-
-def report_snapshot_diff(expected: dict, actual: dict) -> (bool, bool):
+def report_snapshot_diff(expected: dict, actual: dict) -> tuple[bool, bool]:
     failed = False
 
     if expected["code"] != actual["code"]:
-        print(f"Expected exit code: {expected["code"]}\n\nActual exit code: {actual["code"]}\n")
+        print(f"Expected exit code: {expected['code']}\n\nActual exit code: {actual['code']}\n")
         failed = True
 
     if expected["stdout"] != actual["stdout"]:
@@ -89,7 +92,7 @@ def report_snapshot_diff(expected: dict, actual: dict) -> (bool, bool):
         failed = True
 
     if expected["stderr"] != actual["stderr"]:
-        printf("Actual stderr differs from expected")
+        print("Actual stderr differs from expected")
         print_diff(expected["stderr"], actual["stderr"])
         failed = True
 
