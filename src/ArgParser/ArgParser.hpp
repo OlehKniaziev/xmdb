@@ -30,6 +30,8 @@ public:
 
         if (allocator == nullptr) {
             m_allocator = new MallocAllocator{};
+        } else {
+            m_allocator = allocator;
         }
 
         m_flag_specs = ok::List<FlagSpec>::alloc(m_allocator);
