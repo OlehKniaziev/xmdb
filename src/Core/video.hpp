@@ -6,7 +6,7 @@
 #include <Plugin/Plugin.hpp>
 
 namespace xmdb {
-struct VideoContainer {
+struct MediaSource {
     ok::Slice<U8> data; // IDK honestly
 };
 
@@ -47,20 +47,16 @@ struct StartVideoStreamParams {
 class MediaSink {
 };
 
+enum class MediaType {
+    VIDEO,
+    AUDIO,
+};
+
 class MediaTransform;
 
-class MediaStream {
-public:
-    MediaStream* connect(MediaTransform* transform);
+class Pipeline;
 
-    void set_sink(MediaSink *consumer);
-
-private:
-
-};
-
-class MediaTransform : public MediaStream {
-};
+class MediaStream;
 
 class PipelineElement {
 public:
@@ -68,12 +64,65 @@ public:
 
     virtual ok::Slice<MediaStream *> outputs() = 0;
 
-    // NOTE(oleh): Should be in a subclass or something.
-    using OnNewStreamHook = void (*)(MediaStream *stream, void *custom_data);
+protected:
+    // explicit PipelineElement(Pipeline *pipeline) : m_pipeline{pipeline} {}
 
-    virtual void on_new_stream(OnNewStreamHook hook, void *data) = 0;
+    // Pipeline *m_pipeline;
+};
+
+class MediaStream : public PipelineElement {
+public:
+    MediaStream* connect(MediaTransform* transform);
+
+    void set_sink(MediaSink *consumer);
+
+    MediaType type() const;
+
+    ok::Slice<MediaSink *> inputs() override;
+    ok::Slice<MediaStream *> outputs() override;
 
 private:
+};
+
+class MediaTransform : public MediaStream {
+};
+
+class PullPipelineElement : public PipelineElement {
+public:
+    ok::Optional<VideoFrame> pull_sync();
+
+private:
+    MediaStream *m_stream;
+};
+
+class VideoConsumer : public PipelineElement {
+public:
+    using Hook = void (*)(VideoConsumer *consumer, VideoFrame *frame, void *data);
+
+    VideoConsumer(Hook hook, void *data) : m_hook{hook}, m_data{data} {}
+
+    ok::Slice<MediaStream *> outputs() override;
+    ok::Slice<MediaSink *> inputs() override;
+
+private:
+    Hook m_hook;
+    void *m_data;
+};
+
+class Demux : public PipelineElement {
+public:
+    explicit Demux(MediaSource *source) : m_source{source} {}
+
+    ok::Slice<MediaSink *> inputs() override;
+    ok::Slice<MediaStream *> outputs() override;
+
+    using OnNewStreamHook = void (*)(MediaStream *stream, void *custom_data);
+
+    virtual void on_new_stream(OnNewStreamHook hook, void *data);
+
+private:
+    MediaSource *m_source;
+    ok::Optional<OnNewStreamHook> m_on_new_stream_hook;
 };
 
 class Pipeline {
@@ -82,30 +131,32 @@ public:
 
     void add(PipelineElement *element);
 
+    Result<int /* TBD */, ok::String> connect(PipelineElement *source, PipelineElement *dest);
+
 private:
     VideoPlugin *m_plugin;
 };
 
+#define XMDB_ENUM_MEDIA_PLUGIN_CAPABILITIES \
+    X(stream_pull_sync) \
+    X(stream_pull_async) \
+    X(pipeline_create)
+
 class VideoPlugin {
 public:
-    Result<VideoPlugin, ok::String> from_raw(ok::Allocator *allocator,
-                                             plugin::Plugin *plug);
+    Result<VideoPlugin *, ok::String> from_raw(ok::Allocator *allocator,
+                                               plugin::Plugin *plug);
 
-    Result<Pipeline, ok::String> create_pipeline();
+    Result<Pipeline *, ok::String> create_pipeline();
 
 private:
     // TODO(oleh): Add more stuff like
     //             - load_video_container (?)
     //             - is_container_supported (?)
     struct VideoPluginCapabilities {
-        plugin::PluginCapability create_pipeline;
-        plugin::PluginCapability pull_sync;
-        plugin::PluginCapability pull_async;
-        plugin::PluginCapability set_source;
-        plugin::PluginCapability get_streams;
-        plugin::PluginCapability start_stream;
-        plugin::PluginCapability stop_stream;
-        plugin::PluginCapability get_transforms;
+#define X(cap) plugin::PluginCapability cap;
+        XMDB_ENUM_MEDIA_PLUGIN_CAPABILITIES
+#undef X
     };
 
     VideoPlugin(ok::Allocator *allocator,

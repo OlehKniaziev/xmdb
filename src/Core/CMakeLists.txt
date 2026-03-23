@@ -19,6 +19,7 @@ add_library(LibCore
   FixedString.cpp
   state.cpp
   image.cpp
+  video.cpp
   StaticStorage.cpp
   catalog.cpp
 )

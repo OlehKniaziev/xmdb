@@ -1,76 +1,50 @@
 #include "video.hpp"
 
+#include <Core/new.hpp>
+
 namespace xmdb {
 using namespace ok::literals;
 using namespace xmdb::plugin;
 
-constexpr ok::StringView START_STREAM_CAP_NAME = "start_stream"_sv;
-constexpr ok::StringView STOP_STREAM_CAP_NAME = "stop_stream"_sv;
-constexpr ok::StringView PULL_FROM_SYNC_STREAM_CAP_NAME = "pull_from_sync_stream"_sv;
-constexpr ok::StringView PULL_FROM_ASYNC_STREAM_CAP_NAME = "pull_from_async_stream"_sv;
-constexpr ok::StringView CREATE_PIPELINE_STREAM_CAP_NAME = "create_pipeline"_sv;
-
-Result<VideoPlugin, ok::String> VideoPlugin::from_raw(ok::Allocator *allocator,
-                                                      plugin::Plugin *plug) {
-    ok::Optional<PluginCapability> start_cap = plug->get_capability(START_STREAM_CAP_NAME);
-    if (!start_cap) {
-        return ok::String::format(allocator,
-                                  "The plugin is missing the '" OK_SV_FMT "' capability",
-                                  OK_SV_ARG(START_STREAM_CAP_NAME));
+Result<VideoPlugin*, ok::String> VideoPlugin::from_raw(ok::Allocator *allocator,
+                                                       plugin::Plugin *plug) {
+#define X(cap_name) \
+    auto cap_name##_cap = plug->get_capability(ok::StringView{#cap_name}); \
+    if (!cap_name##_cap) { \
+    return ok::String::alloc(allocator, \
+    "The plugin is missing the '" #cap_name "' capability"); \
     }
+XMDB_ENUM_MEDIA_PLUGIN_CAPABILITIES
+#undef X
 
-    ok::Optional<PluginCapability> stop_cap = plug->get_capability(STOP_STREAM_CAP_NAME);
-    if (!stop_cap) {
-        return ok::String::format(allocator,
-                                  "The plugin is missing the '" OK_SV_FMT "' capability",
-                                  OK_SV_ARG(STOP_STREAM_CAP_NAME));
-    }
-
-    ok::Optional<PluginCapability> pull_from_sync_cap = plug->get_capability(PULL_FROM_SYNC_STREAM_CAP_NAME);
-    if (!pull_from_sync_cap) {
-        return ok::String::format(allocator,
-                                  "The plugin is missing the '" OK_SV_FMT "' capability",
-                                  OK_SV_ARG(PULL_FROM_SYNC_STREAM_CAP_NAME));
-    }
-
-    ok::Optional<PluginCapability> pull_from_async_cap = plug->get_capability(PULL_FROM_ASYNC_STREAM_CAP_NAME);
-    if (!pull_from_async_cap) {
-        return ok::String::format(allocator,
-                                  "The plugin is missing the '" OK_SV_FMT "' capability",
-                                  OK_SV_ARG(PULL_FROM_ASYNC_STREAM_CAP_NAME));
-    }
-
-    ok::Optional<PluginCapability> create_pipeline_cap = plug->get_capability(PULL_FROM_ASYNC_STREAM_CAP_NAME);
-    if (!create_pipeline_cap) {
-        return ok::String::format(allocator,
-                                  "The plugin is missing the '" OK_SV_FMT "' capability",
-                                  OK_SV_ARG(CREATE_PIPELINE_CAP_NAME));
-    }
-    return VideoPlugin{
+    return new (allocator) VideoPlugin{
         allocator,
         plug,
         VideoPluginCapabilities{
-            .start_stream = start_cap.get(),
-            .stop_stream = stop_cap.get(),
-            .pull_sync = pull_from_sync_cap.get(),
-            .pull_async = pull_from_async_cap.get(),
-            .create_pipeline = create_pipeline_cap.get(),
+#define X(cap_name) .cap_name = cap_name##_cap.get(),
+            XMDB_ENUM_MEDIA_PLUGIN_CAPABILITIES
+#undef X
         },
     };
 }
 
-void run_stuff() {
-    Pipeline *pipeline;
-    DemuxSourceElement *source = SourceElement::demux(container);
+void run_stuff(VideoPlugin *plugin, MediaSource *media_source) {
+    Pipeline *pipeline = plugin->create_pipeline().unwrap();
+    Demux *source = new Demux{media_source};
 
     source->on_new_stream([](MediaStream *stream, void *data) {
-        if (stream->type() == Type::VIDEO) {
-            auto *video_consumer = VideoConsumer::create([](VideoConsumer *consumer, VideoFrame *frame) {
-                use(frame);
-            });
-            stream->connect(video_consumer);
-        }
-    }, nullptr);
-}
+        auto *pipeline = static_cast<Pipeline *>(data);
 
+        if (stream->type() == MediaType::VIDEO) {
+            auto *video_consumer = new VideoConsumer([](VideoConsumer *consumer, VideoFrame *frame, void *data) {
+                (void) consumer;
+                (void) frame;
+                (void) data;
+                // USE(data);
+            }, nullptr);
+
+            pipeline->connect(stream, video_consumer);
+        }
+    }, pipeline);
+}
 } // namespace xmdb
