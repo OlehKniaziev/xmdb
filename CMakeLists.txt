@@ -19,6 +19,7 @@ add_subdirectory(src/Server)
 add_subdirectory(src/CLI)
 # TODO(oleh): Build this only if in developer mode.
 add_subdirectory(src/IR)
+add_subdirectory(src/WASMParser)
 
 include(FetchContent)
 FetchContent_Declare(
