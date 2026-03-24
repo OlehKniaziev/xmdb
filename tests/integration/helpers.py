@@ -4,18 +4,11 @@ import socket
 import subprocess
 import tempfile
 import time
+import hashlib
 
 
 def sha256_hex(password):
-    """Compute the fake SHA-256 hex digest matching xmdb's sha256_digest().
-
-    The server's hash function is a memcpy of the raw password bytes (up to 32),
-    zero-padded to 32 bytes -- not a real SHA-256.
-    """
-    raw = password.encode("utf-8")[:32]
-    padded = raw.ljust(32, b"\x00")
-    return padded.hex()
-
+    return hashlib.sha256(password.encode("utf-8")).hexdigest()
 
 def find_free_port():
     """Bind to port 0, get the assigned port, then release the socket."""
