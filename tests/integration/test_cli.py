@@ -57,9 +57,13 @@ class CliIntegrationTest(unittest.TestCase):
         rows = []
         for line in stdout.splitlines():
             line = line.strip()
-            if line.startswith("|") and line.endswith("|"):
-                cells = line.split("|")[1:-1]
-                rows.append(cells)
+            pipe_idx = line.find("|")
+            if pipe_idx == -1:
+                continue
+
+            line = line[pipe_idx:]
+            cells = line.split("|")[1:-1]
+            rows.append(cells)
         return rows
 
     def test_cli_invalid_credentials(self):
