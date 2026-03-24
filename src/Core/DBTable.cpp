@@ -8,7 +8,7 @@
 using namespace ok::literals;
 
 namespace xmdb {
-ok::Optional<ColumnAttribute> get_attribute_for_column_type(SQL::ColumnType column_type) {
+ColumnAttribute get_attribute_for_column_type(SQL::ColumnType column_type) {
     if (column_type == SQL::ColumnType::PNG) {
         return ColumnAttribute{
             .flags = ColumnAttribute::F_IMAGE,

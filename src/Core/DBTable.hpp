@@ -26,11 +26,11 @@ struct ColumnAttribute {
 };
 
 /**
- * @brief Gets an attribute for a column type, if any.
+ * @brief Gets an attribute for a column type.
  * @param column_type The column type.
- * @return An Optional ColumnAttribute
+ * @return The column attribute.
  */
-ok::Optional<ColumnAttribute> get_attribute_for_column_type(SQL::ColumnType column_type);
+ColumnAttribute get_attribute_for_column_type(SQL::ColumnType column_type);
 
 /**
  * @brief Represents a database table, managing its metadata and data.
