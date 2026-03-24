@@ -1,0 +1,40 @@
+name: Build WASM Parser
+
+on:
+  push:
+    paths:
+      - 'src/WASMParser/**'
+      - 'src/SQL/**'
+      - 'src/Core/**'
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: write
+
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        submodules: recursive
+
+    - name: Install clang and lld
+      run: sudo apt-get install -y clang lld
+
+    - name: Configure
+      run: cmake -Bbuild
+
+    - name: Build WASM module
+      run: cmake --build build --target WASMParser
+
+    - name: Copy module to GUI
+      run: cp build/src/WASMParser/module.wasm gui/src/sql/module.wasm
+
+    - name: Commit and push
+      run: |
+        git config user.name "github-actions[bot]"
+        git config user.email "github-actions[bot]@users.noreply.github.com"
+        git add gui/src/sql/module.wasm
+        git diff --cached --quiet || git commit -m "Update module.wasm"
+        git push
