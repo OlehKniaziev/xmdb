@@ -19,6 +19,7 @@ enum Type {
     TYPE_TABLE,       ///< A database table.
     TYPE_FLOAT,       ///< Single-precision floating point.
     TYPE_DOUBLE,      ///< Double-precision floating point.
+    TYPE_MEDIA,       ///< Media container.
 };
 
 /**

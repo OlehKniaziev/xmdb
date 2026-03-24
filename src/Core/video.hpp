@@ -6,8 +6,50 @@
 #include <Plugin/Plugin.hpp>
 
 namespace xmdb {
-struct MediaSource {
-    ok::Slice<U8> data; // IDK honestly
+enum class MediaSourceFormat {
+    MP4,
+};
+
+struct BufferedStream {
+    BufferedStream() = default;
+
+    enum class Type {
+        NETWORK,
+        DISK,
+    };
+
+    // Num of bytes or an error string.
+    Result<UZ, ok::String> pull(ok::Allocator *allocator);
+
+    Type type;
+    ok::Slice<U8> buffer;
+
+    union {
+        ok::File file;
+        // NetworkStream? NetworkHandle? Raw socket? What is a network stream here?
+        // HTTP streaming? Abstract class?
+        void *network;
+    } u;
+};
+
+class MediaSource {
+public:
+    static MediaSource from_slice(ok::Slice<U8> slice);
+
+    bool is_in_memory();
+
+    ok::Slice<U8> get_buffer();
+
+    BufferedStream *get_stream();
+
+    MediaSourceFormat identify_format();
+
+private:
+    bool m_in_memory;
+    union {
+        ok::Slice<U8> buffer;
+        BufferedStream buffered_stream;
+    } m_u;
 };
 
 // What should this struct have?
@@ -16,24 +58,6 @@ struct VideoFrame {
 };
 
 class VideoPlugin;
-
-class VideoStream {
-public:
-    ok::Optional<VideoFrame> pull_sync();
-
-    void stop();
-
-    ~VideoStream() {
-        stop();
-    }
-
-private:
-    VideoPlugin *m_plugin;
-    void *m_plugin_stream;
-    U32 m_width;
-    U32 m_height;
-    U32 m_frame_rate;
-};
 
 struct StartVideoStreamParams {
     using Flags = U16;
@@ -72,7 +96,7 @@ protected:
 
 class MediaStream : public PipelineElement {
 public:
-    MediaStream* connect(MediaTransform* transform);
+    explicit MediaStream(MediaSource *source) : m_source{source} {}
 
     void set_sink(MediaSink *consumer);
 
@@ -82,12 +106,13 @@ public:
     ok::Slice<MediaStream *> outputs() override;
 
 private:
+    MediaSource *m_source;
 };
 
 class MediaTransform : public MediaStream {
 };
 
-class PullPipelineElement : public PipelineElement {
+class Pull : public PipelineElement {
 public:
     ok::Optional<VideoFrame> pull_sync();
 
@@ -170,4 +195,6 @@ private:
     plugin::Plugin *m_plugin;
     VideoPluginCapabilities m_caps;
 };
+
+Result<VideoPlugin *, ok::String> video_plugin_for(MediaSourceFormat format);
 } // namespace xmdb

@@ -23,7 +23,8 @@ namespace xmdb::SQL {
     X(DOUBLE) \
     X(TEXT) \
     X(BOOLEAN) \
-    X(PNG)
+    X(PNG) \
+    X(MEDIA)
 
 /**
  * @brief Supported types for table columns.
@@ -182,7 +183,8 @@ static inline const char *ir_instruction_operator_name(IRInstructionOperator op)
 #undef INSTR_3
 
 #define XMDB_ENUM_BUILTIN_FUNCTIONS \
-    X(RGB, ImageChunk, U32, U32, StringView)
+    X(RGB, ImageChunk, U32, U32, StringView) \
+    X(MEDIA, MediaSource, StringView)
 
 #define XMDB_BUILTIN_FUNCTION_SIG_NAME(name, ret, ...) Result<ret, ErrorWithSourceLocation>(*name)(SourceLocation, ok::Allocator *, __VA_ARGS__)
 #define XMDB_BUILTIN_FUNCTION_SIG(ret, ...) Result<ret, ErrorWithSourceLocation>(*)(SourceLocation, ok::Allocator *, __VA_ARGS__)

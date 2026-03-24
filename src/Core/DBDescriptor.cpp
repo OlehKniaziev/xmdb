@@ -168,11 +168,7 @@ Result<DBTable *, ok::String> DBDescriptor::load_existing_table(ok::Allocator *a
 
     for (UZ col_idx = 0; col_idx < columns_count; ++col_idx) {
         SQL::ColumnType column_type = column_types[col_idx];
-        ok::Optional<ColumnAttribute> attr_opt = get_attribute_for_column_type(column_type);
-
-        if (!attr_opt) continue;
-
-        ColumnAttribute attr = attr_opt.get();
+        ColumnAttribute attr = get_attribute_for_column_type(column_type);
 
         if (attr.flags & ColumnAttribute::F_IMAGE) {
             ok::StringView column_name = column_names[col_idx];

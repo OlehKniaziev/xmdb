@@ -4,6 +4,7 @@
 
 #include "ColumnLayout.hpp"
 #include "image.hpp"
+#include "video.hpp"
 
 namespace xmdb {
 /**
@@ -22,6 +23,7 @@ public:
         CONCAT,     ///< Result of a concatenation.
         IMAGE_DATA, ///< Raw image data.
         DELAYED,    ///< A value that will be provided later.
+        MEDIA,      ///< Media source.
     };
 
     DBValue() = delete;
@@ -356,5 +358,15 @@ public:
 
 private:
     ok::Optional<DBValue *> m_value;
+};
+
+class MediaSourceDBValue : public DBValue {
+public:
+    explicit MediaSourceDBValue(const MediaSource& source) : DBValue{SQL::TYPE_MEDIA, Kind::MEDIA}, m_source{source} {}
+
+    MediaSource source() const { return m_source; }
+
+private:
+    MediaSource m_source;
 };
 } // namespace xmdb

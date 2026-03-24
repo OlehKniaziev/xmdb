@@ -27,6 +27,7 @@ static inline ColumnType type_to_column_type(Type type) {
     case TYPE_BOOL:   return ColumnType::BOOLEAN;
     case TYPE_FLOAT:  return ColumnType::FLOAT;
     case TYPE_DOUBLE: return ColumnType::DOUBLE;
+    case TYPE_MEDIA:  return ColumnType::MEDIA;
 
     case TYPE_IMAGE_CHUNK:
     case TYPE_NULL:
@@ -318,6 +319,11 @@ DBValue *cpp_to_db_value<ImageChunk>(ok::Allocator *allocator, const ImageChunk&
     };
 }
 
+template <>
+DBValue *cpp_to_db_value<MediaSource>(ok::Allocator *allocator, const MediaSource &source) {
+    return new (allocator) MediaSourceDBValue{source};
+}
+
 template <typename... Args>
 consteval UZ args_count() {
     return sizeof...(Args);
@@ -508,6 +514,37 @@ static void fill_column(DBRecord *record,
         OK_VERIFY(sizeof(png) == column_layout.size);
 
         memcpy(&record->buffer[column_layout.offset], &png, sizeof(png));
+
+        break;
+    }
+    case Value::Type::MEDIA_SOURCE: {
+        auto *media_source = column_value.as_media_source();
+        OK_VERIFY(table->columns_types()[column_index] == SQL::ColumnType::MEDIA);
+
+        if (media_source->is_in_memory()) {
+            ok::Slice<U8> buffer = media_source->get_buffer();
+            (void) buffer;
+            OK_TODO_MSG("Insert full media from memory");
+        } else {
+            BufferedStream *stream = media_source->get_stream();
+
+            ok::Optional<ok::String> error{};
+
+            for (;;) {
+                Result<UZ, ok::String> pull_res = stream->pull(ok::temp_allocator());
+                if (!pull_res.ok()) {
+                    error = pull_res.error();
+                    break;
+                }
+
+                UZ bytes_count = pull_res.unwrap();
+
+                ok::Slice<U8> data = stream->buffer.slice(0, bytes_count);
+                (void) data;
+            }
+
+            OK_VERIFY(!error);
+        }
 
         break;
     }

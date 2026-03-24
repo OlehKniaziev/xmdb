@@ -38,6 +38,7 @@ static TypeLayout type_layout(SQL::ColumnType type) {
     case SQL::ColumnType::BOOLEAN: return {.size = 1, .alignment = 1};
     case SQL::ColumnType::TEXT:    return {.size = sizeof(FixedString), .alignment = 8};
     case SQL::ColumnType::PNG:     return {.size = sizeof(Png), .alignment = 8};
+    case SQL::ColumnType::MEDIA:   OK_TODO();
     }
 
     OK_UNREACHABLE();
@@ -343,6 +344,67 @@ DBTableStream DBTableStream::from_value(ok::Allocator *allocator, DBValue *value
             },
             state,
         };
+    }
+    case DBValue::Kind::MEDIA: {
+        auto *media_value = static_cast<MediaSourceDBValue *>(value);
+
+        MediaSource source = media_value->source();
+
+        Result<MediaSourceFormat, ok::String> source_format_res = source.identify_format();
+        if (!source_format_res.ok()) {
+            OK_PANIC_FMT("Failed to identify the source format: %s",
+                         source_format_res.error().cstr());
+        }
+
+        auto source_format = source_format_res.unwrap();
+
+        Result<VideoPlugin *, ok::String> video_plugin_res = video_plugin_for(source_format);
+        if (!video_plugin_res.ok()) {
+            OK_PANIC_FMT("Failed to get a plugin for media: %s",
+                         video_plugin_res.error().cstr());
+        }
+
+        auto *plugin = video_plugin_res.unwrap();
+
+        Result<Pipeline *, ok::String> pipeline_res = plugin->create_pipeline();
+        if (!pipeline_res.ok()) {
+            OK_PANIC_FMT("Failed to create a pipeline: %s",
+                         pipeline_res.error().cstr());
+        }
+
+        auto *pipeline = pipeline_res.unwrap();
+
+        auto *media_stream = new (allocator) MediaStream{source};
+
+        auto *pull = new (m_allocator) Pull{};
+
+        pipeline->add(media_stream, pull);
+
+        Result<int, ok::String> connect_res = pipeline->connect(media_stream, pull);
+        if (!connect_res.ok()) {
+            OK_PANIC_FMT("Failed to connect pipeline elements: %s",
+                         connect_res.error().cstr());
+        }
+
+        pipeline.start();
+
+        return DBTableStream{
+            allocator,
+            [](void *data) -> ok::Optional<Value> {
+                auto *pull = static_cast<Pull *>(data);
+                ok::Optional<VideoFrame> frame_opt = pull->pull_sync();
+                if (!frame_opt) {
+                    pipeline.stop();
+                    delete pipeline;
+                }
+
+                VideoFrame frame = frame_opt.get();
+                return Value::frame(frame);
+            },
+            pull,
+        };
+
+        break;
     }
     }
 

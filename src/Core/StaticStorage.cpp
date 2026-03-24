@@ -1,6 +1,8 @@
 #include "StaticStorage.hpp"
 #include "util.hpp"
 #include "Result.hpp"
+#include "video.hpp"
+
 #include <SQL/ir.hpp>
 
 namespace xmdb {
@@ -43,6 +45,15 @@ XMDB_DECLARE_BUILTIN_FUNCTION(RGB, ImageChunk, U32 width, U32 height, ok::String
         .data = data_opt.get(),
         .pixel_format = PixelFormat::RGB,
     };
+}
+
+XMDB_DECLARE_BUILTIN_FUNCTION(MEDIA, MediaSource, ok::StringView hex_bytes) {
+    ok::Optional<ok::Slice<U8>> data_opt = from_hex_string(allocator, hex_bytes);
+    if (!data_opt) {
+        FAIL(location, "failed to decode media source as a valid hex string");
+    }
+
+    return MediaSource::from_slice(data_opt.get());
 }
 
 StaticStorage *make_or_get_static_storage() {

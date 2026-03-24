@@ -5,6 +5,8 @@
 #include "ColumnLayout.hpp"
 #include "FixedString.hpp"
 #include "image.hpp"
+#include "video.hpp"
+#include "new.hpp"
 
 namespace xmdb {
 /**
@@ -21,6 +23,7 @@ public:
         STRING,      ///< Fixed string value.
         IMAGE_CHUNK, ///< Image chunk value.
         BIG_STRING,  ///< String of size exceeding the maximum size of a fixed string.
+        MEDIA_SOURCE, ///< Media stream.
     };
 
     Value() = delete;
@@ -94,6 +97,10 @@ public:
         ok::String *s = allocator->alloc<ok::String>();
         *s = s_value;
         return Value{Type::BIG_STRING, reinterpret_cast<void *>(s)};
+    }
+
+    static Value media_source(MediaSource *source) {
+        return Value{Type::MEDIA_SOURCE, reinterpret_cast<void *>(source)};
     }
 
     /**
@@ -171,6 +178,11 @@ public:
     ok::String *as_big_string() {
         OK_VERIFY(type() == Type::BIG_STRING);
         return reinterpret_cast<ok::String *>(m_data);
+    }
+
+    MediaSource *as_media_source() {
+        OK_VERIFY(type() == Type::MEDIA_SOURCE);
+        return reinterpret_cast<MediaSource *>(m_data);
     }
 
     /**
