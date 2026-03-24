@@ -58,12 +58,14 @@ int main(int argc, char **argv) {
 
     const char *hostname, *db, *username, *password;
     S64 port;
+    bool debug;
 
     parser.string("hostname", &hostname, "The hostname or IP address on which the server is running");
     parser.string("db", &db, "Database name to use");
     parser.string("user", &username, "User name to connect as");
     parser.string("password", &password, "User's password");
     parser.integer("port", &port, "The port on which to establish the connection", 6969);
+    parser.boolean("debug", &debug, "Enable debug logging");
 
     if (argc == 1) {
         parser.help();
@@ -79,7 +81,8 @@ int main(int argc, char **argv) {
 
     parser.dealloc();
 
-    xmdb::set_log_level(xmdb::LogLevel::DEBUG);
+    if (debug)
+        xmdb::set_log_level(xmdb::LogLevel::DEBUG);
 
     xmdb::SHA256Digest password_hash = xmdb::sha256_digest(ok::StringView{password});
 
