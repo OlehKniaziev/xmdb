@@ -5,11 +5,17 @@
 namespace xmdb::server {
 using ConnectionId = U64;
 
+using Timestamp = time_t;
+
+static inline Timestamp current_timestamp() {
+    return time(NULL);
+}
+
 struct ConnectionData {
     xmdb::DBConnection *connection;
     ok::ArenaAllocator temp_arena;
     xmdb::DBUser *user;
-    time_t last_use_time;
+    Timestamp last_use_time;
 };
 
 void init_connection_state();

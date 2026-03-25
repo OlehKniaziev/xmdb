@@ -37,13 +37,11 @@ ConnectionId gen_connection(xmdb::DBDescriptor *db, xmdb::DBUser *user) {
         connection = &conn_node->value;
     }
 
-    time_t use_time = time(NULL);
-
     ConnectionData connection_data = {
         .connection = connection,
         .temp_arena = {},
         .user = user,
-        .last_use_time = use_time,
+        .last_use_time = current_timestamp(),
     };
 
     ConnectionId connection_id = ++last_connection_id;
