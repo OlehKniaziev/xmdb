@@ -126,7 +126,7 @@ DECLARE_HANDLER(run_query_handler) {
 
     connection_id = (ConnectionId) connection_id_f64;
 
-    Optional<ConnectionData> connection_data_opt = get_connection_data(connection_id);
+    Optional<ConnectionData &> connection_data_opt = get_connection_data(connection_id);
     if (!connection_data_opt.has_value()) {
         FAIL(BAD_REQUEST, "connection with requested id was not found");
     }
@@ -330,7 +330,7 @@ DECLARE_HANDLER(get_db_objects_handler) {
         FAIL(BAD_REQUEST, "'connection_id' field not present in the request body");
     }
 
-    Optional<ConnectionData> connection_data_opt = get_connection_data(connection_id);
+    Optional<ConnectionData &> connection_data_opt = get_connection_data(connection_id);
     if (!connection_data_opt.has_value()) {
         FAIL(BAD_REQUEST, "connection with requested id was not found");
     }

@@ -9,6 +9,7 @@ struct ConnectionData {
     xmdb::DBConnection *connection;
     ok::ArenaAllocator temp_arena;
     xmdb::DBUser *user;
+    time_t last_use_time;
 };
 
 void init_connection_state();
@@ -16,5 +17,5 @@ void init_connection_state();
 xmdb::DBPool *get_shared_db_pool();
 
 ConnectionId gen_connection(xmdb::DBDescriptor *db, xmdb::DBUser *user);
-Optional<ConnectionData> get_connection_data(ConnectionId);
+Optional<ConnectionData &> get_connection_data(ConnectionId);
 } // namespace xmdb::server

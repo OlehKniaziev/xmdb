@@ -1161,9 +1161,18 @@ struct Table {
 
     void put(const TKey& key, const TValue& value);
 
-    Optional<TValue> get(const TKey& key);
+    Optional<TValue> get(const TKey& key) const;
+
     template <typename K>
-    Optional<TValue> get(const K& key);
+    Optional<TValue> get(const K& key) const;
+
+    Optional<TValue&> get_ref(const TKey& key);
+    Optional<const TValue&> get_ref(const TKey& key) const;
+
+    template <typename K>
+    Optional<TValue&> get_ref(const K& key);
+    template <typename K>
+    Optional<const TValue&> get_ref(const K& key) const;
 
     bool has(const TKey& key) const;
     template <typename K>
@@ -1200,7 +1209,7 @@ struct Table {
         allocator->dealloc(keys, capacity);
         allocator->dealloc(values, capacity);
 
-        memset(this, 0, sizeof(this));
+        memset(this, 0, sizeof(*this));
     }
 
     TKey* keys;
@@ -1478,7 +1487,7 @@ void Table<K, V>::put(const K& key, const V& value) {
 }
 
 template <typename K, typename V>
-Optional<V> Table<K, V>::get(const K& key) {
+Optional<V> Table<K, V>::get(const K& key) const {
     U64 idx = Hash<K>::hash(key) % capacity;
     U64 initial_idx = idx;
 
@@ -1495,7 +1504,7 @@ Optional<V> Table<K, V>::get(const K& key) {
 
 template <typename TKey, typename TValue>
 template <typename K>
-Optional<TValue> Table<TKey, TValue>::get(const K& key) {
+Optional<TValue> Table<TKey, TValue>::get(const K& key) const {
     U64 idx = Hash<K>::hash(key) % capacity;
     U64 initial_idx = idx;
 
@@ -1508,6 +1517,72 @@ Optional<TValue> Table<TKey, TValue>::get(const K& key) {
     } while (idx != initial_idx);
 
     return Optional<TValue>::empty();
+}
+
+template <typename K, typename V>
+Optional<V&> Table<K, V>::get_ref(const K& key) {
+    U64 idx = Hash<K>::hash(key) % capacity;
+    U64 initial_idx = idx;
+
+    do {
+        if (OK_TAB_IS_OCCUPIED(meta[idx]) && keys[idx] == key) {
+            return values[idx];
+        }
+
+        idx = (idx + 1) % capacity;
+    } while (idx != initial_idx);
+
+    return Optional<V&>::empty();
+}
+
+template <typename K, typename V>
+Optional<const V&> Table<K, V>::get_ref(const K& key) const {
+    U64 idx = Hash<K>::hash(key) % capacity;
+    U64 initial_idx = idx;
+
+    do {
+        if (OK_TAB_IS_OCCUPIED(meta[idx]) && keys[idx] == key) {
+            return values[idx];
+        }
+
+        idx = (idx + 1) % capacity;
+    } while (idx != initial_idx);
+
+    return Optional<const V&>::empty();
+}
+
+template <typename TKey, typename TValue>
+template <typename K>
+Optional<TValue&> Table<TKey, TValue>::get_ref(const K& key) {
+    U64 idx = Hash<K>::hash(key) % capacity;
+    U64 initial_idx = idx;
+
+    do {
+        if (OK_TAB_IS_OCCUPIED(meta[idx]) && keys[idx] == key) {
+            return values[idx];
+        }
+
+        idx = (idx + 1) % capacity;
+    } while (idx != initial_idx);
+
+    return Optional<TValue&>::empty();
+}
+
+template <typename TKey, typename TValue>
+template <typename K>
+Optional<const TValue&> Table<TKey, TValue>::get_ref(const K& key) const {
+    U64 idx = Hash<K>::hash(key) % capacity;
+    U64 initial_idx = idx;
+
+    do {
+        if (OK_TAB_IS_OCCUPIED(meta[idx]) && keys[idx] == key) {
+            return values[idx];
+        }
+
+        idx = (idx + 1) % capacity;
+    } while (idx != initial_idx);
+
+    return Optional<const TValue&>::empty();
 }
 
 template <typename K, typename V>

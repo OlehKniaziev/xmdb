@@ -9,8 +9,8 @@ static ok::Table<ConnectionId, ConnectionData> db_connections_table = ok::Table<
 using ConnectionList = ok::LinkedList<xmdb::DBConnection>;
 static ConnectionList connection_free_list = ConnectionList::alloc(&shared_arena);
 
-Optional<ConnectionData> get_connection_data(ConnectionId id) {
-    return db_connections_table.get(id);
+Optional<ConnectionData &> get_connection_data(ConnectionId id) {
+    return db_connections_table.get_ref(id);
 }
 
 static xmdb::DBPool *shared_db_pool;
@@ -37,10 +37,13 @@ ConnectionId gen_connection(xmdb::DBDescriptor *db, xmdb::DBUser *user) {
         connection = &conn_node->value;
     }
 
+    time_t use_time = time(NULL);
+
     ConnectionData connection_data = {
         .connection = connection,
         .temp_arena = {},
         .user = user,
+        .last_use_time = use_time,
     };
 
     ConnectionId connection_id = ++last_connection_id;
