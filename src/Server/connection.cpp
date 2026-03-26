@@ -9,7 +9,11 @@ static ok::Table<ConnectionId, ConnectionData *> db_connections_table = ok::Tabl
 static ConnectionData *connection_free_list;
 
 Optional<ConnectionData *> get_connection_data(ConnectionId id) {
-    return db_connections_table.get(id);
+    auto conn_opt = db_connections_table.get(id);
+    if (conn_opt) {
+        conn_opt.get()->last_use_time = current_timestamp();
+    }
+    return conn_opt;
 }
 
 static xmdb::DBPool *shared_db_pool;
@@ -17,7 +21,6 @@ static xmdb::DBPool *shared_db_pool;
 void init_connection_state() {
     shared_db_pool = new (&shared_alloc) DBPool{&shared_alloc};
 }
-
 
 xmdb::DBPool *get_shared_db_pool() {
     return shared_db_pool;
