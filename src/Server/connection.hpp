@@ -12,6 +12,7 @@ static inline Timestamp current_timestamp() {
 }
 
 struct ConnectionData {
+    ConnectionData *next;
     xmdb::DBConnection *connection;
     ok::ArenaAllocator temp_arena;
     xmdb::DBUser *user;
@@ -23,5 +24,6 @@ void init_connection_state();
 xmdb::DBPool *get_shared_db_pool();
 
 ConnectionId gen_connection(xmdb::DBDescriptor *db, xmdb::DBUser *user);
-Optional<ConnectionData &> get_connection_data(ConnectionId);
+void free_connection(ConnectionId);
+Optional<ConnectionData *> get_connection_data(ConnectionId);
 } // namespace xmdb::server

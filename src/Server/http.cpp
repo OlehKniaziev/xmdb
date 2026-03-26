@@ -126,13 +126,13 @@ DECLARE_HANDLER(run_query_handler) {
 
     connection_id = (ConnectionId) connection_id_f64;
 
-    Optional<ConnectionData &> connection_data_opt = get_connection_data(connection_id);
+    Optional<ConnectionData *> connection_data_opt = get_connection_data(connection_id);
     if (!connection_data_opt.has_value()) {
         FAIL(BAD_REQUEST, "connection with requested id was not found");
     }
 
-    ConnectionData connection_data = connection_data_opt.value;
-    connection_data.temp_arena.reset();
+    ConnectionData *connection_data = connection_data_opt.value;
+    connection_data->temp_arena.reset();
 
     ok::StringView source_sv = {(const char *) query.Items, query.Count};
     xmdb::QueryResults query_results{};
@@ -140,18 +140,18 @@ DECLARE_HANDLER(run_query_handler) {
 
     DBPool *shared_db_pool = get_shared_db_pool();
 
-    populate_ir_context_from_pool(&connection_data.connection->ir_ctx, shared_db_pool);
+    populate_ir_context_from_pool(&connection_data->connection->ir_ctx, shared_db_pool);
 
     // NOTE(oleh): We need to set this manually, since the IrContext is reset by the
     // populate_ir_context_from_pool call above.
-    for (UZ db_idx = 0; db_idx < connection_data.connection->ir_ctx.database_schemas.count; ++db_idx) {
-        if (connection_data.connection->ir_ctx.database_schemas[db_idx].name == connection_data.connection->db->name) {
-            connection_data.connection->ir_ctx.active_db_id = db_idx;
+    for (UZ db_idx = 0; db_idx < connection_data->connection->ir_ctx.database_schemas.count; ++db_idx) {
+        if (connection_data->connection->ir_ctx.database_schemas[db_idx].name == connection_data->connection->db->name) {
+            connection_data->connection->ir_ctx.active_db_id = db_idx;
             break;
         }
     }
 
-    bool ok = xmdb::compile_and_execute_source(&connection_data.temp_arena, connection_data.connection, source_sv,
+    bool ok = xmdb::compile_and_execute_source(&connection_data->temp_arena, connection_data->connection, source_sv,
                                                &query_results, &error);
 
     WebJsonBegin(&ctx->Arena);
@@ -204,10 +204,10 @@ DECLARE_HANDLER(run_query_handler) {
             WebJsonBeginArray();
 
             xmdb::DBTableOutlet table_outlet{results_table};
-            xmdb::DBTableStream *column_streams_ptr = connection_data.temp_arena.alloc<xmdb::DBTableStream>(results_table->columns_count());
+            xmdb::DBTableStream *column_streams_ptr = connection_data->temp_arena.alloc<xmdb::DBTableStream>(results_table->columns_count());
             ok::Slice<xmdb::DBTableStream> column_streams = {column_streams_ptr, results_table->columns_count()};
             for (UZ i = 0; i < results_table->columns_count(); ++i) {
-                column_streams[i] = table_outlet.column_stream(&connection_data.temp_arena, i);
+                column_streams[i] = table_outlet.column_stream(&connection_data->temp_arena, i);
             }
 
             for (UZ r = 0; r < results_table->rows_count(); ++r) {
@@ -272,7 +272,7 @@ DECLARE_HANDLER(run_query_handler) {
                         WebJsonPutKey(WEB_SV_LIT("height"));
                         WebJsonPutNumber(chunk->height);
 
-                        ok::String data_hex = xmdb::to_hex_string(&connection_data.temp_arena, chunk->data);
+                        ok::String data_hex = xmdb::to_hex_string(&connection_data->temp_arena, chunk->data);
 
                         WebJsonPutKey(WEB_SV_LIT("data"));
                         WebJsonPutString((web_string_view){.Items = (u8 *) data_hex.cstr(), .Count = data_hex.count()});
@@ -330,16 +330,16 @@ DECLARE_HANDLER(get_db_objects_handler) {
         FAIL(BAD_REQUEST, "'connection_id' field not present in the request body");
     }
 
-    Optional<ConnectionData &> connection_data_opt = get_connection_data(connection_id);
+    Optional<ConnectionData *> connection_data_opt = get_connection_data(connection_id);
     if (!connection_data_opt.has_value()) {
         FAIL(BAD_REQUEST, "connection with requested id was not found");
     }
 
-    ConnectionData connection_data = connection_data_opt.get();
-    connection_data.temp_arena.reset();
+    ConnectionData *connection_data = connection_data_opt.get();
+    connection_data->temp_arena.reset();
 
-    DBDescriptor *db = connection_data.connection->db;
-    ok::Slice<TableObject> table_objects = get_db_table_objects(&connection_data.temp_arena, db);
+    DBDescriptor *db = connection_data->connection->db;
+    ok::Slice<TableObject> table_objects = get_db_table_objects(&connection_data->temp_arena, db);
 
     WebJsonBegin(&ctx->Arena);
     WebJsonBeginObject();
