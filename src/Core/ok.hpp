@@ -71,33 +71,39 @@
 #define OK_ASSERT(x) do { \
     if (!(x)) { \
         OK_LOG_ERROR("%s:%d: Assertion failed: %s\n", __FILE__, __LINE__, #x); \
+        /* @Portability */ \
         __builtin_trap(); \
     } \
 } while(0)
 #endif // OK_ASSERT
 #else
 #define OK_ASSERT(x)
-#endif // OK_DEBUG
+#endif // OK_STRIP_ASSERTIONS
 
+// NOTE(oleh): All of thsse are pretty much duplicates.
 #define OK_VERIFY(x) do { \
     if (!(x)) { \
         OK_LOG_ERROR("%s:%d: Verification failed: %s\n", __FILE__, __LINE__, #x); \
+        /* @Portability */ \
         __builtin_trap(); \
     } \
 } while(0)
 
 #define OK_TODO() do { \
     OK_LOG_ERROR("%s:%d: TODO: Not implemented\n", __FILE__, __LINE__); \
+        /* @Portability */ \
     __builtin_trap(); \
 } while (0)
 
 #define OK_TODO_MSG(msg) do { \
     OK_LOG_ERROR("%s:%d: TODO: " msg "\n", __FILE__, __LINE__); \
+        /* @Portability */ \
     __builtin_trap(); \
 } while (0)
 
 #define OK_TODO_MSG_FMT(fmt, ...) do { \
     OK_LOG_ERROR("%s:%d: TODO: " fmt "\n", __FILE__, __LINE__, __VA_ARGS__); \
+        /* @Portability */ \
     __builtin_trap(); \
 } while (0)
 
@@ -105,16 +111,19 @@
 
 #define OK_UNREACHABLE() do { \
     OK_LOG_ERROR("%s:%d: Encountered unreachable code\n", __FILE__, __LINE__); \
+        /* @Portability */ \
     __builtin_trap(); \
 } while (0)
 
 #define OK_PANIC(msg) do { \
     OK_LOG_ERROR("%s:%d: PROGRAM PANICKED: %s\n", __FILE__, __LINE__, (msg)); \
+        /* @Portability */ \
     __builtin_trap(); \
 } while (0)
 
 #define OK_PANIC_FMT(fmt, ...) do { \
     OK_LOG_ERROR("%s:%d: PROGRAM PANICKED: " fmt "\n", __FILE__, __LINE__, __VA_ARGS__); \
+        /* @Portability */ \
     __builtin_trap(); \
 } while (0)
 
@@ -122,6 +131,7 @@
 
 #if defined(__unix__) || defined(__unix) || defined(__APPLE__)
 
+// NOTE(oleh): No need for values here.
 #define OK_UNIX 1
 #define OK_WINDOWS 0
 
@@ -130,10 +140,12 @@
 #include <unistd.h>
 #include <spawn.h>
 
+// @Customization
 #define OK_ALLOC_PAGE(sz) (mmap(NULL, (sz), PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANON, -1, 0))
 #define OK_DEALLOC_PAGE(page, size) (munmap((page), (size)))
 #define OK_ALLOC_SMOL(sz) (sbrk((sz)))
 
+// @Customization
 #define OK_PAGE_SIZE 4096
 #define OK_PAGE_ALIGN OK_PAGE_SIZE
 
@@ -151,15 +163,18 @@
 #undef max
 #undef min
 
+// @Customization
 #define OK_PAGE_SIZE 4096
 #define OK_PAGE_ALIGN (64 * 1024)
 
+// @Customization
 #define OK_ALLOC_PAGE(sz) (VirtualAlloc(nullptr, (sz), MEM_COMMIT | MEM_RESERVE, PAGE_READWRITE))
 #define OK_DEALLOC_PAGE(page, size) (VirtualFree((page), 0, MEM_RELEASE))
 #define OK_ALLOC_SMOL(sz) (HeapAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY, (sz)))
 
 #elif defined(__wasm__)
 
+// NOTE(oleh): Once again, these should be empty defs.
 #define OK_UNIX 0
 #define OK_WINDOWS 0
 #define OK_WASM 1
@@ -175,7 +190,7 @@
 #elif SIZE_MAX == UINT64_MAX
 #  define OK_BITS_64
 #else
-#  error "Could not determine architecture bit size"
+#  error "Could not determine word size"
 #endif // word size check
 
 using U8 = uint8_t;
@@ -222,6 +237,7 @@ namespace ok {
 #       define OK_PAGE_ALIGN OK_PAGE_SIZE
 #   endif // OK_PAGE_ALIGN
 
+// NOTE(oleh): This should be optional.
 #   ifndef OK_VSNPRINTF
 #       error "you have to define `OK_VSNPRINTF` when compiling with `OK_NO_STDLIB`"
 #   endif // OK_VSNPRINTF
@@ -310,6 +326,7 @@ struct Allocator {
     Slice<T> alloc_slice(UZ);
 };
 
+// NOTE(oleh): This should be removed in favor of temp allocator handles.
 Allocator *temp_allocator();
 
 struct FixedBufferAllocator : public Allocator {
@@ -378,6 +395,7 @@ struct ArenaAllocator : public Allocator {
     }
 
     inline void free() {
+        // @Leak
         for (Region* r = head; r != nullptr; r = r->next) OK_DEALLOC_PAGE(head->data, head->size);
     }
 
@@ -576,6 +594,7 @@ Slice<T> Allocator::alloc_slice(UZ count) {
     return Slice<T>{ptr, count};
 }
 
+// NOTE(oleh): Just remove this. It's a mess.
 template <typename T>
 struct MultiListBase {
     T *items;
@@ -750,6 +769,7 @@ struct String;
 #define OK_SV_FMT "%.*s"
 #define OK_SV_ARG(sv) (int)(sv).count, reinterpret_cast<const char*>((sv).data)
 
+// NOTE(oleh): This needs more methods.
 template <typename Self, typename Char>
 struct StringBase : public ArrayBase<Self, Char> {
     inline bool starts_with(const char* prefix) const {
@@ -1062,6 +1082,7 @@ struct Pair {
     B b;
 };
 
+// NOTE(oleh): We need more hash implementations, or at least a better default.
 namespace hash {
 U64 fnv1(StringView);
 };
@@ -1069,6 +1090,7 @@ U64 fnv1(StringView);
 template <typename T>
 struct Hash {
     static U64 hash(const T& value) {
+        // NOTE(oleh): Just make this a function, not a method.
         return value.ok_hash_value();
     }
 };
@@ -1076,6 +1098,7 @@ struct Hash {
 template <typename T>
 struct HashPtr {
     HashPtr(const T* v) : value{v} {}
+    // @Dead
     HashPtr(T* v) : value{v} {}
 
     inline bool operator ==(const T* ptr) const {
@@ -1085,7 +1108,10 @@ struct HashPtr {
     const T* value;
 };
 
+// NOTE(oleh): Remove these all in favor of `ok_hash_value`.
+
 // Default hash implementations
+// NOTE(oleh): Is this even needed?
 template <typename T>
 struct Hash<HashPtr<T>> {
     static U64 hash(const HashPtr<T>& ptr) {
@@ -1790,6 +1816,7 @@ struct File {
 };
 
 // Procedures.
+// NOTE(oleh): These should accept format strings like `std::print`.
 void println(const char*);
 void println(StringView);
 void println(String);
