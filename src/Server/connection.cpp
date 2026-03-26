@@ -41,9 +41,9 @@ ConnectionId gen_connection(xmdb::DBDescriptor *db, xmdb::DBUser *user) {
     Timestamp now = current_timestamp();
 
     OK_TABLE_FOREACH(db_connections_table, conn_id, conn_data, {
-        (void) conn_id;
         if (now - conn_data->last_use_time >= TIMEOUT_DURATION) {
             free_connection_data(conn_data);
+            db_connections_table.remove(conn_id);
         }
     });
 

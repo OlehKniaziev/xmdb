@@ -1187,6 +1187,8 @@ struct Table {
 
     void put(const TKey& key, const TValue& value);
 
+    // NOTE(oleh): Not sure if we need the `get_ref` methods.
+    // Also not sure if we shouldn't just keep the template overloads?
     Optional<TValue> get(const TKey& key) const;
 
     template <typename K>
@@ -1203,6 +1205,8 @@ struct Table {
     bool has(const TKey& key) const;
     template <typename K>
     bool has(const K& key) const;
+
+    bool remove(const TKey&);
 
     static constexpr UZ DEFAULT_CAPACITY = 47;
 
@@ -1627,7 +1631,6 @@ bool Table<K, V>::has(const K& key) const {
     return false;
 }
 
-
 template <typename TKey, typename TValue>
 template <typename K>
 bool Table<TKey, TValue>::has(const K& key) const {
@@ -1643,6 +1646,16 @@ bool Table<TKey, TValue>::has(const K& key) const {
     } while (idx != initial_idx);
 
     return false;
+}
+
+// NOTE(oleh): Should we call destructors here?
+template <typename TKey, typename TValue>
+bool Table<TKey, TValue>::remove(const TKey& key) {
+    U64 idx = Hash<TKey>::hash(key) % capacity;
+    bool result = OK_TAB_IS_OCCUPIED(meta[idx]);
+    if (result) --count;
+    meta[idx] &= ~OK_TAB_META_OCCUPIED;
+    return result;
 }
 
 // SET IMPLEMENTATION
