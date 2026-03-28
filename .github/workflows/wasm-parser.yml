@@ -29,9 +29,11 @@ jobs:
       run: cmake --build build --target WASMParser
 
     - name: Copy module to GUI
+      if: github.ref == 'refs/heads/production'
       run: cp build/src/WASMParser/module.wasm gui/src/sql/module.wasm
 
     - name: Commit and push
+      if: github.ref == 'refs/heads/production'
       run: |
         git config user.name "github-actions[bot]"
         git config user.email "github-actions[bot]@users.noreply.github.com"
