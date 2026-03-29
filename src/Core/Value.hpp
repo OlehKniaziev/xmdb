@@ -5,8 +5,8 @@
 #include "ColumnLayout.hpp"
 #include "FixedString.hpp"
 #include "image.hpp"
-#include "video.hpp"
 #include "new.hpp"
+#include "video.hpp"
 
 namespace xmdb {
 /**
@@ -18,11 +18,12 @@ public:
      * @brief The type of the value.
      */
     enum class Type {
-        INT,         ///< Integer value.
-        BOOL,        ///< Boolean value.
-        STRING,      ///< Fixed string value.
+        INT, ///< Integer value.
+        BOOL, ///< Boolean value.
+        STRING, ///< Fixed string value.
         IMAGE_CHUNK, ///< Image chunk value.
-        BIG_STRING,  ///< String of size exceeding the maximum size of a fixed string.
+        BIG_STRING, ///< String of size exceeding the maximum size of a fixed
+                    ///< string.
         MEDIA_SOURCE, ///< Media stream.
     };
 
@@ -34,7 +35,8 @@ public:
      * @return The resulting Value.
      */
     static Value integer(S64 value) {
-        return Value{Type::INT, reinterpret_cast<void *>(static_cast<U64>(value))};
+        return Value{Type::INT,
+                     reinterpret_cast<void *>(static_cast<U64>(value))};
     }
 
     /**
@@ -43,7 +45,8 @@ public:
      * @return The resulting Value.
      */
     static Value boolean(bool value) {
-        return Value{Type::BOOL, reinterpret_cast<void *>(static_cast<U64>(value))};
+        return Value{Type::BOOL,
+                     reinterpret_cast<void *>(static_cast<U64>(value))};
     }
 
     /**
@@ -69,12 +72,8 @@ public:
      * @param format Pixel format.
      * @return The resulting Value.
      */
-    static Value image_chunk(ok::Allocator *a,
-                             U64 x,
-                             U64 y,
-                             U64 width,
-                             U64 height,
-                             ok::Slice<U8> data,
+    static Value image_chunk(ok::Allocator *a, U64 x, U64 y, U64 width,
+                             U64 height, ok::Slice<U8> data,
                              PixelFormat format) {
         ImageChunk *chunk = a->alloc<ImageChunk>();
         chunk->x = x;
@@ -201,7 +200,8 @@ public:
     Value compare(Value other);
 
 private:
-    Value(Type type, void *data) : m_type{type}, m_data{data} {}
+    Value(Type type, void *data) : m_type{type}, m_data{data} {
+    }
 
     Type m_type;
     void *m_data;

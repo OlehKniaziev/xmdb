@@ -22,6 +22,7 @@ add_library(LibCore
   video.cpp
   StaticStorage.cpp
   catalog.cpp
+  BufferedStream.cpp
 )
 
 set_property(TARGET LibCore PROPERTY POSITION_INDEPENDENT_CODE 1)

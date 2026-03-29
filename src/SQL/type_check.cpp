@@ -1,5 +1,7 @@
 #include "type_check.hpp"
+
 #include <SQL/ir.hpp>
+#include <Core/video.hpp>
 
 namespace xmdb::SQL {
 static inline bool type_is_comparable(Type type) {
@@ -44,6 +46,7 @@ Type column_type_to_type(ColumnType column_type) {
     case ColumnType::TEXT:    return TYPE_STRING;
     case ColumnType::PNG:     return TYPE_PNG;
     case ColumnType::BOOLEAN: return TYPE_BOOL;
+    case ColumnType::MEDIA:   return TYPE_MEDIA;
     }
 
     OK_UNREACHABLE();
@@ -64,6 +67,7 @@ const char *type_name(Type type) {
     case TYPE_DOUBLE:      return "double";
     case TYPE_PNG:         return "PNG";
     case TYPE_IMAGE_CHUNK: return "image";
+    case TYPE_MEDIA:       return "media";
     }
 
     OK_UNREACHABLE();
@@ -352,6 +356,11 @@ Type cpp_to_tt<U32>() {
 template <>
 Type cpp_to_tt<ImageChunk>() {
     return TYPE_IMAGE_CHUNK;
+}
+
+template <>
+Type cpp_to_tt<MediaSource>() {
+    return TYPE_MEDIA;
 }
 
 template <typename... Args>

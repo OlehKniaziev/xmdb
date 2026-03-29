@@ -1,25 +1,37 @@
 #pragma once
 
+#include "ok.hpp"
+
 namespace xmdb {
+#define CHECK(res)                                                             \
+    ({                                                                         \
+        auto _x = (res);                                                       \
+        if (_x.ok()) return _x.error();                                        \
+        _x.unwrap();                                                           \
+    })
+
 /**
- * @brief A template class representing either a success value or an error value.
+ * @brief A template class representing either a success value or an error
+ * value.
  * @tparam TOk The type of the success value.
  * @tparam TError The type of the error value.
  */
-template <typename TOk, typename TError>
-class Result {
+template<typename TOk, typename TError>
+class [[nodiscard]] Result {
 public:
     /**
      * @brief Constructs a success Result.
      * @param ok The success value.
      */
-    Result(const TOk &ok) : m_ok{true}, m_u{.ok_val = ok} {}
+    Result(const TOk &ok) : m_ok{true}, m_u{.ok_val = ok} {
+    }
 
     /**
      * @brief Constructs an error Result.
      * @param error The error value.
      */
-    Result(const TError &error) : m_ok{false}, m_u{.error_val = error} {}
+    Result(const TError &error) : m_ok{false}, m_u{.error_val = error} {
+    }
 
     /**
      * @brief Unwraps the success value. Panics if the Result is an error.
@@ -28,7 +40,8 @@ public:
     TOk &unwrap();
 
     /**
-     * @brief Unwraps the success value (const version). Panics if the Result is an error.
+     * @brief Unwraps the success value (const version). Panics if the Result is
+     * an error.
      * @return Const reference to the success value.
      */
     const TOk &unwrap() const;
@@ -40,7 +53,8 @@ public:
     TOk &unwrap_unchecked();
 
     /**
-     * @brief Unwraps the success value without checking if it's an error (const version).
+     * @brief Unwraps the success value without checking if it's an error (const
+     * version).
      * @return Const reference to the success value.
      */
     const TOk &unwrap_unchecked() const;
@@ -52,7 +66,8 @@ public:
     TError &error();
 
     /**
-     * @brief Retrieves the error value (const version). Panics if the Result is success.
+     * @brief Retrieves the error value (const version). Panics if the Result is
+     * success.
      * @return Const reference to the error value.
      */
     const TError &error() const;
@@ -64,13 +79,15 @@ public:
     TError &error_unchecked();
 
     /**
-     * @brief Retrieves the error value without checking if it's a success (const version).
+     * @brief Retrieves the error value without checking if it's a success
+     * (const version).
      * @return Const reference to the error value.
      */
     const TError &error_unchecked() const;
 
     /**
-     * @brief Matches the result using provided functions for success and error cases.
+     * @brief Matches the result using provided functions for success and error
+     * cases.
      * @tparam TResult The return type of the matching functions.
      * @tparam TOkFn Type of the success function.
      * @tparam TErrorFn Type of the error function.
@@ -78,13 +95,13 @@ public:
      * @param error_fn Function to call on error.
      * @return The result of the called function.
      */
-    template <typename TResult, typename TOkFn, typename TErrorFn>
+    template<typename TResult, typename TOkFn, typename TErrorFn>
     TResult match(TOkFn ok_fn, TErrorFn error_fn);
 
     /**
      * @brief Matches the result using provided functions (const version).
      */
-    template <typename TResult, typename TOkFn, typename TErrorFn>
+    template<typename TResult, typename TOkFn, typename TErrorFn>
     TResult match(TOkFn ok_fn, TErrorFn error_fn) const;
 
     /**
@@ -103,7 +120,7 @@ private:
     } m_u;
 };
 
-template <typename TOk, typename TError>
+template<typename TOk, typename TError>
 TOk &Result<TOk, TError>::unwrap() {
     if (!ok()) {
         OK_PANIC("Called 'unwrap' on an error value");
@@ -112,7 +129,7 @@ TOk &Result<TOk, TError>::unwrap() {
     return m_u.ok_val;
 }
 
-template <typename TOk, typename TError>
+template<typename TOk, typename TError>
 const TOk &Result<TOk, TError>::unwrap() const {
     if (!ok()) {
         OK_PANIC("Called 'unwrap' on an error value");
@@ -121,19 +138,19 @@ const TOk &Result<TOk, TError>::unwrap() const {
     return m_u.ok_val;
 }
 
-template <typename TOk, typename TError>
+template<typename TOk, typename TError>
 TOk &Result<TOk, TError>::unwrap_unchecked() {
     OK_ASSERT(ok());
     return m_u.ok_val;
 }
 
-template <typename TOk, typename TError>
+template<typename TOk, typename TError>
 const TOk &Result<TOk, TError>::unwrap_unchecked() const {
     OK_ASSERT(ok());
     return m_u.ok_val;
 }
 
-template <typename TOk, typename TError>
+template<typename TOk, typename TError>
 TError &Result<TOk, TError>::error() {
     if (ok()) {
         OK_PANIC("Called 'error' on an ok value");
@@ -142,7 +159,7 @@ TError &Result<TOk, TError>::error() {
     return m_u.error_val;
 }
 
-template <typename TOk, typename TError>
+template<typename TOk, typename TError>
 const TError &Result<TOk, TError>::error() const {
     if (ok()) {
         OK_PANIC("Called 'error' on an ok value");
@@ -151,20 +168,20 @@ const TError &Result<TOk, TError>::error() const {
     return m_u.error_val;
 }
 
-template <typename TOk, typename TError>
+template<typename TOk, typename TError>
 TError &Result<TOk, TError>::error_unchecked() {
     OK_ASSERT(!ok());
     return m_u.error_val;
 }
 
-template <typename TOk, typename TError>
+template<typename TOk, typename TError>
 const TError &Result<TOk, TError>::error_unchecked() const {
     OK_ASSERT(!ok());
     return m_u.error_val;
 }
 
-template <typename TOk, typename TError>
-template <typename TResult, typename TOkFn, typename TErrorFn>
+template<typename TOk, typename TError>
+template<typename TResult, typename TOkFn, typename TErrorFn>
 TResult Result<TOk, TError>::match(TOkFn ok_fn, TErrorFn error_fn) {
     if (ok()) {
         return ok_fn(m_u.ok_val);
@@ -173,8 +190,8 @@ TResult Result<TOk, TError>::match(TOkFn ok_fn, TErrorFn error_fn) {
     }
 }
 
-template <typename TOk, typename TError>
-template <typename TResult, typename TOkFn, typename TErrorFn>
+template<typename TOk, typename TError>
+template<typename TResult, typename TOkFn, typename TErrorFn>
 TResult Result<TOk, TError>::match(TOkFn ok_fn, TErrorFn error_fn) const {
     if (ok()) {
         return ok_fn(m_u.ok_val);

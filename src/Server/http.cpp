@@ -281,6 +281,9 @@ DECLARE_HANDLER(run_query_handler) {
 
                         break;
                     }
+                    case Value::Type::MEDIA_SOURCE: {
+                        OK_TODO_MSG("create a media stream and return some id");
+                    }
                     case Value::Type::BIG_STRING: {
                         OK_UNREACHABLE();
                     }

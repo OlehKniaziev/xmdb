@@ -1,7 +1,6 @@
 #pragma once
 
-#include "ok.hpp"
-#include "Result.hpp"
+#include "BufferedStream.hpp"
 
 #include <Plugin/Plugin.hpp>
 
@@ -10,39 +9,25 @@ enum class MediaSourceFormat {
     MP4,
 };
 
-struct BufferedStream {
-    BufferedStream() = default;
-
-    enum class Type {
-        NETWORK,
-        DISK,
-    };
-
-    // Num of bytes or an error string.
-    Result<UZ, ok::String> pull(ok::Allocator *allocator);
-
-    Type type;
-    ok::Slice<U8> buffer;
-
-    union {
-        ok::File file;
-        // NetworkStream? NetworkHandle? Raw socket? What is a network stream here?
-        // HTTP streaming? Abstract class?
-        void *network;
-    } u;
-};
-
 class MediaSource {
 public:
     static MediaSource from_slice(ok::Slice<U8> slice);
 
-    bool is_in_memory();
+    bool is_in_memory() const {
+        return m_in_memory;
+    }
 
-    ok::Slice<U8> get_buffer();
+    ok::Slice<U8> get_buffer() const {
+        OK_VERIFY(m_in_memory);
+        return m_u.buffer;
+    }
 
-    BufferedStream *get_stream();
+    BufferedStream *get_stream() {
+        OK_VERIFY(!m_in_memory);
+        return &m_u.buffered_stream;
+    }
 
-    MediaSourceFormat identify_format();
+    Result<MediaSourceFormat, ok::String> identify_format();
 
 private:
     bool m_in_memory;
@@ -68,8 +53,7 @@ struct StartVideoStreamParams {
     Flags flags;
 };
 
-class MediaSink {
-};
+class MediaSink {};
 
 enum class MediaType {
     VIDEO,
@@ -88,6 +72,8 @@ public:
 
     virtual ok::Slice<MediaStream *> outputs() = 0;
 
+    Pipeline *pipeline;
+
 protected:
     // explicit PipelineElement(Pipeline *pipeline) : m_pipeline{pipeline} {}
 
@@ -96,8 +82,6 @@ protected:
 
 class MediaStream : public PipelineElement {
 public:
-    explicit MediaStream(MediaSource *source) : m_source{source} {}
-
     void set_sink(MediaSink *consumer);
 
     MediaType type() const;
@@ -109,22 +93,18 @@ private:
     MediaSource *m_source;
 };
 
-class MediaTransform : public MediaStream {
-};
+class MediaTransform : public MediaStream {};
 
 class Pull : public PipelineElement {
 public:
-    ok::Optional<VideoFrame> pull_sync();
+    Pull() = delete;
 
-private:
-    MediaStream *m_stream;
-};
+    using Hook = void (*)(Pull *pull, VideoFrame *frame, void *data);
 
-class VideoConsumer : public PipelineElement {
-public:
-    using Hook = void (*)(VideoConsumer *consumer, VideoFrame *frame, void *data);
+    Pull(Hook hook, void *data) : m_hook{hook}, m_data{data} {
+    }
 
-    VideoConsumer(Hook hook, void *data) : m_hook{hook}, m_data{data} {}
+    Result<U32, ok::String> block_until_completion();
 
     ok::Slice<MediaStream *> outputs() override;
     ok::Slice<MediaSink *> inputs() override;
@@ -136,17 +116,19 @@ private:
 
 class Demux : public PipelineElement {
 public:
-    explicit Demux(MediaSource *source) : m_source{source} {}
+    explicit Demux(MediaSource source) : m_source{source} {
+    }
 
     ok::Slice<MediaSink *> inputs() override;
     ok::Slice<MediaStream *> outputs() override;
 
-    using OnNewStreamHook = void (*)(MediaStream *stream, void *custom_data);
+    using OnNewStreamHook = void (*)(Demux *demux, MediaStream *stream,
+                                     void *custom_data);
 
-    virtual void on_new_stream(OnNewStreamHook hook, void *data);
+    void on_new_stream(OnNewStreamHook hook, void *data);
 
 private:
-    MediaSource *m_source;
+    MediaSource m_source;
     ok::Optional<OnNewStreamHook> m_on_new_stream_hook;
 };
 
@@ -154,17 +136,21 @@ class Pipeline {
 public:
     void start();
 
-    void add(PipelineElement *element);
+    void add(PipelineElement *element, const char *name);
 
-    Result<int /* TBD */, ok::String> connect(PipelineElement *source, PipelineElement *dest);
+    Result<PipelineElement *, ok::String> get_element(const char *name);
+
+    Result<int /* TBD */, ok::String> connect(PipelineElement *source,
+                                              PipelineElement *dest);
 
 private:
     VideoPlugin *m_plugin;
+    ok::Table<ok::StringView, PipelineElement *> m_name_to_element;
 };
 
-#define XMDB_ENUM_MEDIA_PLUGIN_CAPABILITIES \
-    X(stream_pull_sync) \
-    X(stream_pull_async) \
+#define XMDB_ENUM_MEDIA_PLUGIN_CAPABILITIES                                    \
+    X(stream_pull_sync)                                                        \
+    X(stream_pull_async)                                                       \
     X(pipeline_create)
 
 class VideoPlugin {
@@ -184,11 +170,9 @@ private:
 #undef X
     };
 
-    VideoPlugin(ok::Allocator *allocator,
-                plugin::Plugin *plugin,
-                VideoPluginCapabilities caps) : m_allocator{allocator},
-                                                m_plugin{plugin},
-                                                m_caps{caps} {
+    VideoPlugin(ok::Allocator *allocator, plugin::Plugin *plugin,
+                VideoPluginCapabilities caps) :
+        m_allocator{allocator}, m_plugin{plugin}, m_caps{caps} {
     }
 
     ok::Allocator *m_allocator;
