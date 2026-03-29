@@ -1,15 +1,16 @@
 #pragma once
 
 #include "SourceLocation.hpp"
+#include "meta.hpp"
 #include "ok.hpp"
 
 #if !defined(OK_NO_STDLIB)
 #include <common.h>
 #endif // !OK_NO_STDLIB
 
-#define TRY(x)                                                                                                          \
-    do {                                                                                                                \
-        if (!(x)) return {};                                                                                            \
+#define TRY(x)                                                                 \
+    do {                                                                       \
+        if (!(x)) return {};                                                   \
     } while (0)
 
 namespace xmdb {
@@ -25,8 +26,9 @@ void dief(const char *fmt, ...) OK_ATTRIBUTE_PRINTF(1, 2);
  * @brief Represents an error message paired with its source location.
  */
 struct ErrorWithSourceLocation {
-    ok::String message;       ///< The error message.
-    SourceLocation location; ///< The location in the source code where the error occurred.
+    ok::String message; ///< The error message.
+    SourceLocation location; ///< The location in the source code where the
+                             ///< error occurred.
 };
 
 /**
@@ -43,7 +45,24 @@ ok::String to_hex_string(ok::Allocator *allocator, ok::Slice<U8> bytes);
  * @param sv The hexadecimal string.
  * @return An optional slice of bytes if conversion succeeded.
  */
-ok::Optional<ok::Slice<U8>> from_hex_string(ok::Allocator *allocator, ok::StringView sv);
+ok::Optional<ok::Slice<U8>> from_hex_string(ok::Allocator *allocator,
+                                            ok::StringView sv);
+
+template<typename T>
+RemoveRef<T> &&move(T &&arg) {
+    return static_cast<RemoveRef<T> &&>(arg);
+}
+
+template<typename T>
+T &&forward(RemoveRef<T> &val) {
+    return static_cast<T&&>(val);
+}
+
+template<typename T>
+T &&forward(RemoveRef<T> &&val) {
+    static_assert(!IsLValueRef<T>::Value);
+    return static_cast<T&&>(val);
+}
 
 #if !defined(OK_NO_STDLIB)
 /**
@@ -54,7 +73,8 @@ struct WebArenaAllocator : public ok::Allocator {
      * @brief Constructs a new WebArenaAllocator.
      * @param impl Pointer to the web_arena implementation.
      */
-    explicit WebArenaAllocator(web_arena *impl) : impl{impl} {}
+    explicit WebArenaAllocator(web_arena *impl) : impl{impl} {
+    }
 
     void *raw_alloc(UZ size) override {
         return WebArenaPush(impl, size);

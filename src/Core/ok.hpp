@@ -1186,6 +1186,7 @@ struct Table {
 
     static Table<TKey, TValue> alloc(Allocator* a, UZ capacity = Table::DEFAULT_CAPACITY);
 
+    // TODO(oleh): Add a template overload as well (or replace this by that).
     void put(const TKey& key, const TValue& value);
 
     // NOTE(oleh): Not sure if we need the `get_ref` methods.

@@ -30,6 +30,10 @@ public:
     Result<MediaSourceFormat, ok::String> identify_format();
 
 private:
+    explicit MediaSource(ok::Slice<U8> slice) :
+        m_in_memory{true}, m_u{.buffer = slice} {
+    }
+
     bool m_in_memory;
     union {
         ok::Slice<U8> buffer;
@@ -77,6 +81,10 @@ public:
     Pipeline *pipeline;
 
 protected:
+    PipelineElement(Pipeline *pipeline, void *plugin_state) :
+        pipeline{pipeline}, m_plugin_state{plugin_state} {
+    }
+
     void *m_plugin_state;
 };
 
@@ -101,8 +109,8 @@ public:
 
     using Hook = void (*)(Pull *pull, VideoFrame *frame, void *data);
 
-    Pull(Hook hook, void *data) : m_hook{hook}, m_data{data} {
-    }
+    static Result<Pull *, ok::String>
+    create(ok::Allocator *allocator, Pipeline *pipeline, Hook hook, void *data);
 
     Result<U32, ok::String> block_until_completion();
 
@@ -110,14 +118,17 @@ public:
     ok::Slice<MediaSink *> inputs() override;
 
 private:
-    Hook m_hook;
-    void *m_data;
+    Pull(Pipeline *pipeline, void *plugin_state) :
+        PipelineElement{pipeline, plugin_state} {
+    }
 };
 
 class Demux : public PipelineElement {
 public:
-    explicit Demux(MediaSource source) : m_source{source} {
-    }
+    Demux() = delete;
+
+    static Result<Demux *, ok::String>
+    create(ok::Allocator *allocator, Pipeline *pipeline, MediaSource source);
 
     ok::Slice<MediaSink *> inputs() override;
     ok::Slice<MediaStream *> outputs() override;
@@ -128,7 +139,9 @@ public:
     void on_new_stream(OnNewStreamHook hook, void *data);
 
 private:
-    MediaSource m_source;
+    Demux(Pipeline *pipeline, void *state) : PipelineElement{pipeline, state} {
+    }
+
     ok::Optional<OnNewStreamHook> m_on_new_stream_hook;
 };
 
@@ -141,15 +154,26 @@ public:
 
     void add(PipelineElement *element, const char *name);
 
-    Result<PipelineElement *, ok::String> get_element(const char *name);
+    ok::Optional<PipelineElement *> get_element(const char *name);
 
     ok::Optional<ok::String> connect(PipelineElement *source,
                                      PipelineElement *dest);
 
+    VideoPlugin *plugin() {
+        return m_plugin;
+    }
+
 private:
+    Pipeline(ok::Allocator *allocator, VideoPlugin *plugin,
+             void *plugin_state) :
+        m_allocator{allocator}, m_plugin{plugin}, m_plugin_state{plugin_state} {
+        m_name_to_element =
+                ok::Table<ok::StringView, PipelineElement *>::alloc(allocator);
+    }
+
     ok::Allocator *m_allocator;
-    void *m_plugin_state;
     VideoPlugin *m_plugin;
+    void *m_plugin_state;
     ok::Table<ok::StringView, PipelineElement *> m_name_to_element;
 };
 
@@ -158,7 +182,10 @@ private:
     X(stream_pull_async)                                                       \
     X(pipeline_create)                                                         \
     X(pipeline_connect)                                                        \
-    X(pipeline_add)
+    X(pipeline_add)                                                            \
+    X(demux_create)                                                            \
+    X(demux_on_new_stream)                                                     \
+    X(pull_create)
 
 class VideoPlugin {
 public:
@@ -181,6 +208,8 @@ private:
     }
 
     friend Pipeline;
+    friend Demux;
+    friend Pull;
 
     ok::Allocator *m_allocator;
     plugin::Plugin *m_plugin;

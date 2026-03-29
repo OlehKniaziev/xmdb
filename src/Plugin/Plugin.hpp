@@ -2,6 +2,7 @@
 
 #include <Core/ok.hpp>
 #include <Core/Result.hpp>
+#include <Core/util.hpp>
 
 #include "NativeLibrary.hpp"
 
@@ -89,7 +90,6 @@ private:
 template <typename T, typename... Args>
 T Plugin::use_capability(PluginCapability capability, Args&&... args) {
     auto fn_ptr = capability.symbol().cast<T (*)(void *, Args...)>();
-    T result = fn_ptr(m_plugin_state, args...);
-    return result;
+    return fn_ptr(m_plugin_state, xmdb::forward<Args>(args)...);
 }
 } // namespace xmdb::plugin

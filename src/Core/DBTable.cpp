@@ -206,16 +206,18 @@ create_demux_pull_pipeline(ok::Allocator *allocator, MediaSource source) {
 
     Pipeline *pipeline = CHECK(Pipeline::create(allocator, plugin, nullptr));
 
-    auto *pull = new (allocator)
-            Pull{[](Pull *pull, VideoFrame *frame, void *data) {
-                     (void) pull;
-                     (void) frame;
-                     (void) data;
-                     OK_TODO_MSG("Actual streaming should be done here");
-                 },
-                 nullptr};
+    auto *pull = CHECK(Pull::create(
+            allocator, pipeline,
+            [](Pull *pull, VideoFrame *frame, void *data) {
+                (void) pull;
+                (void) frame;
+                (void) data;
+                OK_TODO_MSG("Actual streaming should be done here");
+            },
+            nullptr));
 
-    auto *demux = new (allocator) Demux{source};
+    auto *demux = CHECK(Demux::create(allocator, pipeline, source));
+
     demux->on_new_stream(
             [](Demux *demux, MediaStream *stream, void *data) {
                 auto *pull = reinterpret_cast<Pull *>(data);
@@ -396,14 +398,14 @@ DBTableStream DBTableStream::from_value(ok::Allocator *allocator,
                 allocator,
                 [](void *data) -> ok::Optional<Value> {
                     auto *pipeline = static_cast<Pipeline *>(data);
-                    Result<PipelineElement *, ok::String> pull_res =
+                    ok::Optional<PipelineElement *> pull_opt =
                             pipeline->get_element(PULL_NAME);
-                    if (!pull_res.ok()) {
-                        OK_PANIC_FMT("Could not get the pull element: %s",
-                                     pull_res.error().cstr());
+                    if (!pull_opt) {
+                        OK_PANIC_FMT("Could not get the pull element '%s'",
+                                     PULL_NAME);
                     }
 
-                    auto *pull = static_cast<Pull *>(pull_res.unwrap());
+                    auto pull = pull_opt.get();
                     OK_TODO_MSG("Dunno what to do here tbh!");
                     (void) pull;
                 },
