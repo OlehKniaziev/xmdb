@@ -68,6 +68,8 @@ class MediaStream;
 
 class PipelineElement {
 public:
+    friend Pipeline;
+
     virtual ok::Slice<MediaSink *> inputs() = 0;
 
     virtual ok::Slice<MediaStream *> outputs() = 0;
@@ -75,9 +77,7 @@ public:
     Pipeline *pipeline;
 
 protected:
-    // explicit PipelineElement(Pipeline *pipeline) : m_pipeline{pipeline} {}
-
-    // Pipeline *m_pipeline;
+    void *m_plugin_state;
 };
 
 class MediaStream : public PipelineElement {
@@ -134,16 +134,21 @@ private:
 
 class Pipeline {
 public:
+    static Result<Pipeline *, ok::String>
+    create(ok::Allocator *allocator, VideoPlugin *plugin, const char *name);
+
     void start();
 
     void add(PipelineElement *element, const char *name);
 
     Result<PipelineElement *, ok::String> get_element(const char *name);
 
-    Result<int /* TBD */, ok::String> connect(PipelineElement *source,
-                                              PipelineElement *dest);
+    ok::Optional<ok::String> connect(PipelineElement *source,
+                                     PipelineElement *dest);
 
 private:
+    ok::Allocator *m_allocator;
+    void *m_plugin_state;
     VideoPlugin *m_plugin;
     ok::Table<ok::StringView, PipelineElement *> m_name_to_element;
 };
@@ -151,14 +156,14 @@ private:
 #define XMDB_ENUM_MEDIA_PLUGIN_CAPABILITIES                                    \
     X(stream_pull_sync)                                                        \
     X(stream_pull_async)                                                       \
-    X(pipeline_create)
+    X(pipeline_create)                                                         \
+    X(pipeline_connect)                                                        \
+    X(pipeline_add)
 
 class VideoPlugin {
 public:
     Result<VideoPlugin *, ok::String> from_raw(ok::Allocator *allocator,
                                                plugin::Plugin *plug);
-
-    Result<Pipeline *, ok::String> create_pipeline();
 
 private:
     // TODO(oleh): Add more stuff like
@@ -174,6 +179,8 @@ private:
                 VideoPluginCapabilities caps) :
         m_allocator{allocator}, m_plugin{plugin}, m_caps{caps} {
     }
+
+    friend Pipeline;
 
     ok::Allocator *m_allocator;
     plugin::Plugin *m_plugin;

@@ -204,7 +204,7 @@ create_demux_pull_pipeline(ok::Allocator *allocator, MediaSource source) {
 
     VideoPlugin *plugin = CHECK(video_plugin_for(source_format));
 
-    Pipeline *pipeline = CHECK(plugin->create_pipeline());
+    Pipeline *pipeline = CHECK(Pipeline::create(allocator, plugin, nullptr));
 
     auto *pull = new (allocator)
             Pull{[](Pull *pull, VideoFrame *frame, void *data) {
@@ -219,10 +219,11 @@ create_demux_pull_pipeline(ok::Allocator *allocator, MediaSource source) {
     demux->on_new_stream(
             [](Demux *demux, MediaStream *stream, void *data) {
                 auto *pull = reinterpret_cast<Pull *>(data);
-                auto connect_res = demux->pipeline->connect(stream, pull);
-                if (!connect_res.ok()) {
+                ok::Optional<ok::String> connect_err =
+                        demux->pipeline->connect(stream, pull);
+                if (connect_err) {
                     OK_PANIC_FMT("Failed to connect pipeline elements: %s",
-                                 connect_res.error().cstr());
+                                 connect_err.get().cstr());
                 }
             },
             pull);
@@ -539,7 +540,8 @@ ok::Optional<Value> DBTableStream::next() {
                                       pixel_data, png->format);
         }
         case SQL::ColumnType::MEDIA: {
-            // Result<Pipeline *, ok::String> pipeline_res = create_demux_pull_pipeline(m_allocator, media_source);
+            // Result<Pipeline *, ok::String> pipeline_res =
+            // create_demux_pull_pipeline(m_allocator, media_source);
             OK_TODO_MSG("media column");
         }
         case SQL::ColumnType::BOOLEAN: OK_TODO_MSG("[next] BOOL");

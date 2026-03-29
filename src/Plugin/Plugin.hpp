@@ -36,7 +36,7 @@ public:
 
     void unload();
 
-    ok::StringView get_last_error();
+    ok::Optional<ok::StringView> get_last_error() const;
 
     ok::Optional<PluginCapability> get_capability(ok::StringView name) const;
 

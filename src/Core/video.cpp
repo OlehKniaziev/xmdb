@@ -28,4 +28,21 @@ VideoPlugin::from_raw(ok::Allocator *allocator, plugin::Plugin *plug) {
             },
     };
 }
+
+ok::Optional<ok::String> Pipeline::connect(PipelineElement *source,
+                                           PipelineElement *dest) {
+    auto connect_cap = m_plugin->m_caps.pipeline_connect;
+    int ok = m_plugin->m_plugin->use_capability<int>(
+            connect_cap, m_plugin_state, source->m_plugin_state,
+            dest->m_plugin_state);
+
+    if (!ok) {
+        auto err = m_plugin->m_plugin->get_last_error();
+        if (err) return err.get().to_string(m_allocator);
+        else
+            return ok::String::alloc(m_allocator, "unknown");
+    }
+
+    return {};
+}
 } // namespace xmdb

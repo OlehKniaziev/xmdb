@@ -100,4 +100,15 @@ ok::Optional<PluginCapability> Plugin::get_capability(ok::StringView name) const
 
     return ok::Optional<PluginCapability>::empty();
 }
+
+ok::Optional<ok::StringView> Plugin::get_last_error() const {
+    if (!m_get_last_error_hook) return {};
+
+    GetLastErrorHook gle_hook = m_get_last_error_hook.get();
+    const char *error = gle_hook(m_plugin_state);
+
+    if (error != nullptr) return ok::StringView{error};
+
+    return {};
+}
 } // namespace xmdb::plugin
