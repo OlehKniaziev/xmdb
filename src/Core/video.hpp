@@ -80,6 +80,9 @@ public:
 
     Pipeline *pipeline;
 
+    virtual ~PipelineElement() {
+    }
+
 protected:
     PipelineElement(Pipeline *pipeline, void *plugin_state) :
         pipeline{pipeline}, m_plugin_state{plugin_state} {
