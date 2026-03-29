@@ -187,5 +187,6 @@ private:
     VideoPluginCapabilities m_caps;
 };
 
-Result<VideoPlugin *, ok::String> video_plugin_for(MediaSourceFormat format);
+Result<VideoPlugin *, ok::String> video_plugin_for(ok::Allocator *allocator,
+                                                   MediaSourceFormat format);
 } // namespace xmdb

@@ -1092,8 +1092,7 @@ U64 fnv1(StringView);
 template <typename T>
 struct Hash {
     static U64 hash(const T& value) {
-        // NOTE(oleh): Just make this a function, not a method.
-        return value.ok_hash_value();
+        return ok_hash_value(value);
     }
 };
 

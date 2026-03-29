@@ -1,4 +1,5 @@
-// TODO(oleh): Refactor the constructors in this file to accept strings as 'StringView'.
+// TODO(oleh): Refactor the constructors in this file to accept strings as
+// 'StringView'.
 
 #ifndef XMDB_AST_H_
 #define XMDB_AST_H_
@@ -15,17 +16,17 @@ struct Stmt {
      * @brief Types of SQL statements.
      */
     enum Type : U8 {
-        USE,    ///< USE statement.
+        USE, ///< USE statement.
         INSERT, ///< INSERT statement.
         UPDATE, ///< UPDATE statement.
         DELETE, ///< DELETE statement.
-        DROP,   ///< DROP statement.
+        DROP, ///< DROP statement.
         CREATE, ///< CREATE statement.
-        EXPR,   ///< Expression statement.
-        ALTER,  ///< ALTER statement.
+        EXPR, ///< Expression statement.
+        ALTER, ///< ALTER statement.
     };
 
-    Type type;   ///< The type of the statement.
+    Type type; ///< The type of the statement.
     Token token; ///< The primary token associated with the statement.
 };
 
@@ -37,16 +38,16 @@ struct Expr {
      * @brief Types of SQL expressions.
      */
     enum Type : U8 {
-        IDENT,       ///< Identifier.
+        IDENT, ///< Identifier.
         INTEGER_LIT, ///< Integer literal.
-        STRING_LIT,  ///< String literal.
-        TRUE_LIT,    ///< Boolean TRUE literal.
-        FALSE_LIT,   ///< Boolean FALSE literal.
-        NULL_LIT,    ///< NULL literal.
-        BINARY_OP,   ///< Binary operation.
-        SELECT,      ///< SELECT expression.
-        STAR,        ///< Star ('*') expression.
-        CALL,        ///< Function call expression.
+        STRING_LIT, ///< String literal.
+        TRUE_LIT, ///< Boolean TRUE literal.
+        FALSE_LIT, ///< Boolean FALSE literal.
+        NULL_LIT, ///< NULL literal.
+        BINARY_OP, ///< Binary operation.
+        SELECT, ///< SELECT expression.
+        STAR, ///< Star ('*') expression.
+        CALL, ///< Function call expression.
     };
 
     /**
@@ -55,8 +56,8 @@ struct Expr {
      * @param token The associated token.
      * @return Pointer to the new Expr.
      */
-    static Expr* alloc_true(ok::Allocator* allocator, Token token) {
-        Expr* expr = allocator->alloc<Expr>();
+    static Expr *alloc_true(ok::Allocator *allocator, Token token) {
+        Expr *expr = allocator->alloc<Expr>();
         expr->type = TRUE_LIT;
         expr->token = token;
         return expr;
@@ -68,8 +69,8 @@ struct Expr {
      * @param token The associated token.
      * @return Pointer to the new Expr.
      */
-    static Expr* alloc_false(ok::Allocator* allocator, Token token) {
-        Expr* expr = allocator->alloc<Expr>();
+    static Expr *alloc_false(ok::Allocator *allocator, Token token) {
+        Expr *expr = allocator->alloc<Expr>();
         expr->type = FALSE_LIT;
         expr->token = token;
         return expr;
@@ -81,31 +82,32 @@ struct Expr {
      * @param token The associated token.
      * @return Pointer to the new Expr.
      */
-    static Expr* alloc_null(ok::Allocator* allocator, Token token) {
-        Expr* expr = allocator->alloc<Expr>();
+    static Expr *alloc_null(ok::Allocator *allocator, Token token) {
+        Expr *expr = allocator->alloc<Expr>();
         expr->type = NULL_LIT;
         expr->token = token;
         return expr;
     }
 
-    /**
-     * @brief Computes a hash value for the expression.
-     * @return The hash value.
-     */
-    U64 ok_hash_value() const;
-
-    bool operator ==(const Expr& other) const;
+    bool operator==(const Expr &other) const;
 
     /**
      * @brief Converts the expression to a string representation.
      * @param allocator The allocator to use for the string.
      * @return The string representation.
      */
-    ok::String to_string(ok::Allocator* allocator) const;
+    ok::String to_string(ok::Allocator *allocator) const;
 
-    Type type;   ///< The type of the expression.
+    Type type; ///< The type of the expression.
     Token token; ///< The primary token of the expression.
 };
+
+/**
+ * @brief Computes a hash value for the expression.
+ * @param expr The expression.
+ * @return The hash value.
+ */
+U64 ok_hash_value(const Expr &expr);
 
 /**
  * @brief Represents an identifier expression (e.g. column name).
@@ -118,8 +120,9 @@ struct IdentifierExpr : public Expr {
      * @param value The identifier string.
      * @return Pointer to the new IdentifierExpr.
      */
-    static IdentifierExpr* alloc(ok::Allocator* allocator, Token token, ok::StringView value) {
-        auto* expr = allocator->alloc<IdentifierExpr>();
+    static IdentifierExpr *alloc(ok::Allocator *allocator, Token token,
+                                 ok::StringView value) {
+        auto *expr = allocator->alloc<IdentifierExpr>();
         expr->type = IDENT;
         expr->token = token;
         expr->value = value.to_string(allocator);
@@ -140,8 +143,9 @@ struct IntegerExpr : public Expr {
      * @param value The integer value.
      * @return Pointer to the new IntegerExpr.
      */
-    static IntegerExpr* alloc(ok::Allocator* allocator, Token token, int64_t value) {
-        auto* expr = allocator->alloc<IntegerExpr>();
+    static IntegerExpr *alloc(ok::Allocator *allocator, Token token,
+                              int64_t value) {
+        auto *expr = allocator->alloc<IntegerExpr>();
         expr->type = INTEGER_LIT;
         expr->token = token;
         expr->value = value;
@@ -162,8 +166,9 @@ struct StringExpr : public Expr {
      * @param value The string value.
      * @return Pointer to the new StringExpr.
      */
-    static StringExpr* alloc(ok::Allocator* allocator, Token token, ok::String value) {
-        auto* expr = allocator->alloc<StringExpr>();
+    static StringExpr *alloc(ok::Allocator *allocator, Token token,
+                             ok::String value) {
+        auto *expr = allocator->alloc<StringExpr>();
         expr->type = STRING_LIT;
         expr->token = token;
         expr->value = value;
@@ -195,8 +200,9 @@ struct BinaryOpExpr : public Expr {
      * @param rhs Right-hand side operand.
      * @return Pointer to the new BinaryOpExpr.
      */
-    static BinaryOpExpr* alloc(ok::Allocator* allocator, Token token, Kind kind, Expr* lhs, Expr* rhs) {
-        auto* expr = allocator->alloc<BinaryOpExpr>();
+    static BinaryOpExpr *alloc(ok::Allocator *allocator, Token token, Kind kind,
+                               Expr *lhs, Expr *rhs) {
+        auto *expr = allocator->alloc<BinaryOpExpr>();
         expr->type = BINARY_OP;
         expr->token = token;
         expr->kind = kind;
@@ -205,9 +211,9 @@ struct BinaryOpExpr : public Expr {
         return expr;
     }
 
-    Kind kind;  ///< The kind of binary operation.
-    Expr* lhs;  ///< Left-hand side operand.
-    Expr* rhs;  ///< Right-hand side operand.
+    Kind kind; ///< The kind of binary operation.
+    Expr *lhs; ///< Left-hand side operand.
+    Expr *rhs; ///< Right-hand side operand.
 };
 
 /**
@@ -240,8 +246,9 @@ struct SelectExpr : public Expr {
      * @param table The source table expression.
      * @return Pointer to the new SelectExpr.
      */
-    static SelectExpr* alloc(ok::Allocator* allocator, Token token, ok::Slice<Expr*> exprs, Expr* table) {
-        auto* expr = allocator->alloc<SelectExpr>();
+    static SelectExpr *alloc(ok::Allocator *allocator, Token token,
+                             ok::Slice<Expr *> exprs, Expr *table) {
+        auto *expr = allocator->alloc<SelectExpr>();
         expr->type = SELECT;
         expr->token = token;
         expr->exprs = exprs;
@@ -249,8 +256,8 @@ struct SelectExpr : public Expr {
         return expr;
     }
 
-    ok::Slice<Expr*> exprs; ///< The expressions being selected.
-    Expr* table;            ///< The source table.
+    ok::Slice<Expr *> exprs; ///< The expressions being selected.
+    Expr *table; ///< The source table.
 };
 
 /**
@@ -265,9 +272,7 @@ struct CallExpr : public Expr {
      * @param args The arguments to the function call.
      * @return Pointer to the new CallExpr.
      */
-    static CallExpr *alloc(ok::Allocator *allocator,
-                           Token token,
-                           Expr *fn,
+    static CallExpr *alloc(ok::Allocator *allocator, Token token, Expr *fn,
                            ok::Slice<Expr *> args) {
         auto *expr = allocator->alloc<CallExpr>();
         expr->type = CALL;
@@ -277,7 +282,7 @@ struct CallExpr : public Expr {
         return expr;
     }
 
-    Expr *fn;               ///< The function being called.
+    Expr *fn; ///< The function being called.
     ok::Slice<Expr *> args; ///< The arguments to the function call.
 };
 
@@ -292,15 +297,15 @@ struct ExprStmt : public Stmt {
      * @param expr The expression.
      * @return Pointer to the new ExprStmt.
      */
-    static ExprStmt* alloc(ok::Allocator* allocator, Token token, Expr* expr) {
-        auto* stmt = allocator->alloc<ExprStmt>();
+    static ExprStmt *alloc(ok::Allocator *allocator, Token token, Expr *expr) {
+        auto *stmt = allocator->alloc<ExprStmt>();
         stmt->type = EXPR;
         stmt->token = token;
         stmt->expr = expr;
         return stmt;
     }
 
-    Expr* expr; ///< The expression.
+    Expr *expr; ///< The expression.
 };
 
 /**
@@ -314,8 +319,9 @@ struct UseStmt : public Stmt {
      * @param database The name of the database.
      * @return Pointer to the new UseStmt.
      */
-    static UseStmt* alloc(ok::Allocator* allocator, Token token, ok::StringView database) {
-        auto* stmt = allocator->alloc<UseStmt>();
+    static UseStmt *alloc(ok::Allocator *allocator, Token token,
+                          ok::StringView database) {
+        auto *stmt = allocator->alloc<UseStmt>();
         stmt->type = USE;
         stmt->token = token;
         stmt->database = database.to_string(allocator);
@@ -339,9 +345,12 @@ struct InsertStmt : public Stmt {
      * @param values_counts The number of values per row.
      * @return Pointer to the new InsertStmt.
      */
-    static InsertStmt* alloc(ok::Allocator* allocator, Token token, ok::StringView table_name, ok::Slice<ok::String> columns,
-                                ok::Slice<Expr*> values, ok::Slice<uint32_t> values_counts) {
-        auto* stmt = allocator->alloc<InsertStmt>();
+    static InsertStmt *alloc(ok::Allocator *allocator, Token token,
+                             ok::StringView table_name,
+                             ok::Slice<ok::String> columns,
+                             ok::Slice<Expr *> values,
+                             ok::Slice<uint32_t> values_counts) {
+        auto *stmt = allocator->alloc<InsertStmt>();
         stmt->type = INSERT;
         stmt->token = token;
         stmt->table_name = table_name.to_string(allocator);
@@ -351,9 +360,9 @@ struct InsertStmt : public Stmt {
         return stmt;
     }
 
-    ok::String table_name;           ///< The name of the table to insert into.
-    ok::Slice<ok::String> columns;   ///< The columns to insert values for.
-    ok::Slice<Expr*> values;         ///< The values to insert.
+    ok::String table_name; ///< The name of the table to insert into.
+    ok::Slice<ok::String> columns; ///< The columns to insert values for.
+    ok::Slice<Expr *> values; ///< The values to insert.
     ok::Slice<uint32_t> values_counts; ///< The number of values in each row.
 };
 
@@ -371,9 +380,11 @@ struct UpdateStmt : public Stmt {
      * @param filter The filter expression.
      * @return Pointer to the new UpdateStmt.
      */
-    static UpdateStmt* alloc(ok::Allocator* allocator, Token token, Expr* table, ok::Slice<ok::String> columns,
-                                ok::Slice<Expr*> values, ok::Optional<Expr*> filter) {
-        auto* stmt = allocator->alloc<UpdateStmt>();
+    static UpdateStmt *alloc(ok::Allocator *allocator, Token token, Expr *table,
+                             ok::Slice<ok::String> columns,
+                             ok::Slice<Expr *> values,
+                             ok::Optional<Expr *> filter) {
+        auto *stmt = allocator->alloc<UpdateStmt>();
         stmt->type = UPDATE;
         stmt->token = token;
         stmt->table = table;
@@ -383,10 +394,10 @@ struct UpdateStmt : public Stmt {
         return stmt;
     }
 
-    Expr* table;                   ///< The table to update.
+    Expr *table; ///< The table to update.
     ok::Slice<ok::String> columns; ///< The columns to update.
-    ok::Slice<Expr*> values;       ///< The new values.
-    ok::Optional<Expr*> filter;    ///< The WHERE clause filter.
+    ok::Slice<Expr *> values; ///< The new values.
+    ok::Optional<Expr *> filter; ///< The WHERE clause filter.
 };
 
 /**
@@ -401,8 +412,9 @@ struct DeleteStmt : public Stmt {
      * @param filter The filter expression.
      * @return Pointer to the new DeleteStmt.
      */
-    static DeleteStmt* alloc(ok::Allocator* allocator, Token token, Expr* table, ok::Optional<Expr*> filter) {
-        auto* stmt = allocator->alloc<DeleteStmt>();
+    static DeleteStmt *alloc(ok::Allocator *allocator, Token token, Expr *table,
+                             ok::Optional<Expr *> filter) {
+        auto *stmt = allocator->alloc<DeleteStmt>();
         stmt->type = DELETE;
         stmt->token = token;
         stmt->table = table;
@@ -410,8 +422,8 @@ struct DeleteStmt : public Stmt {
         return stmt;
     }
 
-    Expr* table;                ///< The table to delete from.
-    ok::Optional<Expr*> filter; ///< The WHERE clause filter.
+    Expr *table; ///< The table to delete from.
+    ok::Optional<Expr *> filter; ///< The WHERE clause filter.
 };
 
 /**
@@ -422,7 +434,7 @@ struct DropStmt : public Stmt {
      * @brief Targets for DROP statement.
      */
     enum class Target : U8 {
-        TABLE,    ///< DROP TABLE.
+        TABLE, ///< DROP TABLE.
         DATABASE, ///< DROP DATABASE.
     };
 
@@ -434,8 +446,9 @@ struct DropStmt : public Stmt {
      * @param name The name of the target.
      * @return Pointer to the new DropStmt.
      */
-    static DropStmt* alloc(ok::Allocator* allocator, Token token, Target target, ok::String name) {
-        auto* stmt = allocator->alloc<DropStmt>();
+    static DropStmt *alloc(ok::Allocator *allocator, Token token, Target target,
+                           ok::String name) {
+        auto *stmt = allocator->alloc<DropStmt>();
         stmt->type = DROP;
         stmt->token = token;
         stmt->target = target;
@@ -443,7 +456,7 @@ struct DropStmt : public Stmt {
         return stmt;
     }
 
-    Target target;  ///< The target of the DROP operation.
+    Target target; ///< The target of the DROP operation.
     ok::String name; ///< The name of the target.
 };
 
@@ -456,11 +469,11 @@ struct CreateStmt : public Stmt {
      */
     enum class Target : U8 {
         DATABASE, ///< CREATE DATABASE.
-        TABLE,    ///< CREATE TABLE.
-        USER,     ///< CREATE USER.
+        TABLE, ///< CREATE TABLE.
+        USER, ///< CREATE USER.
     };
 
-    Target target;  ///< The target of the CREATE operation.
+    Target target; ///< The target of the CREATE operation.
     ok::String name; ///< The name of the target.
 };
 
@@ -475,8 +488,9 @@ struct CreateDatabaseStmt : public CreateStmt {
      * @param name The name of the database.
      * @return Pointer to the new CreateDatabaseStmt.
      */
-    static CreateDatabaseStmt* alloc(ok::Allocator* allocator, Token token, ok::String name) {
-        auto* stmt = allocator->alloc<CreateDatabaseStmt>();
+    static CreateDatabaseStmt *alloc(ok::Allocator *allocator, Token token,
+                                     ok::String name) {
+        auto *stmt = allocator->alloc<CreateDatabaseStmt>();
         stmt->type = CREATE;
         stmt->token = token;
         stmt->target = Target::DATABASE;
@@ -498,9 +512,11 @@ struct CreateTableStmt : public CreateStmt {
      * @param column_types The types of the columns.
      * @return Pointer to the new CreateTableStmt.
      */
-    static CreateTableStmt* alloc(ok::Allocator* allocator, Token token, ok::String name, ok::Slice<ok::String> column_names,
-                                     ok::Slice<ok::String> column_types) {
-        auto* stmt = allocator->alloc<CreateTableStmt>();
+    static CreateTableStmt *alloc(ok::Allocator *allocator, Token token,
+                                  ok::String name,
+                                  ok::Slice<ok::String> column_names,
+                                  ok::Slice<ok::String> column_types) {
+        auto *stmt = allocator->alloc<CreateTableStmt>();
         stmt->type = CREATE;
         stmt->token = token;
         stmt->target = Target::TABLE;
@@ -525,7 +541,8 @@ struct CreateUserStmt : public CreateStmt {
      * @param name The name of the user.
      * @return Pointer to the new CreateUserStmt.
      */
-    static CreateUserStmt *alloc(ok::Allocator *allocator, Token token, ok::String name) {
+    static CreateUserStmt *alloc(ok::Allocator *allocator, Token token,
+                                 ok::String name) {
         auto *stmt = allocator->alloc<CreateUserStmt>();
         stmt->type = CREATE;
         stmt->target = Target::USER;
@@ -540,7 +557,7 @@ struct CreateUserStmt : public CreateStmt {
  */
 struct SetClause {
     ok::String name; ///< The name of the field.
-    Expr *value;     ///< The value to assign.
+    Expr *value; ///< The value to assign.
 };
 
 /**
@@ -569,8 +586,9 @@ struct AlterUserStmt : public AlterStmt {
      * @param set_clauses The changes to apply.
      * @return Pointer to the new AlterUserStmt.
      */
-    static AlterUserStmt *alloc(ok::Allocator *allocator,
-        Token token, ok::StringView name, ok::Slice<SetClause> set_clauses) {
+    static AlterUserStmt *alloc(ok::Allocator *allocator, Token token,
+                                ok::StringView name,
+                                ok::Slice<SetClause> set_clauses) {
         auto *stmt = allocator->alloc<AlterUserStmt>();
         stmt->type = ALTER;
         stmt->target = Target::USER;
@@ -580,7 +598,7 @@ struct AlterUserStmt : public AlterStmt {
         return stmt;
     }
 
-    ok::String user_name;               ///< The name of the user to alter.
+    ok::String user_name; ///< The name of the user to alter.
     ok::Slice<SetClause> set_clauses; ///< The changes to apply.
 };
 
@@ -588,8 +606,8 @@ struct AlterUserStmt : public AlterStmt {
  * @brief Represents a full SQL query.
  */
 struct Query {
-    ok::Slice<Stmt*> stmts; ///< The statements in the query.
+    ok::Slice<Stmt *> stmts; ///< The statements in the query.
 };
-}; // namespace xmdb
+}; // namespace xmdb::SQL
 
 #endif // XMDB_AST_H_

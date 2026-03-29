@@ -29,6 +29,11 @@ VideoPlugin::from_raw(ok::Allocator *allocator, plugin::Plugin *plug) {
     };
 }
 
+Result<MediaSourceFormat, ok::String> MediaSource::identify_format() {
+    OK_TODO_MSG("Check if GStreamer has something like this and architect this "
+                "mofo after it");
+}
+
 ok::Optional<ok::String> Pipeline::connect(PipelineElement *source,
                                            PipelineElement *dest) {
     auto connect_cap = m_plugin->m_caps.pipeline_connect;
@@ -44,5 +49,18 @@ ok::Optional<ok::String> Pipeline::connect(PipelineElement *source,
     }
 
     return {};
+}
+
+U64 ok_hash_value(MediaSourceFormat format) {
+    return static_cast<U64>(format);
+}
+
+static ok::Table<MediaSourceFormat, VideoPlugin *> registered_plugins{};
+
+Result<VideoPlugin *, ok::String> video_plugin_for(ok::Allocator *allocator,
+                                                   MediaSourceFormat format) {
+    auto plug = registered_plugins.get(format);
+    if (!plug) return ok::String::alloc(allocator, "no registerd plugin found");
+    return plug.get();
 }
 } // namespace xmdb

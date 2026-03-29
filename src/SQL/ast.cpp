@@ -4,49 +4,49 @@
 using namespace ok::literals;
 
 namespace xmdb::SQL {
-U64 Expr::ok_hash_value() const {
-    U64 hash = (U64) type << 32;
+U64 ok_hash_value(const Expr &expr) {
+    U64 hash = (U64) expr.type << 32;
 
-    switch (type) {
+    switch (expr.type) {
     case Expr::NULL_LIT:
     case Expr::TRUE_LIT:
     case Expr::FALSE_LIT:
     case Expr::STAR:        return hash;
     case Expr::INTEGER_LIT: {
-        auto *this_int = static_cast<const IntegerExpr *>(this);
-        return hash | (U64) this_int->value;
+        auto &expr_int = static_cast<const IntegerExpr &>(expr);
+        return hash | (U64) expr_int.value;
     }
     case Expr::STRING_LIT: {
-        auto *this_string = static_cast<const StringExpr *>(this);
-        return hash ^ ok::Hash<ok::String>::hash(this_string->value);
+        auto &expr_string = static_cast<const StringExpr &>(expr);
+        return hash ^ ok::Hash<ok::String>::hash(expr_string.value);
     }
     case Expr::IDENT: {
-        auto *this_ident = static_cast<const IdentifierExpr *>(this);
-        return hash ^ ok::Hash<ok::String>::hash(this_ident->value);
+        auto &expr_ident = static_cast<const IdentifierExpr &>(expr);
+        return hash ^ ok::Hash<ok::String>::hash(expr_ident.value);
     }
     case Expr::BINARY_OP: {
-        auto *this_op = static_cast<const BinaryOpExpr *>(this);
-        return hash ^ this_op->lhs->ok_hash_value() ^ this_op->rhs->ok_hash_value();
+        auto &expr_op = static_cast<const BinaryOpExpr &>(expr);
+        return hash ^ ok_hash_value(*expr_op.lhs) ^ ok_hash_value(*expr_op.rhs);
     }
     case Expr::SELECT: {
-        auto *this_select = static_cast<const SelectExpr *>(this);
+        auto &expr_select = static_cast<const SelectExpr &>(expr);
 
-        hash ^= this_select->table->ok_hash_value();
+        hash ^= ok_hash_value(*expr_select.table);
 
-        for (UZ i = 0; i < this_select->exprs.count; ++i) {
-            hash ^= this_select->exprs[i]->ok_hash_value();
+        for (UZ i = 0; i < expr_select.exprs.count; ++i) {
+            hash ^= ok_hash_value(*expr_select.exprs[i]);
         }
 
         return hash;
     }
     case Expr::CALL: {
-        auto *call = static_cast<const CallExpr *>(this);
+        auto &call = static_cast<const CallExpr &>(expr);
 
-        hash ^= call->fn->ok_hash_value();
+        hash ^= ok_hash_value(*call.fn);
 
-        for (UZ i = 0; i < call->args.count; ++i) {
-            Expr *arg = call->args[i];
-            hash ^= arg->ok_hash_value();
+        for (UZ i = 0; i < call.args.count; ++i) {
+            Expr &arg = *call.args[i];
+            hash ^= ok_hash_value(arg);
         }
 
         return hash;
@@ -86,7 +86,8 @@ bool Expr::operator==(const Expr &other) const {
         auto *this_op = static_cast<const BinaryOpExpr *>(this);
         auto &other_op = static_cast<const BinaryOpExpr &>(other);
 
-        return this_op->kind == other_op.kind && *this_op->lhs == *other_op.lhs && *this_op->rhs == *other_op.rhs;
+        return this_op->kind == other_op.kind &&
+               *this_op->lhs == *other_op.lhs && *this_op->rhs == *other_op.rhs;
     }
     case Expr::SELECT: {
         auto *this_select = static_cast<const SelectExpr *>(this);
@@ -138,7 +139,8 @@ ok::String Expr::to_string(ok::Allocator *allocator) const {
     case Expr::CALL: {
         auto *call = static_cast<const CallExpr *>(this);
         ok::String fn_string = call->fn->to_string(ok::temp_allocator());
-        ok::String result = ok::String::format(allocator, "%s(", fn_string.cstr());
+        ok::String result =
+                ok::String::format(allocator, "%s(", fn_string.cstr());
 
         if (call->args.count == 0) {
             goto end;

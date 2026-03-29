@@ -202,7 +202,7 @@ static Result<Pipeline *, ok::String>
 create_demux_pull_pipeline(ok::Allocator *allocator, MediaSource source) {
     MediaSourceFormat source_format = CHECK(source.identify_format());
 
-    VideoPlugin *plugin = CHECK(video_plugin_for(source_format));
+    VideoPlugin *plugin = CHECK(video_plugin_for(allocator, source_format));
 
     Pipeline *pipeline = CHECK(Pipeline::create(allocator, plugin, nullptr));
 
