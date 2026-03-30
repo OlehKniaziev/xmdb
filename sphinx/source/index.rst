@@ -15,4 +15,4 @@ It exposes a standard SQL interface via a network server and an interactive CLI 
    gui
    library_reference
 
-* :download:`GUI User Manual <User Manual.pdf>`
+* :download:`GUI User Manual <gui-user-manual.pdf>`

@@ -5,7 +5,7 @@ The XMDB graphical interface is a web application that connects to a running XMD
 It provides a SQL query editor, a media gallery for visualising image data, and a database object browser.
 
 Also see the GUI user manual in a form of a PDF document, which contains screenshots
-with detailed explanations of it's features: :download:`GUI User Manual <User Manual.pdf>`
+with detailed explanations of it's features: :download:`GUI User Manual <gui-user-manual.pdf>`
 
 .. contents:: Contents
    :local:
