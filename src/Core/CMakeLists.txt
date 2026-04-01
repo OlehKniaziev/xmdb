@@ -23,6 +23,7 @@ add_library(LibCore
   StaticStorage.cpp
   catalog.cpp
   BufferedStream.cpp
+  config.cpp
 )
 
 set_property(TARGET LibCore PROPERTY POSITION_INDEPENDENT_CODE 1)

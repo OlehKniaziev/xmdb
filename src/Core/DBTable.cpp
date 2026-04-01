@@ -1,4 +1,6 @@
 #include "DBTable.hpp"
+#include <Core/ok.hpp>
+#include <Core/video.hpp>
 #include "FixedString.hpp"
 #include "Logger.hpp"
 #include "Png.hpp"
@@ -7,9 +9,12 @@
 
 using namespace ok::literals;
 
-namespace xmdb {
-ColumnAttribute get_attribute_for_column_type(SQL::ColumnType column_type) {
-    if (column_type == SQL::ColumnType::PNG) {
+namespace xmdb
+{
+ColumnAttribute get_attribute_for_column_type(SQL::ColumnType column_type)
+{
+    if (column_type == SQL::ColumnType::PNG)
+    {
         return ColumnAttribute{
                 .flags = ColumnAttribute::F_IMAGE,
                 .u =
@@ -17,30 +22,36 @@ ColumnAttribute get_attribute_for_column_type(SQL::ColumnType column_type) {
                                 .image_state = {},
                         },
         };
-    } else {
+    }
+    else
+    {
         return {};
     }
 }
 
-struct TypeLayout {
+struct TypeLayout
+{
     static constexpr UZ MAX_ALIGNMENT = sizeof(UZ);
 
     UZ size;
     UZ alignment;
 };
 
-static TypeLayout type_layout(SQL::ColumnType type) {
+static TypeLayout type_layout(SQL::ColumnType type)
+{
     static_assert(sizeof(FixedString) % 8 == 0);
 
-    switch (type) {
+    switch (type)
+    {
     case SQL::ColumnType::INTEGER: return {.size = 8, .alignment = 8};
     case SQL::ColumnType::FLOAT:   return {.size = 4, .alignment = 4};
     case SQL::ColumnType::DOUBLE:  return {.size = 8, .alignment = 8};
     case SQL::ColumnType::BOOLEAN: return {.size = 1, .alignment = 1};
     case SQL::ColumnType::TEXT:
-        return {.size = sizeof(FixedString), .alignment = 8};
-    case SQL::ColumnType::PNG:   return {.size = sizeof(Png), .alignment = 8};
-    case SQL::ColumnType::MEDIA: OK_TODO();
+        return {.size = sizeof(FixedString), .alignment = alignof(FixedString)};
+    case SQL::ColumnType::PNG: return {.size = sizeof(Png), .alignment = 8};
+    case SQL::ColumnType::MEDIA:
+        return {.size = sizeof(FixedString), .alignment = alignof(FixedString)};
     }
 
     OK_UNREACHABLE();
@@ -50,16 +61,19 @@ static TypeLayout type_layout(SQL::ColumnType type) {
 // would involve sorting the columns by type sizes in ascending order.
 static ColumnLayout *compute_columns_layout(ok::Allocator *allocator,
                                             UZ columns_count,
-                                            SQL::ColumnType *columns_types) {
+                                            SQL::ColumnType *columns_types)
+{
     ColumnLayout *columns_layout =
             allocator->alloc<ColumnLayout>(columns_count);
     UZ offset = 0;
 
-    for (UZ i = 0; i < columns_count; ++i) {
+    for (UZ i = 0; i < columns_count; ++i)
+    {
         SQL::ColumnType column_type = columns_types[i];
         TypeLayout t_layout = type_layout(column_type);
 
-        if (t_layout.alignment != 1) {
+        if (t_layout.alignment != 1)
+        {
             OK_ASSERT((t_layout.alignment & 1) == 0);
 
             offset = ok::align_up(offset, t_layout.alignment);
@@ -83,20 +97,27 @@ DBTable::DBTable(ok::Allocator *allocator, DBTable::Flags flags,
                  ok::StringView name, UZ columns_count,
                  ok::StringView *columns_names,
                  SQL::ColumnType *columns_types) :
-    m_name{name}, m_flags{flags}, m_columns_count{columns_count},
-    m_columns_names{columns_names}, m_columns_types{columns_types} {
+    m_name{name},
+    m_flags{flags},
+    m_columns_count{columns_count},
+    m_columns_names{columns_names},
+    m_columns_types{columns_types}
+{
     ColumnLayout *columns_layout =
             compute_columns_layout(allocator, columns_count, columns_types);
 
     UZ id_column_index = (UZ) -1;
-    for (UZ i = 0; i < columns_count; ++i) {
-        if (columns_names[i] == "id"_sv) {
+    for (UZ i = 0; i < columns_count; ++i)
+    {
+        if (columns_names[i] == "id"_sv)
+        {
             id_column_index = i;
             break;
         }
     }
 
-    if (id_column_index == (UZ) -1) {
+    if (id_column_index == (UZ) -1)
+    {
         OK_VERIFY(columns_count > 0);
         id_column_index = 0;
     }
@@ -108,27 +129,32 @@ DBTable::DBTable(ok::Allocator *allocator, DBTable::Flags flags,
     m_layout.columns.items = columns_layout;
     m_layout.columns.count = columns_count;
 
-    if (flags & F_PROXY) {
+    if (flags & F_PROXY)
+    {
         OK_ASSERT(flags & F_ANON);
 
         m_proxy_columns_values = allocator->alloc<DBValue *>(m_columns_count);
-        for (UZ i = 0; i < m_columns_count; ++i) {
+        for (UZ i = 0; i < m_columns_count; ++i)
+        {
             m_proxy_columns_values[i] = new (allocator) NoneDBValue{};
         }
     }
 
-    if (flags & F_EPHEMERAL) {
+    if (flags & F_EPHEMERAL)
+    {
         OK_ASSERT(flags & F_PERSIST);
     }
 
     m_column_attributes = allocator->alloc<ColumnAttribute>(m_columns_count);
 
-    for (UZ i = 0; i < m_columns_count; ++i) {
+    for (UZ i = 0; i < m_columns_count; ++i)
+    {
         ColumnAttribute attribute{};
 
         SQL::Type ty = SQL::column_type_to_type(m_columns_types[i]);
 
-        if (is_image(ty)) {
+        if (is_image(ty))
+        {
             attribute.flags |= ColumnAttribute::F_IMAGE;
         }
 
@@ -140,20 +166,27 @@ DBTable::DBTable(ok::Allocator *allocator, DBTable::Flags flags,
                  ok::StringView name, UZ columns_count,
                  ok::StringView *columns_names, SQL::ColumnType *columns_types,
                  ColumnAttribute *column_attributes) :
-    m_name{name}, m_flags{flags}, m_columns_count{columns_count},
-    m_columns_names{columns_names}, m_columns_types{columns_types} {
+    m_name{name},
+    m_flags{flags},
+    m_columns_count{columns_count},
+    m_columns_names{columns_names},
+    m_columns_types{columns_types}
+{
     ColumnLayout *columns_layout =
             compute_columns_layout(allocator, columns_count, columns_types);
 
     UZ id_column_index = (UZ) -1;
-    for (UZ col_idx = 0; col_idx < columns_count; ++col_idx) {
-        if (columns_names[col_idx] == "id"_sv) {
+    for (UZ col_idx = 0; col_idx < columns_count; ++col_idx)
+    {
+        if (columns_names[col_idx] == "id"_sv)
+        {
             id_column_index = col_idx;
             break;
         }
     }
 
-    if (id_column_index == (UZ) -1) {
+    if (id_column_index == (UZ) -1)
+    {
         OK_VERIFY(columns_count > 0);
         id_column_index = 0;
     }
@@ -165,20 +198,24 @@ DBTable::DBTable(ok::Allocator *allocator, DBTable::Flags flags,
     m_layout.columns.items = columns_layout;
     m_layout.columns.count = columns_count;
 
-    if (flags & F_PROXY) {
+    if (flags & F_PROXY)
+    {
         OK_ASSERT(flags & F_ANON);
 
         m_proxy_columns_values = allocator->alloc<DBValue *>(m_columns_count);
-        for (UZ col_idx = 0; col_idx < m_columns_count; ++col_idx) {
+        for (UZ col_idx = 0; col_idx < m_columns_count; ++col_idx)
+        {
             m_proxy_columns_values[col_idx] = new (allocator) NoneDBValue{};
         }
     }
 
-    if (flags & F_EPHEMERAL) {
+    if (flags & F_EPHEMERAL)
+    {
         OK_ASSERT(flags & F_PERSIST);
     }
 
-    for (UZ col_idx = 0; col_idx < m_columns_count; ++col_idx) {
+    for (UZ col_idx = 0; col_idx < m_columns_count; ++col_idx)
+    {
         SQL::Type ty = SQL::column_type_to_type(m_columns_types[col_idx]);
         bool type_is_image = is_image(ty);
         bool attr_is_image =
@@ -189,7 +226,8 @@ DBTable::DBTable(ok::Allocator *allocator, DBTable::Flags flags,
     m_column_attributes = column_attributes;
 }
 
-struct StreamPair {
+struct StreamPair
+{
     DBTableStream lhs;
     DBTableStream rhs;
 };
@@ -198,17 +236,15 @@ constexpr bool chunk_images = false;
 
 static constexpr const char *PULL_NAME = "pull";
 
-static Result<Pipeline *, ok::String>
-create_demux_pull_pipeline(ok::Allocator *allocator, MediaSource source) {
-    MediaSourceFormat source_format = CHECK(source.identify_format());
-
-    VideoPlugin *plugin = CHECK(video_plugin_for(allocator, source_format));
-
+static Result<Pipeline *, ok::String> create_demux_pull_pipeline(
+        ok::Allocator *allocator, VideoPlugin *plugin, MediaSource source)
+{
     Pipeline *pipeline = CHECK(Pipeline::create(allocator, plugin, nullptr));
 
     auto *pull = CHECK(Pull::create(
             allocator, pipeline,
-            [](Pull *pull, VideoFrame *frame, void *data) {
+            [](Pull *pull, VideoFrame *frame, void *data)
+            {
                 (void) pull;
                 (void) frame;
                 (void) data;
@@ -219,11 +255,13 @@ create_demux_pull_pipeline(ok::Allocator *allocator, MediaSource source) {
     auto *demux = CHECK(Demux::create(allocator, pipeline, source));
 
     demux->on_new_stream(
-            [](Demux *demux, MediaStream *stream, void *data) {
+            [](Demux *demux, MediaStream *stream, void *data)
+            {
                 auto *pull = reinterpret_cast<Pull *>(data);
                 ok::Optional<ok::String> connect_err =
                         demux->pipeline->connect(stream, pull);
-                if (connect_err) {
+                if (connect_err)
+                {
                     OK_PANIC_FMT("Failed to connect pipeline elements: %s",
                                  connect_err.get().cstr());
                 }
@@ -237,31 +275,40 @@ create_demux_pull_pipeline(ok::Allocator *allocator, MediaSource source) {
 }
 
 DBTableStream DBTableStream::from_value(ok::Allocator *allocator,
-                                        DBValue *value) {
-    switch (value->kind()) {
-    case DBValue::Kind::DELAYED: {
+                                        DBValue *value)
+{
+    switch (value->kind())
+    {
+    case DBValue::Kind::DELAYED:
+    {
         auto delayed = static_cast<DelayedDBValue *>(value);
         ok::Optional<DBValue *> delayed_value_opt = delayed->value();
 
-        if (!delayed_value_opt.has_value()) {
+        if (!delayed_value_opt.has_value())
+        {
             return DBTableStream{
                     allocator,
-                    [](void *arg) -> ok::Optional<Value> {
+                    [](void *arg) -> ok::Optional<Value>
+                    {
                         (void) arg;
                         return ok::Optional<Value>::empty();
                     },
                     nullptr,
             };
-        } else {
+        }
+        else
+        {
             DBValue *delayed_value = delayed_value_opt.get();
             return DBTableStream::from_value(allocator, delayed_value);
         }
     }
-    case DBValue::Kind::CONSTANT: {
+    case DBValue::Kind::CONSTANT:
+    {
         auto *const_val = static_cast<ConstDBValue *>(value);
         return DBTableStream{allocator, *const_val};
     }
-    case DBValue::Kind::COMPARE: {
+    case DBValue::Kind::COMPARE:
+    {
         auto *cmp_val = static_cast<CompareDBValue *>(value);
 
         DBTableStream lhs = from_value(allocator, cmp_val->lhs());
@@ -271,22 +318,26 @@ DBTableStream DBTableStream::from_value(ok::Allocator *allocator,
 
         return DBTableStream{
                 allocator,
-                [](void *arg) -> ok::Optional<Value> {
+                [](void *arg) -> ok::Optional<Value>
+                {
                     auto *state = static_cast<StreamPair *>(arg);
                     ok::Optional<Value> lhs_opt = state->lhs.next();
                     ok::Optional<Value> rhs_opt = state->rhs.next();
 
-                    if (lhs_opt && rhs_opt) {
+                    if (lhs_opt && rhs_opt)
+                    {
                         Value lhs = lhs_opt.get();
                         Value rhs = rhs_opt.get();
                         return lhs.compare(rhs);
                     }
 
-                    if (lhs_opt) {
+                    if (lhs_opt)
+                    {
                         return Value::greater();
                     }
 
-                    if (rhs_opt) {
+                    if (rhs_opt)
+                    {
                         return Value::less();
                     }
 
@@ -295,17 +346,20 @@ DBTableStream DBTableStream::from_value(ok::Allocator *allocator,
                 static_cast<void *>(cmp_state),
         };
     }
-    case DBValue::Kind::NONE: {
+    case DBValue::Kind::NONE:
+    {
         return DBTableStream{
                 allocator,
-                [](void *arg) -> ok::Optional<Value> {
+                [](void *arg) -> ok::Optional<Value>
+                {
                     OK_UNUSED(arg);
                     return ok::Optional<Value>::empty();
                 },
                 nullptr,
         };
     }
-    case DBValue::Kind::CONCAT: {
+    case DBValue::Kind::CONCAT:
+    {
         auto *concat_value = static_cast<ConcatDBValue *>(value);
 
         DBTableStream lhs = from_value(allocator, concat_value->lhs());
@@ -315,30 +369,38 @@ DBTableStream DBTableStream::from_value(ok::Allocator *allocator,
 
         return DBTableStream{
                 allocator,
-                [](void *arg) -> ok::Optional<Value> {
+                [](void *arg) -> ok::Optional<Value>
+                {
                     auto *pair = reinterpret_cast<StreamPair *>(arg);
 
-                    if (ok::Optional<Value> lhs = pair->lhs.next(); lhs) {
+                    if (ok::Optional<Value> lhs = pair->lhs.next(); lhs)
+                    {
                         return lhs;
-                    } else {
+                    }
+                    else
+                    {
                         return pair->rhs.next();
                     }
                 },
                 stream_pair,
         };
     }
-    case DBValue::Kind::COLUMN: {
+    case DBValue::Kind::COLUMN:
+    {
         auto *column_value = static_cast<ColumnDBValue *>(value);
         DBTable *table = column_value->table();
         ColumnLayout column_layout = column_value->layout();
 
-        if (table->flags() & DBTable::F_PROXY) {
+        if (table->flags() & DBTable::F_PROXY)
+        {
             ok::Slice<DBValue *> columns_values = table->proxy_column_values();
 
             DBValue *value = columns_values[column_layout.index];
 
             return DBTableStream::from_value(allocator, value);
-        } else {
+        }
+        else
+        {
             OK_ASSERT(table->flags() & DBTable::F_PERSIST);
 
             return DBTableStream{
@@ -348,12 +410,14 @@ DBTableStream DBTableStream::from_value(ok::Allocator *allocator,
             };
         }
     }
-    case DBValue::Kind::IMAGE_DATA: {
+    case DBValue::Kind::IMAGE_DATA:
+    {
         auto *image_value = static_cast<ImageDataDBValue *>(value);
 
         if (chunk_images) OK_TODO_MSG("Image chunking");
 
-        struct State {
+        struct State
+        {
             ok::Allocator *allocator;
             ImageDataDBValue *img;
             UZ times;
@@ -366,7 +430,8 @@ DBTableStream DBTableStream::from_value(ok::Allocator *allocator,
 
         return DBTableStream{
                 allocator,
-                [](void *arg) -> ok::Optional<Value> {
+                [](void *arg) -> ok::Optional<Value>
+                {
                     auto *state = static_cast<State *>(arg);
 
                     if (state->times > 0) return ok::Optional<Value>::empty();
@@ -381,13 +446,25 @@ DBTableStream DBTableStream::from_value(ok::Allocator *allocator,
                 state,
         };
     }
-    case DBValue::Kind::MEDIA: {
+    case DBValue::Kind::MEDIA:
+    {
+        Result<VideoPlugin *, ok::String> video_plugin_res =
+                get_or_load_default_media_plugin(allocator);
+        if (!video_plugin_res.ok())
+        {
+            OK_PANIC_FMT("Failed to get/load the default media plugin: %s",
+                         video_plugin_res.error().cstr());
+        }
+
+        auto *video_plugin = video_plugin_res.unwrap();
+
         auto *media_value = static_cast<MediaSourceDBValue *>(value);
         MediaSource media_source = media_value->source();
         Result<Pipeline *, ok::String> pipeline_res =
-                create_demux_pull_pipeline(allocator, media_source);
+                create_demux_pull_pipeline(allocator, video_plugin, media_source);
 
-        if (!pipeline_res.ok()) {
+        if (!pipeline_res.ok())
+        {
             OK_PANIC_FMT("Failed to create a pipeline: %s",
                          pipeline_res.error().cstr());
         }
@@ -396,11 +473,13 @@ DBTableStream DBTableStream::from_value(ok::Allocator *allocator,
 
         return DBTableStream{
                 allocator,
-                [](void *data) -> ok::Optional<Value> {
+                [](void *data) -> ok::Optional<Value>
+                {
                     auto *pipeline = static_cast<Pipeline *>(data);
                     ok::Optional<PipelineElement *> pull_opt =
                             pipeline->get_element(PULL_NAME);
-                    if (!pull_opt) {
+                    if (!pull_opt)
+                    {
                         OK_PANIC_FMT("Could not get the pull element '%s'",
                                      PULL_NAME);
                     }
@@ -419,28 +498,38 @@ DBTableStream DBTableStream::from_value(ok::Allocator *allocator,
     OK_UNREACHABLE();
 }
 
-ok::Optional<Value> DBTableStream::next() {
-    switch (m_type) {
-    case Type::CONSTANT: {
+ok::Optional<Value> DBTableStream::next()
+{
+    switch (m_type)
+    {
+    case Type::CONSTANT:
+    {
         ConstDBValue constant = m_u.constant;
 
-        switch (constant.kind()) {
-        case ConstDBValue::ConstKind::INT: {
+        switch (constant.kind())
+        {
+        case ConstDBValue::ConstKind::INT:
+        {
             S64 value = constant.as_int();
             return Value::integer(value);
         }
-        case ConstDBValue::ConstKind::BOOL: {
+        case ConstDBValue::ConstKind::BOOL:
+        {
             bool value = constant.as_bool();
             return Value::boolean(value);
         }
-        case ConstDBValue::ConstKind::STRING: {
+        case ConstDBValue::ConstKind::STRING:
+        {
             ok::String *value = constant.as_string();
-            if (value->count() <= FixedString::DATA_SIZE) {
+            if (value->count() <= FixedString::DATA_SIZE)
+            {
                 FixedString fs{};
                 memcpy(fs.items, (U8 *) value->cstr(), value->count());
                 fs.count = (U8) value->count();
                 return Value::string(m_allocator, fs);
-            } else {
+            }
+            else
+            {
                 XMDB_FIXME("eliminate copying of big strings");
                 return Value::big_string(m_allocator, value->view());
             }
@@ -449,17 +538,20 @@ ok::Optional<Value> DBTableStream::next() {
 
         OK_UNREACHABLE();
     }
-    case Type::COMPUTE: {
+    case Type::COMPUTE:
+    {
         ComputationStream comp = m_u.compute;
         return comp.comp(comp.arg);
     }
-    case Type::COLUMN: {
+    case Type::COLUMN:
+    {
         ColumnStream *col = &m_u.column;
         DBTable *table = col->table;
         DBState *state = table->state();
         UZ records_count = state->header.record_count;
 
-        if (col->current_record >= records_count) {
+        if (col->current_record >= records_count)
+        {
             return ok::Optional<Value>::empty();
         }
 
@@ -483,11 +575,14 @@ ok::Optional<Value> DBTableStream::next() {
 
         ++col->current_record;
 
-        switch (column_type) {
-        case SQL::ColumnType::INTEGER: {
+        switch (column_type)
+        {
+        case SQL::ColumnType::INTEGER:
+        {
             U64 result_u = 0;
 
-            for (SZ i = 0; i < 7; ++i) {
+            for (SZ i = 0; i < 7; ++i)
+            {
                 result_u = (result_u | (U64) col->buffer[i]) << 8;
             }
 
@@ -497,12 +592,14 @@ ok::Optional<Value> DBTableStream::next() {
 
             return Value::integer(result);
         }
-        case SQL::ColumnType::TEXT: {
+        case SQL::ColumnType::TEXT:
+        {
             FixedString result{};
             memcpy(&result, col->buffer, sizeof(FixedString));
             return Value::string(m_allocator, result);
         }
-        case SQL::ColumnType::PNG: {
+        case SQL::ColumnType::PNG:
+        {
             Png *png = reinterpret_cast<Png *>(col->buffer);
             OK_VERIFY(png->indices.count == 1);
 
@@ -541,7 +638,8 @@ ok::Optional<Value> DBTableStream::next() {
                                       disk_chunk->width, disk_chunk->height,
                                       pixel_data, png->format);
         }
-        case SQL::ColumnType::MEDIA: {
+        case SQL::ColumnType::MEDIA:
+        {
             // Result<Pipeline *, ok::String> pipeline_res =
             // create_demux_pull_pipeline(m_allocator, media_source);
             OK_TODO_MSG("media column");
@@ -558,7 +656,8 @@ ok::Optional<Value> DBTableStream::next() {
     OK_UNREACHABLE();
 }
 
-Value Value::compare(Value) {
+Value Value::compare(Value)
+{
     OK_TODO();
 }
 } // namespace xmdb

@@ -26,7 +26,8 @@ TEST(DBConnection, execute_create_and_select_on_empty_table) {
     DBDescriptor *default_db = db_pool.get_db("default"_sv);
     DBConnection db_conn{&db_pool, default_db, &admin};
 
-    bool ok = compile_and_execute_source(&arena, &db_conn, source, &query_results, &error);
+    bool ok = compile_and_execute_source(&arena, &db_conn, source,
+                                         &query_results, &error);
 
     ASSERT_TRUE(ok);
 
@@ -47,12 +48,14 @@ TEST(DBConnection, execute_create_and_select_on_empty_table) {
 TEST(DBConnection, select_empty_png_column) {
 #define PIXEL_DATA "abcdabcdabcdabcdabababab"
     ok::ArenaAllocator arena{};
-    StringView source = "CREATE TABLE MyTable ("
-        "id int,"
-        "img PNG"
-    ");"
-    "INSERT INTO MyTable(id, img) VALUES (1, RGB(2, 2, \"" PIXEL_DATA "\"));"
-    "SELECT img FROM MyTable;"_sv;
+    StringView source =
+            "CREATE TABLE MyTable ("
+            "id int,"
+            "img PNG"
+            ");"
+            "INSERT INTO MyTable(id, img) VALUES (1, RGB(2, 2, \"" PIXEL_DATA
+            "\"));"
+            "SELECT img FROM MyTable;"_sv;
 
     String error{};
 
@@ -63,7 +66,8 @@ TEST(DBConnection, select_empty_png_column) {
     DBDescriptor *default_db = db_pool.get_db("default"_sv);
     DBConnection db_conn{&db_pool, default_db, &admin};
 
-    bool ok = compile_and_execute_source(&arena, &db_conn, source, &query_results, &error);
+    bool ok = compile_and_execute_source(&arena, &db_conn, source,
+                                         &query_results, &error);
 
     ASSERT_TRUE(ok) << error.cstr();
 
@@ -91,7 +95,8 @@ TEST(DBConnection, select_empty_png_column) {
     ASSERT_EQ(image_chunk->height, 2);
     ASSERT_EQ(image_chunk->pixel_format, PixelFormat::RGB);
 
-    ok::Slice<U8> expected_pixel_data = from_hex_string(&arena, ok::StringView{PIXEL_DATA}).get();
+    ok::Slice<U8> expected_pixel_data =
+            from_hex_string(&arena, ok::StringView{PIXEL_DATA}).get();
 
     ASSERT_EQ(expected_pixel_data.count, image_chunk->data.count);
 
@@ -130,7 +135,8 @@ TEST(DBConnection, execute_create_insert_and_select_on_table_with_one_row) {
     DBDescriptor *default_db = db_pool.get_db("default"_sv);
     DBConnection db_conn{&db_pool, default_db, &admin};
 
-    bool ok = compile_and_execute_source(&arena, &db_conn, source, &query_results, &error);
+    bool ok = compile_and_execute_source(&arena, &db_conn, source,
+                                         &query_results, &error);
 
     ASSERT_TRUE(ok) << error.cstr();
 
@@ -174,7 +180,8 @@ TEST(DBConnection, execute_create_insert_and_select_on_table_with_one_row) {
     ASSERT_FALSE(column2_value.next());
 }
 
-TEST(DBConnection, execute_create_insert_update_and_select_on_table_with_one_row) {
+TEST(DBConnection,
+     execute_create_insert_update_and_select_on_table_with_one_row) {
     ok::ArenaAllocator arena{};
     StringView source = R"sql(CREATE TABLE MyTable (
         column1 int,
@@ -193,7 +200,8 @@ TEST(DBConnection, execute_create_insert_update_and_select_on_table_with_one_row
     DBDescriptor *default_db = db_pool.get_db("default"_sv);
     DBConnection db_conn{&db_pool, default_db, &admin};
 
-    bool ok = compile_and_execute_source(&arena, &db_conn, source, &query_results, &error);
+    bool ok = compile_and_execute_source(&arena, &db_conn, source,
+                                         &query_results, &error);
 
     ASSERT_TRUE(ok);
 
@@ -235,7 +243,8 @@ TEST(DBConnection, execute_create_insert_update_and_select_on_table_with_one_row
     ASSERT_FALSE(column2_stream.next());
 }
 
-TEST(DBConnection, execute_create_insert_delete_and_select_on_table_with_one_row) {
+TEST(DBConnection,
+     execute_create_insert_delete_and_select_on_table_with_one_row) {
     ok::ArenaAllocator arena{};
     StringView source = R"sql(CREATE TABLE MyTable (
         column1 int,
@@ -254,7 +263,8 @@ TEST(DBConnection, execute_create_insert_delete_and_select_on_table_with_one_row
     DBDescriptor *default_db = db_pool.get_db("default"_sv);
     DBConnection db_conn{&db_pool, default_db, &admin};
 
-    bool ok = compile_and_execute_source(&arena, &db_conn, source, &query_results, &error);
+    bool ok = compile_and_execute_source(&arena, &db_conn, source,
+                                         &query_results, &error);
 
     ASSERT_TRUE(ok);
 
@@ -280,7 +290,8 @@ TEST(DBConnection, execute_create_insert_delete_and_select_on_table_with_one_row
     ASSERT_FALSE(column2_stream.next());
 }
 
-TEST(DBConnection, create_new_db_and_execute_create_insert_and_select_on_table_with_one_row) {
+TEST(DBConnection,
+     create_new_db_and_execute_create_insert_and_select_on_table_with_one_row) {
     ok::ArenaAllocator arena{};
     StringView source = R"sql(
     CREATE DATABASE MyDb;
@@ -302,7 +313,8 @@ TEST(DBConnection, create_new_db_and_execute_create_insert_and_select_on_table_w
     DBDescriptor *default_db = db_pool.get_db("default"_sv);
     DBConnection db_conn{&db_pool, default_db, &admin};
 
-    bool ok = compile_and_execute_source(&arena, &db_conn, source, &query_results, &error);
+    bool ok = compile_and_execute_source(&arena, &db_conn, source,
+                                         &query_results, &error);
 
     ASSERT_TRUE(ok);
 
@@ -362,7 +374,8 @@ TEST(DBConnection, insert_and_select_multiple_rows) {
     DBDescriptor *default_db = db_pool.get_db("default"_sv);
     DBConnection db_conn{&db_pool, default_db, &admin};
 
-    bool ok = compile_and_execute_source(&arena, &db_conn, source, &query_results, &error);
+    bool ok = compile_and_execute_source(&arena, &db_conn, source,
+                                         &query_results, &error);
 
     ASSERT_TRUE(ok);
 
@@ -409,7 +422,8 @@ TEST(DBConnection, create_duplicate_table_fails) {
     DBDescriptor *default_db = db_pool.get_db("default"_sv);
     DBConnection db_conn{&db_pool, default_db, &admin};
 
-    bool ok = compile_and_execute_source(&arena, &db_conn, source, &query_results, &error);
+    bool ok = compile_and_execute_source(&arena, &db_conn, source,
+                                         &query_results, &error);
 
     ASSERT_FALSE(ok);
     ASSERT_TRUE(error.ends_with("already exists"));
@@ -433,7 +447,8 @@ TEST(DBConnection, create_and_drop_empty_table) {
     DBDescriptor *default_db = db_pool.get_db("default"_sv);
     DBConnection db_conn{&db_pool, default_db, &admin};
 
-    bool ok = compile_and_execute_source(&arena, &db_conn, source, &query_results, &error);
+    bool ok = compile_and_execute_source(&arena, &db_conn, source,
+                                         &query_results, &error);
 
     ASSERT_TRUE(ok);
 
@@ -458,14 +473,16 @@ TEST(DBConnection, create_and_drop_empty_database) {
     DBDescriptor *default_db = db_pool.get_db("default"_sv);
     DBConnection db_conn{&db_pool, default_db, &admin};
 
-    bool ok = compile_and_execute_source(&arena, &db_conn, source, &query_results, &error);
+    bool ok = compile_and_execute_source(&arena, &db_conn, source,
+                                         &query_results, &error);
 
     ASSERT_TRUE(ok);
 
     ASSERT_FALSE(query_results.error.has_value());
     ASSERT_TRUE(!query_results.value.has_value());
 
-    for (DBDescriptor *db = db_pool.db_descriptors; db != nullptr; db = db->next) {
+    for (DBDescriptor *db = db_pool.db_descriptors; db != nullptr;
+         db = db->next) {
         ASSERT_NE(db->name, "DB"_sv);
     }
 }
@@ -483,25 +500,29 @@ TEST(DBConnection, execute_multiple_queries_with_the_same_connection) {
     DBDescriptor *default_db = db_pool.get_db("default"_sv);
     DBConnection db_conn{&db_pool, default_db, &admin};
 
-    bool ok = compile_and_execute_source(&arena, &db_conn, source, &query_results, &error);
+    bool ok = compile_and_execute_source(&arena, &db_conn, source,
+                                         &query_results, &error);
 
     ASSERT_TRUE(ok) << error.cstr();
     ASSERT_FALSE(query_results.error.has_value());
 
     source = "USE DB;"_sv;
-    ok = compile_and_execute_source(&arena, &db_conn, source, &query_results, &error);
+    ok = compile_and_execute_source(&arena, &db_conn, source, &query_results,
+                                    &error);
 
     ASSERT_TRUE(ok) << error.cstr();
     ASSERT_FALSE(query_results.error.has_value());
 
     source = "CREATE TABLE MyTable (column1 int);"_sv;
-    ok = compile_and_execute_source(&arena, &db_conn, source, &query_results, &error);
+    ok = compile_and_execute_source(&arena, &db_conn, source, &query_results,
+                                    &error);
 
     ASSERT_TRUE(ok) << error.cstr();
     ASSERT_FALSE(query_results.error.has_value());
 
     source = "SELECT column1 FROM MyTable;"_sv;
-    ok = compile_and_execute_source(&arena, &db_conn, source, &query_results, &error);
+    ok = compile_and_execute_source(&arena, &db_conn, source, &query_results,
+                                    &error);
 
     ASSERT_TRUE(ok) << error.cstr();
     ASSERT_FALSE(query_results.error.has_value());
@@ -533,7 +554,8 @@ TEST(DBConnection, user_permissions) {
     DBDescriptor *default_db = db_pool.get_db("default"_sv);
     DBConnection db_conn{&db_pool, default_db, &user};
 
-    bool ok = compile_and_execute_source(&arena, &db_conn, source, &query_results, &error);
+    bool ok = compile_and_execute_source(&arena, &db_conn, source,
+                                         &query_results, &error);
 
     ASSERT_FALSE(ok) << error.cstr();
     ASSERT_TRUE(query_results.error.has_value());
@@ -542,13 +564,15 @@ TEST(DBConnection, user_permissions) {
 
     user.perm |= PERM_WRITE;
 
-    ok = compile_and_execute_source(&arena, &db_conn, source, &query_results, &error);
+    ok = compile_and_execute_source(&arena, &db_conn, source, &query_results,
+                                    &error);
 
     ASSERT_TRUE(ok) << error.cstr();
 
     source = "select * from tab;"_sv;
 
-    ok = compile_and_execute_source(&arena, &db_conn, source, &query_results, &error);
+    ok = compile_and_execute_source(&arena, &db_conn, source, &query_results,
+                                    &error);
 
     ASSERT_FALSE(ok);
     ASSERT_EQ(error, "0:0: user user does not have READ permissions"_sv);
@@ -567,7 +591,8 @@ TEST(DBConnection, create_new_user) {
     DBDescriptor *default_db = db_pool.get_db("default"_sv);
     DBConnection db_conn{&db_pool, default_db, &user};
 
-    bool ok = compile_and_execute_source(&arena, &db_conn, source, &query_results, &error);
+    bool ok = compile_and_execute_source(&arena, &db_conn, source,
+                                         &query_results, &error);
 
     ASSERT_TRUE(ok) << error.cstr();
 
@@ -587,7 +612,8 @@ TEST(DBConnection, create_new_user) {
 
 TEST(DBConnection, alter_new_user) {
     ok::ArenaAllocator arena{};
-    StringView source = "create user some_user; alter user some_user set PASSWORD = 'pass';"_sv;
+    StringView source =
+            "create user some_user; alter user some_user set PASSWORD = 'pass';"_sv;
 
     String error{};
 
@@ -598,14 +624,16 @@ TEST(DBConnection, alter_new_user) {
     DBDescriptor *default_db = db_pool.get_db("default"_sv);
     DBConnection db_conn{&db_pool, default_db, &user};
 
-    bool ok = compile_and_execute_source(&arena, &db_conn, source, &query_results, &error);
+    bool ok = compile_and_execute_source(&arena, &db_conn, source,
+                                         &query_results, &error);
 
     ASSERT_TRUE(ok) << error.cstr();
 
     Optional<DBUser *> some_user = default_db->find_user("some_user"_sv);
     ASSERT_TRUE(some_user.has_value());
 
-    ASSERT_EQ(some_user.value->sha256_password_digest, sha256_digest("pass"_sv));
+    ASSERT_EQ(some_user.value->sha256_password_digest,
+              sha256_digest("pass"_sv));
 }
 
 TEST(DBConnection, create_user_requires_admin_permissions) {
@@ -620,10 +648,12 @@ TEST(DBConnection, create_user_requires_admin_permissions) {
     DBDescriptor *default_db = db_pool.get_db("default"_sv);
     DBConnection db_conn{&db_pool, default_db, &user};
 
-    bool ok = compile_and_execute_source(&arena, &db_conn, source, &query_results, &error);
+    bool ok = compile_and_execute_source(&arena, &db_conn, source,
+                                         &query_results, &error);
 
     ASSERT_FALSE(ok);
-    ASSERT_TRUE(error.ends_with("does not have ADMIN permissions")) << error.cstr();
+    ASSERT_TRUE(error.ends_with("does not have ADMIN permissions"))
+            << error.cstr();
 }
 
 TEST(DBConnection, create_duplicate_user_fails) {
@@ -640,8 +670,29 @@ TEST(DBConnection, create_duplicate_user_fails) {
     DBDescriptor *default_db = db_pool.get_db("default"_sv);
     DBConnection db_conn{&db_pool, default_db, &admin};
 
-    bool ok = compile_and_execute_source(&arena, &db_conn, source, &query_results, &error);
+    bool ok = compile_and_execute_source(&arena, &db_conn, source,
+                                         &query_results, &error);
 
     ASSERT_FALSE(ok);
     ASSERT_TRUE(error.ends_with("already exists")) << error.cstr();
+}
+
+TEST(DBConnection, insert_media) {
+    ok::ArenaAllocator arena{};
+    StringView source =
+            "create table meds (m MEDIA); insert into meds(m) values (MEDIA('')); select m from meds;"_sv;
+
+    DBUser admin = DBUser::admin();
+    DBPool db_pool{&arena};
+    DBDescriptor *default_db = db_pool.get_db("default"_sv);
+    DBConnection db_conn{&db_pool, default_db, &admin};
+
+    QueryResults query_results{};
+
+    ok::String error{};
+
+    bool ok = compile_and_execute_source(&arena, &db_conn, source,
+                                         &query_results, &error);
+
+    ASSERT_TRUE(ok) << error.cstr();
 }

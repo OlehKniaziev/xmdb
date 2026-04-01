@@ -4,8 +4,10 @@
 
 #include "Plugin.hpp"
 
-namespace xmdb::plugin {
-class PluginManager {
+namespace xmdb::plugin
+{
+class PluginManager
+{
 public:
     explicit PluginManager(ok::Allocator *allocator);
 

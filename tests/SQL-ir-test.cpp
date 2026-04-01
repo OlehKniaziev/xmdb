@@ -92,9 +92,11 @@ TEST(ir, select_star) {
 
     CompiledQuery compiled_query_regular{};
 
-    ASSERT_TRUE(ir_compile_query(&query.value, &ir_ctx, &compiled_query_regular));
+    ASSERT_TRUE(
+            ir_compile_query(&query.value, &ir_ctx, &compiled_query_regular));
 
-    ASSERT_EQ(stringify_ir(&arena, &compiled_query_star), stringify_ir(&arena, &compiled_query_regular));
+    ASSERT_EQ(stringify_ir(&arena, &compiled_query_star),
+              stringify_ir(&arena, &compiled_query_regular));
 }
 
 TEST(ir, create_database) {
@@ -136,7 +138,8 @@ TEST(ir, create_table) {
 
 TEST(ir, drop_database) {
     ok::ArenaAllocator arena{};
-    auto source = "DROP DATABASE default; CREATE DATABASE DB; DROP DATABASE DB;"_sv;
+    auto source =
+            "DROP DATABASE default; CREATE DATABASE DB; DROP DATABASE DB;"_sv;
     Parser parser{&arena, source};
 
     auto query = parser.query();
@@ -153,7 +156,8 @@ TEST(ir, drop_database) {
 
 TEST(ir, select_png_column) {
     ok::ArenaAllocator arena{};
-    auto source = "CREATE TABLE Tab (id int, avatar PNG); SELECT avatar FROM Tab;"_sv;
+    auto source =
+            "CREATE TABLE Tab (id int, avatar PNG); SELECT avatar FROM Tab;"_sv;
     Parser parser{&arena, source};
 
     auto q = parser.query();
@@ -161,9 +165,10 @@ TEST(ir, select_png_column) {
 
     IrContext ir_ctx{&arena, source};
     CompiledQuery compiled_query{};
-    ASSERT_TRUE(ir_compile_query(&q.value, &ir_ctx, &compiled_query)) << format_error(&arena,
-                                                                                      ir_ctx.error.get().location,
-                                                                                      ir_ctx.error.get().message.view()).cstr();
+    ASSERT_TRUE(ir_compile_query(&q.value, &ir_ctx, &compiled_query))
+            << format_error(&arena, ir_ctx.error.get().location,
+                            ir_ctx.error.get().message.view())
+                       .cstr();
 
     TypedCompiledQuery typed_query{};
     TypingContext t_ctx{&arena, source};
@@ -269,10 +274,13 @@ TEST(ir, delete_) {
 
 TEST(ir, alter_user) {
     ok::ArenaAllocator arena{};
-    auto source = "CREATE USER foo; ALTER USER foo SET PASSWORD = 'strong_pass';"_sv;
+    auto source =
+            "CREATE USER foo; ALTER USER foo SET PASSWORD = 'strong_pass';"_sv;
 
     TypedCompiledQuery typed_query{};
     String error{};
 
-    ASSERT_TRUE(compile_and_type_check_source(&arena, source, &typed_query, &error)) << error.cstr();
+    ASSERT_TRUE(
+            compile_and_type_check_source(&arena, source, &typed_query, &error))
+            << error.cstr();
 }
