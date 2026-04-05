@@ -39,7 +39,7 @@ public:
 
     ok::Optional<ok::StringView> get_last_error() const;
 
-    ok::Optional<PluginCapability> get_capability(ok::StringView name) const;
+    Result<PluginCapability, ok::String> get_capability(ok::StringView name) const;
 
     template <typename T, typename... Args>
     T use_capability(PluginCapability capability, Args&&... args);
@@ -51,7 +51,7 @@ public:
     }
 
 private:
-    using LoadHook = int (*)(void *);
+    using LoadHook = int (*)(void **);
     using UnloadHook = void (*)(void *);
     using InstallHook = void (*)(void *,
                                  const char *,

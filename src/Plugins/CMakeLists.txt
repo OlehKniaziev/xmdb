@@ -1,4 +1,4 @@
-file(GLOB PLUGIN_SOURCES "*.c")
+file(GLOB PLUGIN_SOURCES "*.cpp")
 
 foreach(PLUGIN_SOURCE ${PLUGIN_SOURCES})
     get_filename_component(PLUGIN_NAME ${PLUGIN_SOURCE} NAME_WE)

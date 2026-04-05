@@ -96,7 +96,7 @@ TEST_F(PluginIntegrationFixture, load_plugin_succeeds) {
 
     plug->install(ok::StringView{PLUGIN_NAME});
 
-    PluginCapability was_loaded_cap = plug->get_capability(ok::StringView{CAP_WAS_LOADED}).get();
+    PluginCapability was_loaded_cap = plug->get_capability(ok::StringView{CAP_WAS_LOADED}).unwrap();
     int was_loaded = plug->use_capability<int>(was_loaded_cap);
     ASSERT_TRUE(was_loaded);
 }
@@ -118,8 +118,8 @@ TEST_F(PluginIntegrationFixture, install_hook_registers_capabilities) {
     Plugin *plugin = result.unwrap();
     plugin->install(ok::StringView{PLUGIN_NAME});
 
-    ASSERT_TRUE(plugin->get_capability(ok::StringView{CAP_SAY_HELLO}).has_value());
-    ASSERT_TRUE(plugin->get_capability(ok::StringView{CAP_ADD}).has_value());
+    ASSERT_TRUE(plugin->get_capability(ok::StringView{CAP_SAY_HELLO}).ok());
+    ASSERT_TRUE(plugin->get_capability(ok::StringView{CAP_ADD}).ok());
 }
 
 TEST_F(PluginIntegrationFixture, missing_capability_returns_empty) {
@@ -129,7 +129,7 @@ TEST_F(PluginIntegrationFixture, missing_capability_returns_empty) {
     Plugin *plugin = result.unwrap();
     plugin->install(ok::StringView{PLUGIN_NAME});
 
-    ASSERT_FALSE(plugin->get_capability("nonexistent"_sv).has_value());
+    ASSERT_FALSE(plugin->get_capability("nonexistent"_sv).ok());
 }
 
 TEST_F(PluginIntegrationFixture, capabilities_are_callable) {
@@ -139,14 +139,14 @@ TEST_F(PluginIntegrationFixture, capabilities_are_callable) {
     Plugin *plugin = result.unwrap();
     plugin->install(ok::StringView{PLUGIN_NAME});
 
-    ok::Optional<PluginCapability> say_hello_cap = plugin->get_capability(ok::StringView{CAP_SAY_HELLO});
-    ASSERT_TRUE(say_hello_cap.has_value());
-    const char *say_hello_res = plugin->use_capability<const char *>(say_hello_cap.get());
+    Result<PluginCapability, ok::String> say_hello_cap = plugin->get_capability(ok::StringView{CAP_SAY_HELLO});
+    ASSERT_TRUE(say_hello_cap.ok());
+    const char *say_hello_res = plugin->use_capability<const char *>(say_hello_cap.unwrap());
     ASSERT_STREQ(say_hello_res, SAY_HELLO_RESULT);
 
-    ok::Optional<PluginCapability> add_cap = plugin->get_capability(ok::StringView{CAP_ADD});
-    ASSERT_TRUE(add_cap.has_value());
-    int add_res = plugin->use_capability<int>(add_cap.get(), 3, 4);
+    Result<PluginCapability, ok::String> add_cap = plugin->get_capability(ok::StringView{CAP_ADD});
+    ASSERT_TRUE(add_cap.ok());
+    int add_res = plugin->use_capability<int>(add_cap.unwrap(), 3, 4);
     ASSERT_EQ(add_res, 7);
 }
 
@@ -158,7 +158,7 @@ TEST_F(PluginIntegrationFixture, install_is_idempotent) {
     plugin->install(ok::StringView{PLUGIN_NAME});
     plugin->install(ok::StringView{PLUGIN_NAME});
 
-    ASSERT_TRUE(plugin->get_capability(ok::StringView{CAP_SAY_HELLO}).has_value());
+    ASSERT_TRUE(plugin->get_capability(ok::StringView{CAP_SAY_HELLO}).ok());
 }
 
 #endif // XMDB_BUILDING_TEST_PLUGIN

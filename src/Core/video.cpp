@@ -1,7 +1,6 @@
 #include "video.hpp"
 
 #include "new.hpp"
-#include "video-plugin-api.h"
 
 #include <Core/config.hpp>
 #include <Plugin/PluginManager.hpp>
@@ -17,11 +16,11 @@ Result<VideoPlugin *, ok::String> VideoPlugin::from_raw(
 {
 #define X(cap_name)                                                            \
     auto cap_name##_cap = plug->get_capability(ok::StringView{#cap_name});     \
-    if (!cap_name##_cap)                                                       \
+    if (!cap_name##_cap.ok())                                                  \
     {                                                                          \
-        return ok::String::alloc(allocator,                                    \
-                                 "The plugin is missing the '" #cap_name       \
-                                 "' capability");                              \
+        return ok::String::format(allocator,                                   \
+                                  "could not get the plugin capability: %s",   \
+                                  cap_name##_cap.error().cstr());              \
     }
     XMDB_ENUM_MEDIA_PLUGIN_CAPABILITIES
 #undef X
@@ -30,7 +29,7 @@ Result<VideoPlugin *, ok::String> VideoPlugin::from_raw(
             allocator,
             plug,
             VideoPluginCapabilities{
-#define X(cap_name) .cap_name = cap_name##_cap.get(),
+#define X(cap_name) .cap_name = cap_name##_cap.unwrap(),
                     XMDB_ENUM_MEDIA_PLUGIN_CAPABILITIES
 #undef X
             },
@@ -65,8 +64,8 @@ Result<MediaSourceFormat, ok::String> MediaSource::identify_format(
 
         WebBase64Encode(buffer_sv, buffer_base64, &buffer_base64_count);
 
-        int ok = plugin->m_plugin->use_capability<int>(identify_cap,
-                                                       buffer_base64, &format);
+        int ok = plugin->m_plugin->use_capability<int>(
+                identify_cap, buffer_base64, buffer_base64_count, &format);
         if (!ok)
         {
             return get_error(allocator, plugin->m_plugin);

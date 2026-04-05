@@ -1,6 +1,7 @@
 #pragma once
 
 #include "BufferedStream.hpp"
+#include "video-plugin-api.h"
 
 #include <Plugin/Plugin.hpp>
 
@@ -212,17 +213,6 @@ private:
     void *m_plugin_state;
     ok::Table<ok::StringView, PipelineElement *> m_name_to_element;
 };
-
-#define XMDB_ENUM_MEDIA_PLUGIN_CAPABILITIES                                    \
-    X(stream_pull_sync)                                                        \
-    X(stream_pull_async)                                                       \
-    X(pipeline_create)                                                         \
-    X(pipeline_connect)                                                        \
-    X(pipeline_add)                                                            \
-    X(demux_create)                                                            \
-    X(demux_on_new_stream)                                                     \
-    X(pull_create)                                                             \
-    X(identify_format_base64)
 
 class VideoPlugin
 {
