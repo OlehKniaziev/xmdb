@@ -14,6 +14,8 @@ using namespace xmdb::plugin;
 Result<VideoPlugin *, ok::String> VideoPlugin::from_raw(
         ok::Allocator *allocator, plugin::Plugin *plug)
 {
+    plug->install("media"_sv);
+
 #define X(cap_name)                                                            \
     auto cap_name##_cap = plug->get_capability(ok::StringView{#cap_name});     \
     if (!cap_name##_cap.ok())                                                  \
