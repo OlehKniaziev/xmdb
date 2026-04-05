@@ -5,10 +5,14 @@
 
 namespace xmdb
 {
+using namespace ok::literals;
+
 // @Safety All of these should be in read-only pages after the load succeeds.
 #define X(name, _h, type, _ht) type g_##name;
+#define XD(name, _h, type, _ht, d) type g_##name = d;
 XMDB_ENUM_CONFIG_OPTIONS
 #undef X
+#undef XD
 
 template <typename T>
 Result<T, ok::String> load_option(MallocAllocator *, const char *, const char *,
@@ -50,8 +54,20 @@ ok::Optional<ok::String> GlobalConfig::load()
                 &allocator, "failed to load option '" #human_name "': %s",     \
                 opt_res.error().cstr());                                       \
     }
+#define XD(name, human_name, type, human_type, default_value)                  \
+    auto opt_res =                                                             \
+            load_option<type>(&allocator, #name, #human_name, #human_type);    \
+    if (opt_res.ok())                                                          \
+    {                                                                          \
+        g_##name = opt_res.unwrap();                                           \
+    }                                                                          \
+    else                                                                       \
+    {                                                                          \
+        g_##name = default_value;                                              \
+    }
     XMDB_ENUM_CONFIG_OPTIONS
 #undef X
+#undef XD
 
     return {};
 }
@@ -63,6 +79,8 @@ ok::Optional<ok::String> GlobalConfig::load()
     {                                                                          \
         return g_##name;                                                       \
     }
+#define XD(name, human_name, type, _ht, _d) X(name, human_name, type, _ht)
 XMDB_ENUM_CONFIG_OPTIONS
 #undef X
+#undef XD
 } // namespace xmdb
