@@ -2,11 +2,12 @@
 
 #include "ok.hpp"
 
-namespace xmdb {
+namespace xmdb
+{
 #define CHECK(res)                                                             \
     ({                                                                         \
         auto _x = (res);                                                       \
-        if (_x.ok()) return _x.error();                                        \
+        if (!_x.ok()) return _x.error();                                       \
         _x.unwrap();                                                           \
     })
 
@@ -16,21 +17,24 @@ namespace xmdb {
  * @tparam TOk The type of the success value.
  * @tparam TError The type of the error value.
  */
-template<typename TOk, typename TError>
-class [[nodiscard]] Result {
+template <typename TOk, typename TError>
+class [[nodiscard]] Result
+{
 public:
     /**
      * @brief Constructs a success Result.
      * @param ok The success value.
      */
-    Result(const TOk &ok) : m_ok{true}, m_u{.ok_val = ok} {
+    Result(const TOk &ok) : m_ok{true}, m_u{.ok_val = ok}
+    {
     }
 
     /**
      * @brief Constructs an error Result.
      * @param error The error value.
      */
-    Result(const TError &error) : m_ok{false}, m_u{.error_val = error} {
+    Result(const TError &error) : m_ok{false}, m_u{.error_val = error}
+    {
     }
 
     /**
@@ -95,107 +99,129 @@ public:
      * @param error_fn Function to call on error.
      * @return The result of the called function.
      */
-    template<typename TResult, typename TOkFn, typename TErrorFn>
+    template <typename TResult, typename TOkFn, typename TErrorFn>
     TResult match(TOkFn ok_fn, TErrorFn error_fn);
 
     /**
      * @brief Matches the result using provided functions (const version).
      */
-    template<typename TResult, typename TOkFn, typename TErrorFn>
+    template <typename TResult, typename TOkFn, typename TErrorFn>
     TResult match(TOkFn ok_fn, TErrorFn error_fn) const;
 
     /**
      * @brief Checks if the Result is a success.
      * @return true if success, false if error.
      */
-    bool ok() const {
+    bool ok() const
+    {
         return m_ok;
     }
 
 private:
     bool m_ok;
-    union {
+    union
+    {
         TOk ok_val;
         TError error_val;
     } m_u;
 };
 
-template<typename TOk, typename TError>
-TOk &Result<TOk, TError>::unwrap() {
-    if (!ok()) {
+template <typename TOk, typename TError>
+TOk &Result<TOk, TError>::unwrap()
+{
+    if (!ok())
+    {
         OK_PANIC("Called 'unwrap' on an error value");
     }
 
     return m_u.ok_val;
 }
 
-template<typename TOk, typename TError>
-const TOk &Result<TOk, TError>::unwrap() const {
-    if (!ok()) {
+template <typename TOk, typename TError>
+const TOk &Result<TOk, TError>::unwrap() const
+{
+    if (!ok())
+    {
         OK_PANIC("Called 'unwrap' on an error value");
     }
 
     return m_u.ok_val;
 }
 
-template<typename TOk, typename TError>
-TOk &Result<TOk, TError>::unwrap_unchecked() {
+template <typename TOk, typename TError>
+TOk &Result<TOk, TError>::unwrap_unchecked()
+{
     OK_ASSERT(ok());
     return m_u.ok_val;
 }
 
-template<typename TOk, typename TError>
-const TOk &Result<TOk, TError>::unwrap_unchecked() const {
+template <typename TOk, typename TError>
+const TOk &Result<TOk, TError>::unwrap_unchecked() const
+{
     OK_ASSERT(ok());
     return m_u.ok_val;
 }
 
-template<typename TOk, typename TError>
-TError &Result<TOk, TError>::error() {
-    if (ok()) {
+template <typename TOk, typename TError>
+TError &Result<TOk, TError>::error()
+{
+    if (ok())
+    {
         OK_PANIC("Called 'error' on an ok value");
     }
 
     return m_u.error_val;
 }
 
-template<typename TOk, typename TError>
-const TError &Result<TOk, TError>::error() const {
-    if (ok()) {
+template <typename TOk, typename TError>
+const TError &Result<TOk, TError>::error() const
+{
+    if (ok())
+    {
         OK_PANIC("Called 'error' on an ok value");
     }
 
     return m_u.error_val;
 }
 
-template<typename TOk, typename TError>
-TError &Result<TOk, TError>::error_unchecked() {
+template <typename TOk, typename TError>
+TError &Result<TOk, TError>::error_unchecked()
+{
     OK_ASSERT(!ok());
     return m_u.error_val;
 }
 
-template<typename TOk, typename TError>
-const TError &Result<TOk, TError>::error_unchecked() const {
+template <typename TOk, typename TError>
+const TError &Result<TOk, TError>::error_unchecked() const
+{
     OK_ASSERT(!ok());
     return m_u.error_val;
 }
 
-template<typename TOk, typename TError>
-template<typename TResult, typename TOkFn, typename TErrorFn>
-TResult Result<TOk, TError>::match(TOkFn ok_fn, TErrorFn error_fn) {
-    if (ok()) {
+template <typename TOk, typename TError>
+template <typename TResult, typename TOkFn, typename TErrorFn>
+TResult Result<TOk, TError>::match(TOkFn ok_fn, TErrorFn error_fn)
+{
+    if (ok())
+    {
         return ok_fn(m_u.ok_val);
-    } else {
+    }
+    else
+    {
         return error_fn(m_u.error_val);
     }
 }
 
-template<typename TOk, typename TError>
-template<typename TResult, typename TOkFn, typename TErrorFn>
-TResult Result<TOk, TError>::match(TOkFn ok_fn, TErrorFn error_fn) const {
-    if (ok()) {
+template <typename TOk, typename TError>
+template <typename TResult, typename TOkFn, typename TErrorFn>
+TResult Result<TOk, TError>::match(TOkFn ok_fn, TErrorFn error_fn) const
+{
+    if (ok())
+    {
         return ok_fn(m_u.ok_val);
-    } else {
+    }
+    else
+    {
         return error_fn(m_u.error_val);
     }
 }
