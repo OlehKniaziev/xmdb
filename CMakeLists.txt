@@ -17,6 +17,7 @@ add_subdirectory(src/ArgParser)
 add_subdirectory(src/SQL)
 add_subdirectory(src/Server)
 add_subdirectory(src/CLI)
+add_subdirectory(src/Plugins)
 # TODO(oleh): Build this only if in developer mode.
 add_subdirectory(src/IR)
 add_subdirectory(src/WASMParser)
