@@ -141,7 +141,7 @@ public:
                                              Pipeline *pipeline, Hook hook,
                                              void *data);
 
-    Result<U32, ok::String> block_until_completion();
+    Result<bool, ok::String> pull_sync(VideoFrame *frame);
 
     ok::Slice<MediaStream *> outputs() override;
     ok::Slice<MediaSink *> inputs() override;
@@ -171,7 +171,8 @@ public:
     void on_new_stream(OnNewStreamHook hook, void *data);
 
 private:
-    Demux(ok::Allocator *allocator, Pipeline *pipeline, xmdb_PluginEntity state) :
+    Demux(ok::Allocator *allocator, Pipeline *pipeline,
+          xmdb_PluginEntity state) :
         PipelineElement{pipeline, state}, m_allocator{allocator}
     {
     }

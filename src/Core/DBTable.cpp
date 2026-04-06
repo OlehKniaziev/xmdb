@@ -461,7 +461,8 @@ DBTableStream DBTableStream::from_value(ok::Allocator *allocator,
         auto *media_value = static_cast<MediaSourceDBValue *>(value);
         MediaSource media_source = media_value->source();
         Result<Pipeline *, ok::String> pipeline_res =
-                create_demux_pull_pipeline(allocator, video_plugin, media_source);
+                create_demux_pull_pipeline(allocator, video_plugin,
+                                           media_source);
 
         if (!pipeline_res.ok())
         {
@@ -484,9 +485,27 @@ DBTableStream DBTableStream::from_value(ok::Allocator *allocator,
                                      PULL_NAME);
                     }
 
-                    auto pull = pull_opt.get();
-                    OK_TODO_MSG("Dunno what to do here tbh!");
-                    (void) pull;
+                    auto *pull_element = pull_opt.get();
+                    auto *pull = static_cast<Pull *>(pull_element);
+
+                    VideoFrame frame{};
+
+                    auto pull_res = pull->pull_sync(&frame);
+                    if (!pull_res.ok())
+                    {
+                        log::error("Failed to synchronously pull a frame: %s",
+                                   pull_res.error().cstr());
+                        return {};
+                    }
+
+                    if (pull_res.unwrap())
+                    {
+                        return Value::frame(frame);
+                    }
+                    else
+                    {
+                        return {};
+                    }
                 },
                 pipeline,
         };

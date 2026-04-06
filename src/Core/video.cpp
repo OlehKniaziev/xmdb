@@ -165,6 +165,8 @@ Result<Demux *, ok::String> Demux::create(ok::Allocator *allocator,
 
 void Demux::on_new_stream(OnNewStreamHook hook, void *data)
 {
+    OK_PANIC("Don't call this, use the synchronous API instead");
+
     struct UserDataStub
     {
         OnNewStreamHook hook;
