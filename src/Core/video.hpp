@@ -104,12 +104,12 @@ public:
     }
 
 protected:
-    PipelineElement(Pipeline *pipeline, void *plugin_state) :
+    PipelineElement(Pipeline *pipeline, xmdb_PluginEntity plugin_state) :
         pipeline{pipeline}, m_plugin_state{plugin_state}
     {
     }
 
-    void *m_plugin_state;
+    xmdb_PluginEntity m_plugin_state;
 };
 
 class MediaStream : public PipelineElement
@@ -147,7 +147,7 @@ public:
     ok::Slice<MediaSink *> inputs() override;
 
 private:
-    Pull(Pipeline *pipeline, void *plugin_state) :
+    Pull(Pipeline *pipeline, xmdb_PluginEntity plugin_state) :
         PipelineElement{pipeline, plugin_state}
     {
     }
@@ -171,11 +171,12 @@ public:
     void on_new_stream(OnNewStreamHook hook, void *data);
 
 private:
-    Demux(Pipeline *pipeline, void *state) : PipelineElement{pipeline, state}
+    Demux(ok::Allocator *allocator, Pipeline *pipeline, xmdb_PluginEntity state) :
+        PipelineElement{pipeline, state}, m_allocator{allocator}
     {
     }
 
-    ok::Optional<OnNewStreamHook> m_on_new_stream_hook;
+    ok::Allocator *m_allocator;
 };
 
 class Pipeline
@@ -201,7 +202,7 @@ public:
 
 private:
     Pipeline(ok::Allocator *allocator, VideoPlugin *plugin,
-             void *plugin_state) :
+             xmdb_PluginEntity plugin_state) :
         m_allocator{allocator}, m_plugin{plugin}, m_plugin_state{plugin_state}
     {
         m_name_to_element =
@@ -210,7 +211,7 @@ private:
 
     ok::Allocator *m_allocator;
     VideoPlugin *m_plugin;
-    void *m_plugin_state;
+    xmdb_PluginEntity m_plugin_state;
     ok::Table<ok::StringView, PipelineElement *> m_name_to_element;
 };
 

@@ -1,14 +1,18 @@
-file(GLOB PLUGIN_SOURCES "*.cpp")
+add_library(xmdbmediaplugin SHARED media.cpp)
 
-foreach(PLUGIN_SOURCE ${PLUGIN_SOURCES})
-    get_filename_component(PLUGIN_NAME ${PLUGIN_SOURCE} NAME_WE)
-    set(TARGET_NAME "xmdb${PLUGIN_NAME}plugin")
+find_package(PkgConfig REQUIRED)
 
-    add_library(${TARGET_NAME} SHARED ${PLUGIN_SOURCE})
+pkg_search_module(gstreamer REQUIRED IMPORTED_TARGET gstreamer-1.0)
+pkg_search_module(gstreamer-app REQUIRED IMPORTED_TARGET gstreamer-app-1.0)
 
-    set_target_properties(${TARGET_NAME} PROPERTIES
+set_target_properties(xmdbmediaplugin PROPERTIES
         LIBRARY_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/plugins"
         PREFIX "lib"
-        OUTPUT_NAME "xmdb${PLUGIN_NAME}plugin"
-    )
-endforeach()
+        OUTPUT_NAME xmdbmediaplugin
+)
+
+target_link_libraries(xmdbmediaplugin
+        PkgConfig::gstreamer
+        PkgConfig::gstreamer-app
+        libweb
+)

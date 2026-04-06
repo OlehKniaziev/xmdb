@@ -99,8 +99,9 @@ ok::Optional<ok::String> Pipeline::connect(PipelineElement *source,
 {
     auto &connect_cap = m_plugin->m_caps.pipeline_connect;
     int ok = m_plugin->m_plugin->use_capability<int>(
-            connect_cap, m_plugin_state, source->m_plugin_state,
-            dest->m_plugin_state);
+            connect_cap, m_plugin_state,
+            plugin_entity_to_callback(source->m_plugin_state),
+            plugin_entity_to_callback(dest->m_plugin_state));
 
     if (!ok)
     {
@@ -115,7 +116,7 @@ Result<Pipeline *, ok::String> Pipeline::create(ok::Allocator *allocator,
                                                 const char *name)
 {
     auto &create_cap = plugin->m_caps.pipeline_create;
-    void *out_pipeline = nullptr;
+    xmdb_PluginEntity out_pipeline{};
     int ok = plugin->m_plugin->use_capability<int>(create_cap, name,
                                                    &out_pipeline);
 
@@ -145,28 +146,52 @@ Result<Demux *, ok::String> Demux::create(ok::Allocator *allocator,
     auto *video_plugin = pipeline->plugin();
     auto &create_cap = video_plugin->m_caps.demux_create;
 
-    void *plugin_demux = nullptr;
+    xmdb_PluginEntity plugin_state{};
 
     int ok = video_plugin->m_plugin->use_capability<int>(
             create_cap, source_buffer.items, source_buffer.count,
-            &plugin_demux);
+            &plugin_state);
     if (!ok)
     {
         return get_error(allocator, video_plugin->m_plugin);
     }
 
     return new (allocator) Demux{
+            allocator,
             pipeline,
-            plugin_demux,
+            plugin_state,
     };
 }
 
 void Demux::on_new_stream(OnNewStreamHook hook, void *data)
 {
-    (void) hook;
-    (void) data;
+    struct UserDataStub
+    {
+        OnNewStreamHook hook;
+        void *user_data;
+    };
 
-    OK_TODO();
+    auto hook_stub = [](void *demux_state, void *stream_state, void *user_data)
+    {
+        auto *stub = static_cast<UserDataStub *>(user_data);
+        (void) stub;
+        (void) demux_state;
+        (void) stream_state;
+        OK_TODO();
+        // stub->hook(demux_state, stream_state, stub->user_data);
+    };
+
+    auto *data_stub = new (m_allocator) UserDataStub{
+            .hook = hook,
+            .user_data = data,
+    };
+
+    auto *plug = pipeline->plugin();
+
+    auto &on_new_stream_cap = plug->m_caps.demux_on_new_stream;
+
+    plug->m_plugin->use_capability<void>(on_new_stream_cap, m_plugin_state.impl,
+                                         hook_stub, data_stub);
 }
 
 Result<Pull *, ok::String> Pull::create(ok::Allocator *allocator,
@@ -176,19 +201,20 @@ Result<Pull *, ok::String> Pull::create(ok::Allocator *allocator,
     auto *video_plugin = pipeline->plugin();
     auto &create_cap = video_plugin->m_caps.pull_create;
 
-    struct DataStub
+    struct UserDataStub
     {
         Hook hook;
         void *user_data;
     };
 
-    auto *data_stub = new (allocator) DataStub{
+    auto *data_stub = new (allocator) UserDataStub{
             .hook = hook,
             .user_data = data,
     };
 
-    void (*hook_stub)(Pull *, int, int, U8 *, DataStub *) =
-            [](Pull *pull, int w, int h, U8 *frame_data, DataStub *data_stub)
+    void (*hook_stub)(Pull *, int, int, U8 *, UserDataStub *) =
+            [](Pull *pull, int w, int h, U8 *frame_data,
+               UserDataStub *data_stub)
     {
         VideoFrame frame{
                 .data = {frame_data, (UZ) (w * h)},
@@ -197,10 +223,10 @@ Result<Pull *, ok::String> Pull::create(ok::Allocator *allocator,
         data_stub->hook(pull, &frame, data_stub->user_data);
     };
 
-    void *pull_plugin = nullptr;
+    xmdb_PluginEntity plugin_state{};
 
     int ok = video_plugin->m_plugin->use_capability<int>(
-            create_cap, hook_stub, data_stub, &pull_plugin);
+            create_cap, hook_stub, data_stub, &plugin_state);
 
     if (!ok)
     {
@@ -209,7 +235,7 @@ Result<Pull *, ok::String> Pull::create(ok::Allocator *allocator,
 
     return new (allocator) Pull{
             pipeline,
-            pull_plugin,
+            plugin_state,
     };
 }
 
@@ -217,8 +243,9 @@ void Pipeline::add(PipelineElement *element, const char *name)
 {
     auto &add_cap = m_plugin->m_caps.pipeline_add;
 
-    m_plugin->m_plugin->use_capability<void>(add_cap, m_plugin_state,
-                                             element->m_plugin_state, name);
+    m_plugin->m_plugin->use_capability<void>(
+            add_cap, plugin_entity_to_callback(this->m_plugin_state),
+            plugin_entity_to_callback(element->m_plugin_state));
 
     m_name_to_element.put(ok::StringView{name}, element);
 }

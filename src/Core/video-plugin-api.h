@@ -13,6 +13,26 @@ typedef enum
     XMDB_MEDIA_FORMAT_MP4,
 } xmdb_MediaFormat;
 
+typedef struct
+{
+    void *impl;
+    unsigned int callback_offset;
+    int indirect;
+} xmdb_PluginEntity;
+
+static inline void *plugin_entity_to_callback(xmdb_PluginEntity e)
+{
+    void *ptr = (void *) ((unsigned char *) e.impl + e.callback_offset);
+    if (e.indirect)
+    {
+        return *(void **) ptr;
+    }
+    else
+    {
+        return ptr;
+    }
+}
+
 #define XMDB_ENUM_MEDIA_PLUGIN_CAPABILITIES                                    \
     X(pipeline_create)                                                         \
     X(pipeline_connect)                                                        \
@@ -33,12 +53,7 @@ typedef void (*xmdb_DemuxOnNewStreamCallback)(void *demux, void *stream_state,
 #define XMDB_MEDIA_DECLARE_PIPELINE_CREATE()                                   \
     XMDB_EXTERN int pipeline_create_cap(void *plugin_state,                    \
                                         const char *pipeline_name,             \
-                                        void **out_pipeline)
-
-#define XMDB_MEDIA_DECLARE_PIPELINE_CREATE()                                   \
-    XMDB_EXTERN int pipeline_create_cap(void *plugin_state,                    \
-                                        const char *pipeline_name,             \
-                                        void **out_pipeline)
+                                        xmdb_PluginEntity *out_pipeline)
 
 #define XMDB_MEDIA_DECLARE_PIPELINE_CONNECT()                                  \
     XMDB_EXTERN int pipeline_connect_cap(void *plugin_state,                   \
@@ -46,19 +61,18 @@ typedef void (*xmdb_DemuxOnNewStreamCallback)(void *demux, void *stream_state,
                                          void *source_state, void *dest_state)
 
 #define XMDB_MEDIA_DECLARE_PIPELINE_ADD()                                      \
-    XMDB_EXTERN int pipeline_add_cap(void *plugin_state, void *pipeline_state, \
-                                     void *element_state,                      \
-                                     const char *element_name)
+    XMDB_EXTERN void pipeline_add_cap(                                         \
+            void *plugin_state, void *pipeline_state, void *element_state)
 
 #define XMDB_MEDIA_DECLARE_PULL_CREATE()                                       \
-    XMDB_EXTERN int pull_create_cap(void *plugin_state,                        \
-                                    xmdb_PullOnFrameCallback callback,         \
-                                    void *user_data, void **out_pull)
+    XMDB_EXTERN int pull_create_cap(                                           \
+            void *plugin_state, xmdb_PullOnFrameCallback callback,             \
+            void *user_data, xmdb_PluginEntity *out_pull)
 
 #define XMDB_MEDIA_DECLARE_DEMUX_CREATE()                                      \
     XMDB_EXTERN int demux_create_cap(                                          \
             void *plugin_state, unsigned char *source_data,                    \
-            unsigned int source_data_count, void **out_demux)
+            unsigned int source_data_count, xmdb_PluginEntity *out_demux)
 
 #define XMDB_MEDIA_DECLARE_DEMUX_ON_NEW_STREAM()                               \
     XMDB_EXTERN int demux_on_new_stream_cap(                                   \

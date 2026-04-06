@@ -42,7 +42,7 @@ public:
     Result<PluginCapability, ok::String> get_capability(ok::StringView name) const;
 
     template <typename T, typename... Args>
-    T use_capability(PluginCapability capability, Args&&... args);
+    T use_capability(PluginCapability capability, Args... args);
 
     static void operator delete(void *ptr) {
         auto *plug = reinterpret_cast<Plugin *>(ptr);
@@ -88,8 +88,8 @@ private:
 };
 
 template <typename T, typename... Args>
-T Plugin::use_capability(PluginCapability capability, Args&&... args) {
+T Plugin::use_capability(PluginCapability capability, Args... args) {
     auto fn_ptr = capability.symbol().cast<T (*)(void *, Args...)>();
-    return fn_ptr(m_plugin_state, xmdb::forward<Args>(args)...);
+    return fn_ptr(m_plugin_state, args...);
 }
 } // namespace xmdb::plugin
