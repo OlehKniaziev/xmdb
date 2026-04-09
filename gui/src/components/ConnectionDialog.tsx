@@ -44,7 +44,7 @@ function ConnectionDialog() {
           db_name: database.toString(),
           username: user.toString(),
           // FIXME(liza): Replace by hex encoding of SHA256 hash of the password.
-          password_hash: sha256HexDigest(password.toString()),
+          password_hash: await sha256HexDigest(password.toString()),
         }),
       });
 
