@@ -13,6 +13,13 @@ typedef enum
     XMDB_MEDIA_FORMAT_MP4,
 } xmdb_MediaFormat;
 
+typedef enum
+{
+    XMDB_PULL_SYNC_OK,
+    XMDB_PULL_SYNC_EOS,
+    XMDB_PULL_SYNC_ERR,
+} xmdb_PullSyncResult;
+
 typedef struct
 {
     void *impl;
@@ -23,14 +30,11 @@ typedef struct
 static inline void *plugin_entity_to_callback(xmdb_PluginEntity e)
 {
     void *ptr = (void *) ((unsigned char *) e.impl + e.callback_offset);
-    if (e.indirect)
+    for (int i = e.indirect; i > 0; --i)
     {
-        return *(void **) ptr;
+        ptr = *(void **) ptr;
     }
-    else
-    {
-        return ptr;
-    }
+    return ptr;
 }
 
 #define XMDB_ENUM_MEDIA_PLUGIN_CAPABILITIES                                    \
@@ -66,9 +70,8 @@ typedef void (*xmdb_DemuxOnNewStreamCallback)(void *demux, void *stream_state,
             void *plugin_state, void *pipeline_state, void *element_state)
 
 #define XMDB_MEDIA_DECLARE_PULL_CREATE()                                       \
-    XMDB_EXTERN int pull_create_cap(                                           \
-            void *plugin_state, xmdb_PullOnFrameCallback callback,             \
-            void *user_data, xmdb_PluginEntity *out_pull)
+    XMDB_EXTERN int pull_create_cap(void *plugin_state,                        \
+                                    xmdb_PluginEntity *out_pull)
 
 #define XMDB_MEDIA_DECLARE_DEMUX_CREATE()                                      \
     XMDB_EXTERN int demux_create_cap(                                          \
@@ -81,7 +84,7 @@ typedef void (*xmdb_DemuxOnNewStreamCallback)(void *demux, void *stream_state,
             xmdb_DemuxOnNewStreamCallback callback, void *user_data)
 
 #define XMDB_MEDIA_DECLARE_PULL_PULL_SYNC()                                    \
-    XMDB_EXTERN int pull_pull_sync_cap(                                        \
+    XMDB_EXTERN xmdb_PullSyncResult pull_pull_sync_cap(                        \
             void *plugin_state, void *pull_state, int *out_width,              \
             int *out_height, unsigned char **out_data, int *out_data_count)
 

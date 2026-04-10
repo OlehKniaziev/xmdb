@@ -8,16 +8,19 @@
 #include "new.hpp"
 #include "video.hpp"
 
-namespace xmdb {
+namespace xmdb
+{
 /**
  * @brief Represents a concrete value of a specific SQL type.
  */
-class Value {
+class Value
+{
 public:
     /**
      * @brief The type of the value.
      */
-    enum class Type {
+    enum class Type
+    {
         INT, ///< Integer value.
         BOOL, ///< Boolean value.
         STRING, ///< Fixed string value.
@@ -25,6 +28,7 @@ public:
         BIG_STRING, ///< String of size exceeding the maximum size of a fixed
                     ///< string.
         MEDIA_SOURCE, ///< Media stream.
+        FRAME, ///<
     };
 
     Value() = delete;
@@ -34,7 +38,8 @@ public:
      * @param value The integer.
      * @return The resulting Value.
      */
-    static Value integer(S64 value) {
+    static Value integer(S64 value)
+    {
         return Value{Type::INT,
                      reinterpret_cast<void *>(static_cast<U64>(value))};
     }
@@ -44,7 +49,8 @@ public:
      * @param value The boolean.
      * @return The resulting Value.
      */
-    static Value boolean(bool value) {
+    static Value boolean(bool value)
+    {
         return Value{Type::BOOL,
                      reinterpret_cast<void *>(static_cast<U64>(value))};
     }
@@ -55,7 +61,8 @@ public:
      * @param s The fixed string.
      * @return The resulting Value.
      */
-    static Value string(ok::Allocator *a, FixedString s) {
+    static Value string(ok::Allocator *a, FixedString s)
+    {
         FixedString *ptr = a->alloc<FixedString>();
         memcpy(ptr, reinterpret_cast<U8 *>(&s), sizeof(s));
         return Value{Type::STRING, reinterpret_cast<void *>(ptr)};
@@ -73,8 +80,8 @@ public:
      * @return The resulting Value.
      */
     static Value image_chunk(ok::Allocator *a, U64 x, U64 y, U64 width,
-                             U64 height, ok::Slice<U8> data,
-                             PixelFormat format) {
+                             U64 height, ok::Slice<U8> data, PixelFormat format)
+    {
         ImageChunk *chunk = a->alloc<ImageChunk>();
         chunk->x = x;
         chunk->y = y;
@@ -91,22 +98,31 @@ public:
      * @param data String data.
      * @return The resulting Value.
      */
-    static Value big_string(ok::Allocator *allocator, ok::StringView data) {
+    static Value big_string(ok::Allocator *allocator, ok::StringView data)
+    {
         ok::String s_value = data.to_string(allocator);
         ok::String *s = allocator->alloc<ok::String>();
         *s = s_value;
         return Value{Type::BIG_STRING, reinterpret_cast<void *>(s)};
     }
 
-    static Value media_source(MediaSource *source) {
+    static Value media_source(MediaSource *source)
+    {
         return Value{Type::MEDIA_SOURCE, reinterpret_cast<void *>(source)};
+    }
+
+    static Value frame(ok::Allocator *allocator, VideoFrame frame)
+    {
+        auto *owned_frame = new (allocator) VideoFrame{frame};
+        return Value{Type::FRAME, static_cast<void *>(owned_frame)};
     }
 
     /**
      * @brief Creates a "greater than" comparison result (integer 1).
      * @return The resulting Value.
      */
-    static Value greater() {
+    static Value greater()
+    {
         return integer(1);
     }
 
@@ -114,7 +130,8 @@ public:
      * @brief Creates a "less than" comparison result (integer -1).
      * @return The resulting Value.
      */
-    static Value less() {
+    static Value less()
+    {
         return integer(-1);
     }
 
@@ -122,7 +139,8 @@ public:
      * @brief Creates an "equal" comparison result (integer 0).
      * @return The resulting Value.
      */
-    static Value equal() {
+    static Value equal()
+    {
         return integer(0);
     }
 
@@ -130,7 +148,8 @@ public:
      * @brief Retrieves the value as an integer.
      * @return The integer value.
      */
-    S64 as_int() {
+    S64 as_int()
+    {
         OK_VERIFY(type() == Type::INT);
         return static_cast<S64>(reinterpret_cast<U64>(m_data));
     }
@@ -139,7 +158,8 @@ public:
      * @brief Retrieves the value as a boolean.
      * @return The boolean value.
      */
-    bool as_bool() {
+    bool as_bool()
+    {
         OK_VERIFY(type() == Type::BOOL);
         return static_cast<bool>(reinterpret_cast<U64>(m_data));
     }
@@ -148,7 +168,8 @@ public:
      * @brief Retrieves the value as a FixedString.
      * @return The fixed string.
      */
-    FixedString as_string() {
+    FixedString as_string()
+    {
         return *as_string_ptr();
     }
 
@@ -156,7 +177,8 @@ public:
      * @brief Retrieves the value as a pointer to FixedString.
      * @return Const pointer to the fixed string.
      */
-    const FixedString *as_string_ptr() const {
+    const FixedString *as_string_ptr() const
+    {
         OK_VERIFY(type() == Type::STRING);
         return reinterpret_cast<const FixedString *>(m_data);
     }
@@ -165,7 +187,8 @@ public:
      * @brief Retrieves the value as an ImageChunk pointer.
      * @return Pointer to the image chunk.
      */
-    ImageChunk *as_chunk() {
+    ImageChunk *as_chunk()
+    {
         OK_VERIFY(type() == Type::IMAGE_CHUNK);
         return reinterpret_cast<ImageChunk *>(m_data);
     }
@@ -174,12 +197,14 @@ public:
      * @brief Retrieves the value as a pointer to a String.
      * @return Pointer to the string.
      */
-    ok::String *as_big_string() {
+    ok::String *as_big_string()
+    {
         OK_VERIFY(type() == Type::BIG_STRING);
         return reinterpret_cast<ok::String *>(m_data);
     }
 
-    MediaSource *as_media_source() {
+    MediaSource *as_media_source()
+    {
         OK_VERIFY(type() == Type::MEDIA_SOURCE);
         return reinterpret_cast<MediaSource *>(m_data);
     }
@@ -188,7 +213,8 @@ public:
      * @brief Gets the type of the value.
      * @return The type.
      */
-    Type type() const {
+    Type type() const
+    {
         return m_type;
     }
 
@@ -200,7 +226,8 @@ public:
     Value compare(Value other);
 
 private:
-    Value(Type type, void *data) : m_type{type}, m_data{data} {
+    Value(Type type, void *data) : m_type{type}, m_data{data}
+    {
     }
 
     Type m_type;

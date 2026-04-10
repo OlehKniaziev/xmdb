@@ -241,16 +241,7 @@ static Result<Pipeline *, ok::String> create_demux_pull_pipeline(
 {
     Pipeline *pipeline = CHECK(Pipeline::create(allocator, plugin, nullptr));
 
-    auto *pull = CHECK(Pull::create(
-            allocator, pipeline,
-            [](Pull *pull, VideoFrame *frame, void *data)
-            {
-                (void) pull;
-                (void) frame;
-                (void) data;
-                OK_TODO_MSG("Actual streaming should be done here");
-            },
-            nullptr));
+    auto *pull = CHECK(Pull::create(allocator, pipeline));
 
     auto *demux = CHECK(Demux::create(allocator, pipeline, source));
 
@@ -270,6 +261,8 @@ static Result<Pipeline *, ok::String> create_demux_pull_pipeline(
 
     pipeline->add(demux, "demux");
     pipeline->add(pull, PULL_NAME);
+
+    pipeline->connect(demux, pull);
 
     return pipeline;
 }
@@ -472,11 +465,20 @@ DBTableStream DBTableStream::from_value(ok::Allocator *allocator,
 
         auto *pipeline = pipeline_res.unwrap();
 
+        auto *data = new (allocator) ok::Pair{
+                .a = allocator,
+                .b = pipeline,
+        };
+
+        using DataType = decltype(data);
+
         return DBTableStream{
                 allocator,
-                [](void *data) -> ok::Optional<Value>
+                [](void *data_ptr) -> ok::Optional<Value>
                 {
-                    auto *pipeline = static_cast<Pipeline *>(data);
+                    auto *data = static_cast<DataType>(data_ptr);
+                    auto [allocator, pipeline] = *data;
+
                     ok::Optional<PipelineElement *> pull_opt =
                             pipeline->get_element(PULL_NAME);
                     if (!pull_opt)
@@ -495,19 +497,23 @@ DBTableStream DBTableStream::from_value(ok::Allocator *allocator,
                     {
                         log::error("Failed to synchronously pull a frame: %s",
                                    pull_res.error().cstr());
-                        return {};
+                        return Optional<Value>::empty();
                     }
 
                     if (pull_res.unwrap())
                     {
-                        return Value::frame(frame);
+                        log::debug(
+                                "got a frame (w: %d, h: %d, data_count: %zu)",
+                                frame.width, frame.height, frame.data.count);
+                        return Value::frame(allocator, frame);
                     }
                     else
                     {
-                        return {};
+                        log::debug("got no frame");
+                        return Optional<Value>::empty();
                     }
                 },
-                pipeline,
+                data,
         };
 
         break;

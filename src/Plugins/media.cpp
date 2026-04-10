@@ -19,10 +19,8 @@ XMDB_MEDIA_DECLARE_PIPELINE_CREATE()
     (void) plugin_state;
 
     GstElement *pipeline = gst_pipeline_new(pipeline_name);
-    if (pipeline == nullptr)
-    {
-        return 0;
-    }
+    OK_ASSERT(pipeline != nullptr);
+
     out_pipeline->impl = pipeline;
     out_pipeline->callback_offset = 0;
     return 1;
@@ -30,7 +28,15 @@ XMDB_MEDIA_DECLARE_PIPELINE_CREATE()
 
 XMDB_MEDIA_DECLARE_PIPELINE_CONNECT()
 {
-    OK_TODO();
+    (void) plugin_state;
+    (void) pipeline_state;
+
+    auto *src = GST_ELEMENT(source_state);
+    auto *dest = GST_ELEMENT(dest_state);
+
+    OK_ASSERT(gst_element_link(src, dest) == true);
+
+    return 1;
 }
 
 XMDB_MEDIA_DECLARE_PIPELINE_ADD()
@@ -48,12 +54,12 @@ struct AppSinkNewSampleData
     void *user_data;
 };
 
-struct PluginPullState
+struct PluginAsyncPullState
 {
-    PluginPullState() = delete;
+    PluginAsyncPullState() = delete;
 
-    PluginPullState(AppSinkNewSampleData *new_sample_data,
-                    GstElement *app_sink) :
+    PluginAsyncPullState(AppSinkNewSampleData *new_sample_data,
+                         GstElement *app_sink) :
         new_sample_data{new_sample_data}, app_sink{app_sink}
     {
     }
@@ -65,7 +71,7 @@ struct PluginPullState
     int stream_width = UNSET;
     int stream_height = UNSET;
 
-    ~PluginPullState()
+    ~PluginAsyncPullState()
     {
         delete new_sample_data;
         gst_object_unref(app_sink);
@@ -75,12 +81,12 @@ struct PluginPullState
 XMDB_EXTERN GstFlowReturn app_sink_new_sample_stub(GstElement *sink,
                                                    gpointer user_data)
 {
-    auto *pull_state = static_cast<PluginPullState *>(user_data);
+    auto *pull_state = static_cast<PluginAsyncPullState *>(user_data);
 
     GstSample *sample = gst_app_sink_pull_sample(GST_APP_SINK(sink));
 
-    if (pull_state->stream_width == PluginPullState::UNSET ||
-        pull_state->stream_height == PluginPullState::UNSET)
+    if (pull_state->stream_width == PluginAsyncPullState::UNSET ||
+        pull_state->stream_height == PluginAsyncPullState::UNSET)
     {
         GstCaps *sample_caps = gst_sample_get_caps(sample);
         GstStructure *sample_structure = gst_caps_get_structure(sample_caps, 0);
@@ -112,7 +118,29 @@ XMDB_EXTERN GstFlowReturn app_sink_new_sample_stub(GstElement *sink,
 
 XMDB_MEDIA_DECLARE_PULL_CREATE()
 {
+    GstElement *app_sink = gst_element_factory_make("appsink", nullptr);
+
+    if (app_sink == nullptr)
+    {
+        return 0;
+    }
+
+    out_pull->impl = app_sink;
+    out_pull->callback_offset = 0;
+    out_pull->indirect = false;
+
+    return 1;
+}
+
+#if 0
+XMDB_EXTERN int create_pull_async(void *plugin_state,
+                                  xmdb_PullOnFrameCallback callback,
+                                  void *user_data, xmdb_PluginEntity *out_pull)
+{
+    OK_PANIC("The async pull API is not finished");
+
     (void) plugin_state;
+
     GstElement *app_sink = gst_element_factory_make("appsink", nullptr);
 
     if (app_sink == nullptr)
@@ -127,7 +155,7 @@ XMDB_MEDIA_DECLARE_PULL_CREATE()
             .user_data = user_data,
     };
 
-    auto *pull_state = new PluginPullState{
+    auto *pull_state = new PluginAsyncPullState{
             new_sample_data,
             app_sink,
     };
@@ -140,6 +168,57 @@ XMDB_MEDIA_DECLARE_PULL_CREATE()
     out_pull->indirect = true;
 
     return 1;
+}
+#endif // 0
+
+// extern "C" int pull_pull_sync_cap(void *plugin_state, void *pull_state,
+//                                   int *out_width, int *out_height,
+//                                   unsigned char **out_data, int
+//                                   *out_data_count)
+XMDB_MEDIA_DECLARE_PULL_PULL_SYNC()
+{
+    (void) plugin_state;
+
+    auto *appsink_elem = static_cast<GstElement *>(pull_state);
+    auto *appsink = GST_APP_SINK(appsink_elem);
+
+    GstSample *sample = gst_app_sink_pull_sample(appsink);
+
+    if (sample == nullptr)
+    {
+        if (gst_app_sink_is_eos(appsink))
+        {
+            return XMDB_PULL_SYNC_EOS;
+        }
+        else
+        {
+            return XMDB_PULL_SYNC_ERR;
+        }
+    }
+
+    GstCaps *caps = gst_sample_get_caps(sample);
+    GstStructure *structure = gst_caps_get_structure(caps, 0);
+
+    gst_structure_get_int(structure, "width", out_width);
+    gst_structure_get_int(structure, "height", out_height);
+
+    GstBuffer *sample_buffer = gst_sample_get_buffer(sample);
+
+    GstMapInfo map_info{};
+    gst_buffer_map(sample_buffer, &map_info, GST_MAP_READ);
+
+    *out_data = map_info.data;
+    *out_data_count = map_info.size;
+
+    // NOTE(oleh): Not sure what to unref here tbh, the object ownership is very
+    // confusing.
+    xmdb::ScopeGuard guard{[&]()
+                           {
+                               gst_caps_unref(caps);
+                               gst_sample_unref(sample);
+                           }};
+
+    return XMDB_PULL_SYNC_OK;
 }
 
 struct PluginDemuxState
@@ -263,6 +342,6 @@ void xmdb_plugin_install(void *state, const char *name,
 const char *xmdb_plugin_get_last_error(void *state)
 {
     (void) state;
-    OK_TODO();
+    return nullptr;
 }
 }

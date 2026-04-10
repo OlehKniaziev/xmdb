@@ -71,6 +71,32 @@ T &&forward(RemoveRef<T> &&val)
     return static_cast<T &&>(val);
 }
 
+/**
+ * @brief A utility class for implementing the 'defer' pattern.
+ */
+template <typename F>
+class ScopeGuard
+{
+public:
+    ScopeGuard(F f) : m_f{f}
+    {
+    }
+
+    template <typename T>
+    ScopeGuard(const ScopeGuard<T> &other) = delete;
+
+    template <typename T>
+    ScopeGuard &operator=(const ScopeGuard<T> &other) = delete;
+
+    ~ScopeGuard()
+    {
+        m_f();
+    }
+
+private:
+    F m_f;
+};
+
 #if !defined(OK_NO_STDLIB)
 /**
  * @brief An allocator that uses a web_arena for memory management.

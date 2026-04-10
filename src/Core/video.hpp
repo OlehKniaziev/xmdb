@@ -56,6 +56,8 @@ private:
 // What should this struct have?
 struct VideoFrame
 {
+    int width;
+    int height;
     ok::Slice<U8> data;
 };
 
@@ -138,8 +140,7 @@ public:
     using Hook = void (*)(Pull *pull, VideoFrame *frame, void *data);
 
     static Result<Pull *, ok::String> create(ok::Allocator *allocator,
-                                             Pipeline *pipeline, Hook hook,
-                                             void *data);
+                                             Pipeline *pipeline);
 
     Result<bool, ok::String> pull_sync(VideoFrame *frame);
 
@@ -147,10 +148,13 @@ public:
     ok::Slice<MediaSink *> inputs() override;
 
 private:
-    Pull(Pipeline *pipeline, xmdb_PluginEntity plugin_state) :
-        PipelineElement{pipeline, plugin_state}
+    Pull(ok::Allocator *allocator, Pipeline *pipeline,
+         xmdb_PluginEntity plugin_state) :
+        PipelineElement{pipeline, plugin_state}, m_allocator{allocator}
     {
     }
+
+    ok::Allocator *m_allocator;
 };
 
 class Demux : public PipelineElement

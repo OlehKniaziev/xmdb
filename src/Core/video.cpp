@@ -99,7 +99,7 @@ ok::Optional<ok::String> Pipeline::connect(PipelineElement *source,
 {
     auto &connect_cap = m_plugin->m_caps.pipeline_connect;
     int ok = m_plugin->m_plugin->use_capability<int>(
-            connect_cap, m_plugin_state,
+            connect_cap, plugin_entity_to_callback(m_plugin_state),
             plugin_entity_to_callback(source->m_plugin_state),
             plugin_entity_to_callback(dest->m_plugin_state));
 
@@ -165,8 +165,6 @@ Result<Demux *, ok::String> Demux::create(ok::Allocator *allocator,
 
 void Demux::on_new_stream(OnNewStreamHook hook, void *data)
 {
-    OK_PANIC("Don't call this, use the synchronous API instead");
-
     struct UserDataStub
     {
         OnNewStreamHook hook;
@@ -197,38 +195,13 @@ void Demux::on_new_stream(OnNewStreamHook hook, void *data)
 }
 
 Result<Pull *, ok::String> Pull::create(ok::Allocator *allocator,
-                                        Pipeline *pipeline, Hook hook,
-                                        void *data)
+                                        Pipeline *pipeline)
 {
     auto *video_plugin = pipeline->plugin();
     auto &create_cap = video_plugin->m_caps.pull_create;
-
-    struct UserDataStub
-    {
-        Hook hook;
-        void *user_data;
-    };
-
-    auto *data_stub = new (allocator) UserDataStub{
-            .hook = hook,
-            .user_data = data,
-    };
-
-    void (*hook_stub)(Pull *, int, int, U8 *, UserDataStub *) =
-            [](Pull *pull, int w, int h, U8 *frame_data,
-               UserDataStub *data_stub)
-    {
-        VideoFrame frame{
-                .data = {frame_data, (UZ) (w * h)},
-        };
-
-        data_stub->hook(pull, &frame, data_stub->user_data);
-    };
-
     xmdb_PluginEntity plugin_state{};
-
-    int ok = video_plugin->m_plugin->use_capability<int>(
-            create_cap, hook_stub, data_stub, &plugin_state);
+    int ok = video_plugin->m_plugin->use_capability<int>(create_cap,
+                                                         &plugin_state);
 
     if (!ok)
     {
@@ -236,6 +209,7 @@ Result<Pull *, ok::String> Pull::create(ok::Allocator *allocator,
     }
 
     return new (allocator) Pull{
+            allocator,
             pipeline,
             plugin_state,
     };
@@ -255,6 +229,32 @@ void Pipeline::add(PipelineElement *element, const char *name)
 ok::Optional<PipelineElement *> Pipeline::get_element(const char *name)
 {
     return m_name_to_element.get(ok::StringView{name});
+}
+
+Result<bool, ok::String> Pull::pull_sync(VideoFrame *frame)
+{
+    auto *plug = pipeline->plugin();
+    auto &pull_sync_cap = plug->m_caps.pull_pull_sync;
+
+    auto res = plug->m_plugin->use_capability<xmdb_PullSyncResult>(
+            pull_sync_cap, plugin_entity_to_callback(m_plugin_state),
+            &frame->width, &frame->height, &frame->data.items,
+            &frame->data.count);
+    switch (res)
+    {
+    case XMDB_PULL_SYNC_OK:  return true;
+    case XMDB_PULL_SYNC_EOS: return false;
+    case XMDB_PULL_SYNC_ERR:
+    {
+        return get_error(m_allocator, plug->m_plugin);
+    }
+    default:
+        return ok::String::format(
+                m_allocator,
+                "unexpected return from the 'pull_pull_sync' capability call: "
+                "'%d' instead of valid xmdb_PullSyncResult value",
+                res);
+    }
 }
 
 ok::Slice<MediaStream *> Pull::outputs()
