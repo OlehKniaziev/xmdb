@@ -7,11 +7,25 @@ import type { DBTable, DBObjectsResponse } from "../data/objects";
 export default function Sidebar() {
   const [isOpen, setIsOpen] = useState(true);
   const [tables, setTables] = useState<DBTable[]>([]);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [showSuggestions, setShowSuggestions] = useState(false);
   const { ConnectionId, Hostname, dbObjectsVersion } = useConnectionStore();
   const { addObjectTab, updateObjectTabs } = useMultiTabQueryStore();
   const navigate = useNavigate();
 
   const isConnected = ConnectionId !== undefined;
+
+  const trimmedQuery = searchQuery.trim().toLowerCase();
+  const suggestions = trimmedQuery
+    ? tables.filter((t) => t.name.toLowerCase().includes(trimmedQuery))
+    : [];
+
+  function openTable(table: DBTable) {
+    addObjectTab(table);
+    navigate("/object");
+    setSearchQuery("");
+    setShowSuggestions(false);
+  }
 
   useEffect(() => {
     async function fetchTables() {
@@ -71,17 +85,74 @@ export default function Sidebar() {
                 <li
                   key={table.name}
                   style={{ padding: '2px 0', fontFamily: 'var(--font-main)', cursor: 'pointer' }}
-                  onClick={() => { addObjectTab(table); navigate('/object'); }}
+                  onClick={() => openTable(table)}
                 >{table.name}</li>
               ))}
             </ul>
           )}
         </div>
-        <input
-          type="text"
-          className="sidebar-search-button"
-          placeholder="Search..."
-        />
+        <div style={{ position: 'relative' }}>
+          <input
+            type="text"
+            className="sidebar-search-button"
+            placeholder="Search..."
+            value={searchQuery}
+            onChange={(e) => {
+              setSearchQuery(e.target.value);
+              setShowSuggestions(true);
+            }}
+            onFocus={() => setShowSuggestions(true)}
+            onBlur={() => setTimeout(() => setShowSuggestions(false), 150)}
+          />
+          {showSuggestions && trimmedQuery && (
+            <ul
+              style={{
+                position: 'absolute',
+                bottom: '100%',
+                left: 0,
+                right: 0,
+                margin: '0 12px 4px 12px',
+                padding: 0,
+                listStyle: 'none',
+                background: 'var(--color-darker)',
+                border: '1px solid var(--color-brown)',
+                borderRadius: '4px',
+                maxHeight: '200px',
+                overflowY: 'auto',
+                zIndex: 10,
+                fontFamily: 'var(--font-main)',
+                fontSize: '13px',
+                boxShadow: '0 -2px 8px rgba(0,0,0,0.15)',
+              }}
+            >
+              {suggestions.length === 0 ? (
+                <li style={{ padding: '8px 12px', color: 'var(--color-grey)', fontStyle: 'italic' }}>
+                  No matches
+                </li>
+              ) : (
+                suggestions.map((table) => (
+                  <li
+                    key={table.name}
+                    onMouseDown={(e) => {
+                      e.preventDefault();
+                      openTable(table);
+                    }}
+                    style={{
+                      padding: '8px 12px',
+                      cursor: 'pointer',
+                      color: 'var(--color-black)',
+                      borderBottom: '1px solid var(--color-brown)',
+                    }}
+                    onMouseEnter={(e) => (e.currentTarget.style.background = 'var(--color-dark-beige)')}
+                    onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
+                  >
+                    {table.name}
+                  </li>
+                ))
+              )}
+            </ul>
+          )}
+        </div>
       </div>
   );
 }

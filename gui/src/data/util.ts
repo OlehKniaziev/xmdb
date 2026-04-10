@@ -43,10 +43,12 @@ export function toHexString(s: string): string {
   return out;
 }
 
-export function sha256HexDigest(s: string): string {
-  let encoded = toHexString(s);
-  for (let i = encoded.length; i < 64; ++i) {
-    encoded += "0";
+export async function sha256HexDigest(s: string): Promise<string> {
+  const hashBuffer = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(s));
+  const hashArray = new Uint8Array(hashBuffer);
+  let encoded = "";
+  for (const byte of hashArray) {
+    encoded += byte.toString(16).padStart(2, "0");
   }
   return encoded;
 }
