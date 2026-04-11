@@ -64,13 +64,12 @@ const ConnectionEdit = forwardRef<ConnectionEditHandle>((_, ref) => {
 
       try {
         setIsLoadingConnect(true);
-        const resp = await fetch(hostname!.toString(), {
+        const resp = await fetch(`${hostname!.toString()}/connect`, {
           method: "POST",
           body: JSON.stringify({
             db_name: database.toString(),
             username: user.toString(),
-            // FIXME(liza): Replace by base64 encoding of SHA256 hash of the password.
-            password_hash: sha256HexDigest(password.toString()),
+            password_hash: await sha256HexDigest(password.toString()),
           }),
         });
 

@@ -45,7 +45,7 @@ export default function ObjectsOverview() {
   }
 
   return (
-    <div style={{
+    <div className="custom-scrollbar" style={{
       padding: "24px 32px",
       height: "100%",
       boxSizing: "border-box",

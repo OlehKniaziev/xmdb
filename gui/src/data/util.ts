@@ -106,6 +106,11 @@ export async function fileToHexDataString(file: File): Promise<{
   let hexString = "";
 
   for (let i = 0; i < rgba.length; i += 4) {
+    if (rgba[i + 3] === 0) {
+      hexString += "FBFEFB"; // editor background color will show through transparent pixels
+      continue;
+    }
+
     hexString += rgba[i].toString(16).padStart(2, "0");
     hexString += rgba[i + 1].toString(16).padStart(2, "0");
     hexString += rgba[i + 2].toString(16).padStart(2, "0");
