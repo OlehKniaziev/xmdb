@@ -134,8 +134,36 @@ a {
     margin: 0;
     padding-top: 12px;
     padding-left: 24px;
+    padding-right: 20px;
     box-sizing: border-box;
     height: 100%;
+    overflow-x: auto;
+    overflow-y: auto;
+    scrollbar-color: rgba(99, 87, 79, 0.8) var(--color-darker);
+    scrollbar-width: thin;
+}
+
+.sidebar::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+}
+
+.sidebar::-webkit-scrollbar:horizontal {
+    z-index: 500;
+}
+
+.sidebar::-webkit-scrollbar-track {
+    background: var(--color-darker);
+    z-index: 1;
+}
+
+.sidebar::-webkit-scrollbar-thumb {
+    background: var(--color-grey);
+    border-radius: 4px;
+}
+
+.sidebar::-webkit-scrollbar-thumb:hover {
+    background: var(--color-grey);
 }
 
 .sidebar button {
@@ -328,6 +356,47 @@ a {
 .tab-content {
     height: calc(100% - 32px);
     overflow: auto;
+    scrollbar-color: rgba(99, 87, 79, 0.8) transparent;
+}
+
+.tab-content::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+}
+
+.tab-content::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.tab-content::-webkit-scrollbar-thumb {
+    background: rgba(99, 87, 79, 0.8);
+    border-radius: 4px;
+}
+
+.tab-content::-webkit-scrollbar-thumb:hover {
+    background: rgba(99, 87, 79, 1);
+}
+
+.custom-scrollbar {
+    scrollbar-color: rgba(99, 87, 79, 0.8) transparent;
+}
+
+.custom-scrollbar::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb {
+    background: rgba(99, 87, 79, 0.8);
+    border-radius: 4px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+    background: rgba(99, 87, 79, 1);
 }
 
 .query-response-table {

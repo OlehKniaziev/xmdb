@@ -44,7 +44,7 @@ export default function Toolbar({ onAddTab }: ToolbarProps) {
         resp = await fetch(`${Hostname!.toString()}/run-query`, {
           method: "POST",
           body: JSON.stringify({
-            query: queryToExecute.replace(/\n/g, " "),
+            query: queryToExecute,
             connection_id: ConnectionId,
           }),
         });

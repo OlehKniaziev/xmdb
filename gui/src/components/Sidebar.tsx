@@ -1,6 +1,9 @@
 import { useState, useEffect } from "react";
 import { ChevronDown, ChevronRight } from "lucide-react";
-import { useConnectionStore, useMultiTabQueryStore } from "../data/global-states";
+import {
+  useConnectionStore,
+  useMultiTabQueryStore,
+} from "../data/global-states";
 import { useNavigate } from "react-router-dom";
 import type { DBTable, DBObjectsResponse } from "../data/objects";
 
@@ -37,7 +40,7 @@ export default function Sidebar() {
           });
 
           if (resp.ok) {
-            const data = await resp.json() as DBObjectsResponse;
+            const data = (await resp.json()) as DBObjectsResponse;
             if (data.ok) {
               setTables(data.tables);
               updateObjectTabs(data.tables);
@@ -56,103 +59,154 @@ export default function Sidebar() {
     }
 
     fetchTables();
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isConnected, ConnectionId, Hostname, dbObjectsVersion]);
 
   return (
-      <div className="sidebar-container">
-        <div className="connection-status" style={{
+    <div className="sidebar-container">
+      <div
+        className="connection-status"
+        style={{
           padding: "12px 20px",
           fontSize: "14px",
           fontWeight: "bold",
-          fontFamily: 'var(--font-main)',
-          backgroundColor: 'var(--color-darker)',
-          color: isConnected ? "var(--color-accent-green)" : "var(--color-accent-dark)",
-        }}>
-          {isConnected ? "Connected to the server" : "Not connected to the server"}
-        </div>
+          fontFamily: "var(--font-main)",
+          backgroundColor: "var(--color-darker)",
+          color: isConnected
+            ? "var(--color-accent-green)"
+            : "var(--color-accent-dark)",
+        }}
+      >
+        {isConnected
+          ? "Connected to the server"
+          : "Not connected to the server"}
+      </div>
 
+      <div style={{ position: "relative", flex: 1, minHeight: 0 }}>
         <div className="sidebar">
-          <button onClick={() => setIsOpen(!isOpen)} style={{fontWeight: "bold", cursor: "pointer"}}>
-            {isOpen ? <ChevronDown size={16} style={{marginRight: "6px"}}/> : <ChevronRight size={16} style={{marginRight: "6px"}} />}
-            <span className="ml-2">Tables</span>
-            <span style={{color: "var(--color-grey)", marginLeft: "6px"}}>({tables.length})</span>
-          </button>
-
-          {isOpen && (
-            <ul style={{ listStyle: 'none', paddingLeft: '40px', marginTop: '8px' }}>
-              {tables.map((table) => (
-                <li
-                  key={table.name}
-                  style={{ padding: '2px 0', fontFamily: 'var(--font-main)', cursor: 'pointer' }}
-                  onClick={() => openTable(table)}
-                >{table.name}</li>
-              ))}
-            </ul>
-          )}
-        </div>
-        <div style={{ position: 'relative' }}>
-          <input
-            type="text"
-            className="sidebar-search-button"
-            placeholder="Search..."
-            value={searchQuery}
-            onChange={(e) => {
-              setSearchQuery(e.target.value);
-              setShowSuggestions(true);
+          <div
+            style={{
+              display: "inline-block",
+              minWidth: "100%",
+              boxSizing: "border-box",
+              paddingRight: "16px",
             }}
-            onFocus={() => setShowSuggestions(true)}
-            onBlur={() => setTimeout(() => setShowSuggestions(false), 150)}
-          />
-          {showSuggestions && trimmedQuery && (
-            <ul
-              style={{
-                position: 'absolute',
-                bottom: '100%',
-                left: 0,
-                right: 0,
-                margin: '0 12px 4px 12px',
-                padding: 0,
-                listStyle: 'none',
-                background: 'var(--color-darker)',
-                border: '1px solid var(--color-brown)',
-                borderRadius: '4px',
-                maxHeight: '200px',
-                overflowY: 'auto',
-                zIndex: 10,
-                fontFamily: 'var(--font-main)',
-                fontSize: '13px',
-                boxShadow: '0 -2px 8px rgba(0,0,0,0.15)',
-              }}
+          >
+            <button
+              onClick={() => setIsOpen(!isOpen)}
+              style={{ fontWeight: "bold", cursor: "pointer" }}
             >
-              {suggestions.length === 0 ? (
-                <li style={{ padding: '8px 12px', color: 'var(--color-grey)', fontStyle: 'italic' }}>
-                  No matches
-                </li>
+              {isOpen ? (
+                <ChevronDown size={16} style={{ marginRight: "6px" }} />
               ) : (
-                suggestions.map((table) => (
+                <ChevronRight size={16} style={{ marginRight: "6px" }} />
+              )}
+              <span className="ml-2">Tables</span>
+              <span style={{ color: "var(--color-grey)", marginLeft: "6px" }}>
+                ({tables.length})
+              </span>
+            </button>
+
+            {isOpen && (
+              <ul
+                style={{
+                  listStyle: "none",
+                  paddingLeft: "40px",
+                  marginTop: "8px",
+                }}
+              >
+                {tables.map((table) => (
                   <li
                     key={table.name}
-                    onMouseDown={(e) => {
-                      e.preventDefault();
-                      openTable(table);
-                    }}
                     style={{
-                      padding: '8px 12px',
-                      cursor: 'pointer',
-                      color: 'var(--color-black)',
-                      borderBottom: '1px solid var(--color-brown)',
+                      padding: "2px 0",
+                      fontFamily: "var(--font-main)",
+                      cursor: "pointer",
+                      whiteSpace: "nowrap",
                     }}
-                    onMouseEnter={(e) => (e.currentTarget.style.background = 'var(--color-dark-beige)')}
-                    onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
+                    onClick={() => openTable(table)}
                   >
                     {table.name}
                   </li>
-                ))
-              )}
-            </ul>
-          )}
+                ))}
+              </ul>
+            )}
+          </div>
         </div>
       </div>
+      <div style={{ position: "relative" }}>
+        <input
+          type="text"
+          className="sidebar-search-button"
+          placeholder="Search..."
+          value={searchQuery}
+          onChange={(e) => {
+            setSearchQuery(e.target.value);
+            setShowSuggestions(true);
+          }}
+          onFocus={() => setShowSuggestions(true)}
+          onBlur={() => setTimeout(() => setShowSuggestions(false), 150)}
+        />
+        {showSuggestions && trimmedQuery && (
+          <ul
+            style={{
+              position: "absolute",
+              bottom: "100%",
+              left: 0,
+              right: 0,
+              margin: "0 12px 4px 12px",
+              padding: 0,
+              listStyle: "none",
+              background: "var(--color-darker)",
+              border: "1px solid var(--color-brown)",
+              borderRadius: "4px",
+              maxHeight: "200px",
+              overflowY: "auto",
+              zIndex: 10,
+              fontFamily: "var(--font-main)",
+              fontSize: "13px",
+              boxShadow: "0 -2px 8px rgba(0,0,0,0.15)",
+            }}
+          >
+            {suggestions.length === 0 ? (
+              <li
+                style={{
+                  padding: "8px 12px",
+                  color: "var(--color-grey)",
+                  fontStyle: "italic",
+                }}
+              >
+                No matches
+              </li>
+            ) : (
+              suggestions.map((table) => (
+                <li
+                  key={table.name}
+                  onMouseDown={(e) => {
+                    e.preventDefault();
+                    openTable(table);
+                  }}
+                  style={{
+                    padding: "8px 12px",
+                    cursor: "pointer",
+                    color: "var(--color-black)",
+                    borderBottom: "1px solid var(--color-brown)",
+                  }}
+                  onMouseEnter={(e) =>
+                    (e.currentTarget.style.background =
+                      "var(--color-dark-beige)")
+                  }
+                  onMouseLeave={(e) =>
+                    (e.currentTarget.style.background = "transparent")
+                  }
+                >
+                  {table.name}
+                </li>
+              ))
+            )}
+          </ul>
+        )}
+      </div>
+    </div>
   );
 }
