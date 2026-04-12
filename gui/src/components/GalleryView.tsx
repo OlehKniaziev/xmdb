@@ -2,7 +2,7 @@ import type { ImageChunk, QueryResponse as QueryResponseType } from "../data/que
 import { imageHexToDataUrl, saveFile } from "../data/util";
 import { useMemo, useState } from "react";
 
-function ImageDisplay({ chunk }: { chunk: ImageChunk }) {
+function ImageDisplay({ chunk, onClick }: { chunk: ImageChunk; onClick: () => void }) {
   const [isHovered, setIsHovered] = useState(false);
 
   const src = useMemo(
@@ -23,24 +23,25 @@ Data (first 16 chars): ${chunk.data.substring(0, 16)}...`;
   };
 
   return (
-    <div 
-      className="gallery-item" 
-      style={{ position: "relative" }}
+    <div
+      className="gallery-item"
+      style={{ position: "relative", overflow: "visible", justifySelf: "start", alignSelf: "start" }}
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
     >
       <img
         src={src}
         alt="Gallery data"
-        style={{ maxWidth: "100%", maxHeight: "300px", objectFit: "contain", borderRadius: "4px" }}
+        style={{ maxWidth: "100%", maxHeight: "300px", objectFit: "contain", borderRadius: "4px", cursor: "pointer" }}
+        onClick={onClick}
       />
       {isHovered && (
         <div 
           className="image-tooltip"
           style={{
             position: "absolute",
-            top: "24px",
-            left: "24px",
+            top: "calc(100% + 4px)",
+            left: "calc(100% + 4px)",
             backgroundColor: "var(--color-accent-green)",
             opacity: 0.9,
             color: "white",
@@ -88,7 +89,91 @@ interface GalleryViewProps {
   query: string;
 }
 
+function FullScreenOverlay({ images, currentIndex, onClose, onNavigate }: {
+  images: ImageChunk[];
+  currentIndex: number;
+  onClose: () => void;
+  onNavigate: (index: number) => void;
+}) {
+  const chunk = images[currentIndex];
+  const src = useMemo(
+    () => imageHexToDataUrl(chunk.data, chunk.width, chunk.height),
+    [chunk.data, chunk.width, chunk.height]
+  );
+
+  const hasPrev = currentIndex > 0;
+  const hasNext = currentIndex < images.length - 1;
+
+  const arrowStyle: React.CSSProperties = {
+    position: "fixed",
+    top: "50%",
+    transform: "translateY(-50%)",
+    background: "transparent",
+    border: "none",
+    cursor: "pointer",
+    zIndex: 1001,
+    padding: 0,
+  };
+
+  return (
+    <div
+      style={{
+        position: "fixed",
+        top: 0,
+        left: 0,
+        width: "100vw",
+        height: "100vh",
+        backgroundColor: "rgba(69, 33, 3, 0.4)",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        zIndex: 1000,
+      }}
+      onClick={onClose}
+    >
+      <button
+        onClick={(e) => { e.stopPropagation(); onClose(); }}
+        className="close-button-gallery"
+        style={{
+          position: "fixed",
+          top: "2rem",
+          right: "2rem",
+          zIndex: 1001,
+        }}
+      >
+        <img src="src/assets/icons/close.png" alt="Close" />
+      </button>
+      {hasPrev && (
+        <button
+          onClick={(e) => { e.stopPropagation(); onNavigate(currentIndex - 1); }}
+          style={{ ...arrowStyle, left: "2rem" }}
+        >
+          <img src="src/assets/icons/left-arrow.png" alt="Previous" style={{ width: "56px", height: "56px" }} />
+        </button>
+      )}
+      {hasNext && (
+        <button
+          onClick={(e) => { e.stopPropagation(); onNavigate(currentIndex + 1); }}
+          style={{ ...arrowStyle, right: "2rem" }}
+        >
+          <img src="src/assets/icons/right-arrow.png" alt="Next" style={{ width: "56px", height: "56px" }} />
+        </button>
+      )}
+      <img
+        src={src}
+        alt="Full size"
+        onClick={(e) => e.stopPropagation()}
+        style={{ maxWidth: "95vw", maxHeight: "95vh" }}
+        width={chunk.width}
+        height={chunk.height}
+      />
+    </div>
+  );
+}
+
 function GalleryView({ response, columnName, query }: GalleryViewProps) {
+  const [fullScreenIndex, setFullScreenIndex] = useState<number | null>(null);
+
   const tableName = useMemo(() => {
     const match = query.match(/from\s+([a-zA-Z0-9_]+)/i);
     return match ? match[1] : "Current Query";
@@ -123,9 +208,17 @@ function GalleryView({ response, columnName, query }: GalleryViewProps) {
         }}
       >
         {images.map((chunk, index) => (
-          <ImageDisplay key={index} chunk={chunk} />
+          <ImageDisplay key={index} chunk={chunk} onClick={() => setFullScreenIndex(index)} />
         ))}
       </div>
+      {fullScreenIndex !== null && (
+        <FullScreenOverlay
+          images={images}
+          currentIndex={fullScreenIndex}
+          onClose={() => setFullScreenIndex(null)}
+          onNavigate={setFullScreenIndex}
+        />
+      )}
     </div>
   );
 }

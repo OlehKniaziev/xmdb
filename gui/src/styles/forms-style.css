@@ -131,3 +131,18 @@ dialog .button-danger:hover {
 .connect-button img {
     height: 24px;
 }
+
+.close-button-gallery {
+    background-color: transparent;
+    border: none;
+    cursor: pointer;
+}
+
+.close-button-gallery img {
+    width: 64px;
+    height: 64px;
+}
+
+.close-button-gallery:hover img {
+    content: url("src/assets/icons/close-red.png");
+}
