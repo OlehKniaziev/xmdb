@@ -4,12 +4,14 @@
 #include <Core/Core.hpp>
 #include <Core/DBConnection.hpp>
 #include <Core/DBPool.hpp>
+#include "test.hpp"
 
 using namespace ok::literals;
 using namespace xmdb;
 using namespace xmdb::SQL;
 
-TEST(DBConnection, execute_create_and_select_on_empty_table) {
+TEST(DBConnection, execute_create_and_select_on_empty_table)
+{
     ok::ArenaAllocator arena{};
     StringView source = R"sql(CREATE TABLE MyTable (
         column1 int,
@@ -45,7 +47,8 @@ TEST(DBConnection, execute_create_and_select_on_empty_table) {
     ASSERT_EQ(results_table->columns_types()[1], SQL::ColumnType::TEXT);
 }
 
-TEST(DBConnection, select_empty_png_column) {
+TEST(DBConnection, select_empty_png_column)
+{
 #define PIXEL_DATA "abcdabcdabcdabcdabababab"
     ok::ArenaAllocator arena{};
     StringView source =
@@ -100,24 +103,29 @@ TEST(DBConnection, select_empty_png_column) {
 
     ASSERT_EQ(expected_pixel_data.count, image_chunk->data.count);
 
-    for (UZ pi = 0; pi < image_chunk->data.count; ++pi) {
+    for (UZ pi = 0; pi < image_chunk->data.count; ++pi)
+    {
         U8 px = image_chunk->data[pi];
         ASSERT_EQ(px, expected_pixel_data[pi]);
     }
 }
 
-struct MallocAllocator : public ok::ArenaAllocator {
-    void *raw_alloc(UZ size) override {
+struct MallocAllocator : public ok::ArenaAllocator
+{
+    void *raw_alloc(UZ size) override
+    {
         return calloc(1, size);
     }
 
-    void raw_dealloc(void *ptr, UZ size) override {
+    void raw_dealloc(void *ptr, UZ size) override
+    {
         (void) size;
         ::free(ptr);
     }
 };
 
-TEST(DBConnection, execute_create_insert_and_select_on_table_with_one_row) {
+TEST(DBConnection, execute_create_insert_and_select_on_table_with_one_row)
+{
     ok::ArenaAllocator arena{};
     StringView source = R"sql(CREATE TABLE MyTable (
         column1 int,
@@ -181,7 +189,8 @@ TEST(DBConnection, execute_create_insert_and_select_on_table_with_one_row) {
 }
 
 TEST(DBConnection,
-     execute_create_insert_update_and_select_on_table_with_one_row) {
+     execute_create_insert_update_and_select_on_table_with_one_row)
+{
     ok::ArenaAllocator arena{};
     StringView source = R"sql(CREATE TABLE MyTable (
         column1 int,
@@ -244,7 +253,8 @@ TEST(DBConnection,
 }
 
 TEST(DBConnection,
-     execute_create_insert_delete_and_select_on_table_with_one_row) {
+     execute_create_insert_delete_and_select_on_table_with_one_row)
+{
     ok::ArenaAllocator arena{};
     StringView source = R"sql(CREATE TABLE MyTable (
         column1 int,
@@ -291,7 +301,8 @@ TEST(DBConnection,
 }
 
 TEST(DBConnection,
-     create_new_db_and_execute_create_insert_and_select_on_table_with_one_row) {
+     create_new_db_and_execute_create_insert_and_select_on_table_with_one_row)
+{
     ok::ArenaAllocator arena{};
     StringView source = R"sql(
     CREATE DATABASE MyDb;
@@ -358,7 +369,8 @@ TEST(DBConnection,
     ASSERT_FALSE(column2_stream.next());
 }
 
-TEST(DBConnection, insert_and_select_multiple_rows) {
+TEST(DBConnection, insert_and_select_multiple_rows)
+{
     ok::ArenaAllocator arena{};
     StringView source = R"sql(
     CREATE TABLE TAB(id int);
@@ -408,7 +420,8 @@ TEST(DBConnection, insert_and_select_multiple_rows) {
     ASSERT_FALSE(stream.next());
 }
 
-TEST(DBConnection, create_duplicate_table_fails) {
+TEST(DBConnection, create_duplicate_table_fails)
+{
     ok::ArenaAllocator arena{};
     StringView source = R"sql(
     CREATE TABLE Dup (x int);
@@ -429,7 +442,8 @@ TEST(DBConnection, create_duplicate_table_fails) {
     ASSERT_TRUE(error.ends_with("already exists"));
 }
 
-TEST(DBConnection, create_and_drop_empty_table) {
+TEST(DBConnection, create_and_drop_empty_table)
+{
     ok::ArenaAllocator arena{};
     StringView source = R"sql(
     CREATE TABLE MyTable (
@@ -458,7 +472,8 @@ TEST(DBConnection, create_and_drop_empty_table) {
     ASSERT_EQ(default_db->tables.count, 0);
 }
 
-TEST(DBConnection, create_and_drop_empty_database) {
+TEST(DBConnection, create_and_drop_empty_database)
+{
     ok::ArenaAllocator arena{};
     StringView source = R"sql(
     CREATE DATABASE DB;
@@ -482,12 +497,14 @@ TEST(DBConnection, create_and_drop_empty_database) {
     ASSERT_TRUE(!query_results.value.has_value());
 
     for (DBDescriptor *db = db_pool.db_descriptors; db != nullptr;
-         db = db->next) {
+         db = db->next)
+    {
         ASSERT_NE(db->name, "DB"_sv);
     }
 }
 
-TEST(DBConnection, execute_multiple_queries_with_the_same_connection) {
+TEST(DBConnection, execute_multiple_queries_with_the_same_connection)
+{
     ok::ArenaAllocator arena{};
     StringView source = "CREATE DATABASE DB;"_sv;
 
@@ -541,7 +558,8 @@ TEST(DBConnection, execute_multiple_queries_with_the_same_connection) {
     ASSERT_FALSE(stream.next());
 }
 
-TEST(DBConnection, user_permissions) {
+TEST(DBConnection, user_permissions)
+{
     ok::ArenaAllocator arena{};
     StringView source = "create table tab (x int);"_sv;
 
@@ -578,7 +596,8 @@ TEST(DBConnection, user_permissions) {
     ASSERT_EQ(error, "0:0: user user does not have READ permissions"_sv);
 }
 
-TEST(DBConnection, create_new_user) {
+TEST(DBConnection, create_new_user)
+{
     ok::ArenaAllocator arena{};
     StringView source = "create user some_user;"_sv;
 
@@ -598,8 +617,10 @@ TEST(DBConnection, create_new_user) {
 
     DBUser *usr = nullptr;
 
-    while (default_db->users != nullptr) {
-        if (default_db->users->name == "some_user"_sv) {
+    while (default_db->users != nullptr)
+    {
+        if (default_db->users->name == "some_user"_sv)
+        {
             usr = default_db->users;
             break;
         }
@@ -610,7 +631,8 @@ TEST(DBConnection, create_new_user) {
     ASSERT_NE(usr, nullptr);
 }
 
-TEST(DBConnection, alter_new_user) {
+TEST(DBConnection, alter_new_user)
+{
     ok::ArenaAllocator arena{};
     StringView source =
             "create user some_user; alter user some_user set PASSWORD = 'pass';"_sv;
@@ -636,7 +658,8 @@ TEST(DBConnection, alter_new_user) {
               sha256_digest("pass"_sv));
 }
 
-TEST(DBConnection, create_user_requires_admin_permissions) {
+TEST(DBConnection, create_user_requires_admin_permissions)
+{
     ok::ArenaAllocator arena{};
     StringView source = "CREATE USER new_user;"_sv;
 
@@ -656,7 +679,8 @@ TEST(DBConnection, create_user_requires_admin_permissions) {
             << error.cstr();
 }
 
-TEST(DBConnection, create_duplicate_user_fails) {
+TEST(DBConnection, create_duplicate_user_fails)
+{
     ok::ArenaAllocator arena{};
     StringView source = R"sql(
     CREATE USER dup_user;
@@ -677,10 +701,19 @@ TEST(DBConnection, create_duplicate_user_fails) {
     ASSERT_TRUE(error.ends_with("already exists")) << error.cstr();
 }
 
-TEST(DBConnection, insert_media) {
+TEST(DBConnection, insert_media)
+{
+    ok::StringView media_source = tests::load_test_file_hex("earth.mp4");
+
     ok::ArenaAllocator arena{};
+
     StringView source =
-            "create table meds (m MEDIA); insert into meds(m) values (MEDIA('')); select m from meds;"_sv;
+            ok::String::format(
+                    &arena,
+                    "create table meds (m MEDIA); insert into meds(m) values "
+                    "(MEDIA('" OK_SV_FMT "')); select m from meds;",
+                    OK_SV_ARG(media_source))
+                    .view();
 
     DBUser admin = DBUser::admin();
     DBPool db_pool{&arena};

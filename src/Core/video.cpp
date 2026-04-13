@@ -56,6 +56,8 @@ MediaStream *MediaStream::wrap(ok::Allocator *allocator, Pipeline *pipeline,
 Result<MediaSourceFormat, ok::String> MediaSource::identify_format(
         ok::Allocator *allocator, VideoPlugin *plugin)
 {
+    OK_PANIC("Please don't use this");
+
     if (m_in_memory)
     {
         ok::Slice<U8> buffer = get_buffer();
@@ -146,8 +148,7 @@ ok::Optional<ok::String> Pipeline::connect(MediaStream *source,
 {
     auto &connect_cap = m_plugin->m_caps.stream_connect;
     int ok = m_plugin->m_plugin->use_capability<int>(
-            connect_cap, plugin_entity_to_callback(m_plugin_entity),
-            plugin_entity_to_callback(source->m_plugin_state),
+            connect_cap, plugin_entity_to_callback(source->m_plugin_state),
             plugin_entity_to_callback(dest->m_plugin_state));
 
     if (!ok)

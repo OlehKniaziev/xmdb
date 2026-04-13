@@ -403,7 +403,29 @@ XMDB_MEDIA_DECLARE_DEMUX_ON_NEW_STREAM()
 XMDB_MEDIA_DECLARE_STREAM_CONNECT()
 {
     (void) plugin_state;
-    OK_TODO();
+
+    auto *pad = GST_PAD(stream_state);
+
+    auto *pad_caps = gst_pad_get_current_caps(pad);
+    if (pad_caps == nullptr)
+    {
+        pad_caps = gst_pad_query_caps(pad, nullptr);
+    }
+
+    OK_VERIFY(pad_caps != nullptr);
+
+    auto *pad_structure = gst_caps_get_structure(pad_caps, 0);
+    const char *pad_name = gst_structure_get_name(pad_structure);
+    if (!g_str_has_prefix(pad_name, "video/"))
+    {
+        xmdb::log::warn("skipping the linking of pad of unsupported type '%s'", pad_name);
+        return 1;
+    }
+
+    auto *elem = GST_ELEMENT(dest_state);
+    auto *elem_pad = gst_element_get_static_pad(elem, "sink");
+
+    return gst_pad_link(pad, elem_pad) == GST_PAD_LINK_OK;
 }
 
 XMDB_MEDIA_DECLARE_IDENTIFY_FORMAT_BASE64()
