@@ -41,6 +41,7 @@ static inline void *plugin_entity_to_callback(xmdb_PluginEntity e)
     X(pipeline_create)                                                         \
     X(pipeline_connect)                                                        \
     X(pipeline_add)                                                            \
+    X(pipeline_start)                                                          \
     X(demux_create)                                                            \
     X(demux_on_new_stream)                                                     \
     X(pull_create)                                                             \
@@ -68,6 +69,9 @@ typedef void (*xmdb_DemuxOnNewStreamCallback)(void *demux, void *stream_state,
 #define XMDB_MEDIA_DECLARE_PIPELINE_ADD()                                      \
     XMDB_EXTERN void pipeline_add_cap(                                         \
             void *plugin_state, void *pipeline_state, void *element_state)
+
+#define XMDB_MEDIA_DECLARE_PIPELINE_START()                                    \
+    XMDB_EXTERN int pipeline_start_cap(void *plugin_state, void *pipeline_state)
 
 #define XMDB_MEDIA_DECLARE_PULL_CREATE()                                       \
     XMDB_EXTERN int pull_create_cap(void *plugin_state,                        \

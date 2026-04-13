@@ -262,7 +262,11 @@ static Result<Pipeline *, ok::String> create_demux_pull_pipeline(
     pipeline->add(demux, "demux");
     pipeline->add(pull, PULL_NAME);
 
+    OK_TODO_MSG("move this connect outta here, connect a new demux stream to "
+                "the pull instead");
     pipeline->connect(demux, pull);
+
+    pipeline->start();
 
     return pipeline;
 }

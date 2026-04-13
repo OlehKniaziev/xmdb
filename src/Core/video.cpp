@@ -94,12 +94,19 @@ MediaSource MediaSource::from_slice(ok::Slice<U8> slice)
     return MediaSource{slice};
 }
 
+void Pipeline::start()
+{
+    auto &start_cap = m_plugin->m_caps.pipeline_start;
+    m_plugin->m_plugin->use_capability<void>(
+            start_cap, plugin_entity_to_callback(m_plugin_entity), 1, 2, true);
+}
+
 ok::Optional<ok::String> Pipeline::connect(PipelineElement *source,
                                            PipelineElement *dest)
 {
     auto &connect_cap = m_plugin->m_caps.pipeline_connect;
     int ok = m_plugin->m_plugin->use_capability<int>(
-            connect_cap, plugin_entity_to_callback(m_plugin_state),
+            connect_cap, plugin_entity_to_callback(m_plugin_entity),
             plugin_entity_to_callback(source->m_plugin_state),
             plugin_entity_to_callback(dest->m_plugin_state));
 
@@ -220,7 +227,7 @@ void Pipeline::add(PipelineElement *element, const char *name)
     auto &add_cap = m_plugin->m_caps.pipeline_add;
 
     m_plugin->m_plugin->use_capability<void>(
-            add_cap, plugin_entity_to_callback(this->m_plugin_state),
+            add_cap, plugin_entity_to_callback(this->m_plugin_entity),
             plugin_entity_to_callback(element->m_plugin_state));
 
     m_name_to_element.put(ok::StringView{name}, element);

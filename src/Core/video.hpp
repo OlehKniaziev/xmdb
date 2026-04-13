@@ -208,7 +208,7 @@ public:
 private:
     Pipeline(ok::Allocator *allocator, VideoPlugin *plugin,
              xmdb_PluginEntity plugin_state) :
-        m_allocator{allocator}, m_plugin{plugin}, m_plugin_state{plugin_state}
+        m_allocator{allocator}, m_plugin{plugin}, m_plugin_entity{plugin_state}
     {
         m_name_to_element =
                 ok::Table<ok::StringView, PipelineElement *>::alloc(allocator);
@@ -216,7 +216,7 @@ private:
 
     ok::Allocator *m_allocator;
     VideoPlugin *m_plugin;
-    xmdb_PluginEntity m_plugin_state;
+    xmdb_PluginEntity m_plugin_entity;
     ok::Table<ok::StringView, PipelineElement *> m_name_to_element;
 };
 

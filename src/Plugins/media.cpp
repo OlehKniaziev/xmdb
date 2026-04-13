@@ -48,6 +48,14 @@ XMDB_MEDIA_DECLARE_PIPELINE_ADD()
     gst_bin_add(GST_BIN(pipeline), static_cast<GstElement *>(element_state));
 }
 
+XMDB_MEDIA_DECLARE_PIPELINE_START()
+{
+    auto *pipeline = GST_PIPELINE(pipeline_state);
+    GstStateChangeReturn ret =
+            gst_element_set_state(GST_ELEMENT(pipeline), GST_STATE_PLAYING);
+    return ret != GST_STATE_CHANGE_FAILURE;
+}
+
 struct AppSinkNewSampleData
 {
     xmdb_PullOnFrameCallback callback;
