@@ -141,6 +141,53 @@ XMDB_MEDIA_DECLARE_PULL_CREATE()
     return 1;
 }
 
+XMDB_MEDIA_DECLARE_PUSH_CREATE()
+{
+    (void) plugin_state;
+
+    GstElement *app_src = gst_element_factory_make("appsrc", nullptr);
+    if (app_src == nullptr)
+    {
+        return 0;
+    }
+
+    out_push->impl = app_src;
+    out_push->callback_offset = 0;
+    out_push->indirect = false;
+
+    return 1;
+}
+
+XMDB_MEDIA_DECLARE_PUSH_PUSH()
+{
+    (void) plugin_state;
+
+    auto *appsrc_elem = static_cast<GstElement *>(push_state);
+    auto *appsrc = GST_APP_SRC(appsrc_elem);
+
+    GstBuffer *buffer =
+            gst_buffer_new_allocate(nullptr, source_data_count, nullptr);
+    if (buffer == nullptr)
+    {
+        return 0;
+    }
+
+    GstMapInfo map_info{};
+    gboolean mapped = gst_buffer_map(buffer, &map_info, GST_MAP_WRITE);
+    if (!mapped)
+    {
+        gst_buffer_unref(buffer);
+        return 0;
+    }
+
+    memcpy(map_info.data, source_data, source_data_count);
+    gst_buffer_unmap(buffer, &map_info);
+
+    GstFlowReturn ret = gst_app_src_push_buffer(appsrc, buffer);
+    return ret == GST_FLOW_OK;
+}
+
+
 #if 0
 XMDB_EXTERN int create_pull_async(void *plugin_state,
                                   xmdb_PullOnFrameCallback callback,
@@ -217,23 +264,17 @@ XMDB_MEDIA_DECLARE_PULL_PULL_SYNC()
 
     // NOTE(oleh): Not sure what to unref here tbh, the object ownership is very
     // confusing.
-    xmdb::ScopeGuard guard{[&]()
-                           {
-                               gst_caps_unref(caps);
-                               gst_sample_unref(sample);
-                           }};
+    xmdb::ScopeGuard guard{[&]() { gst_sample_unref(sample); }};
 
     return XMDB_PULL_SYNC_OK;
 }
 
 struct PluginDemuxState
 {
-    GstElement *app_src;
     GstElement *qt_demux;
 
     ~PluginDemuxState()
     {
-        gst_object_unref(app_src);
         gst_object_unref(qt_demux);
     }
 };
@@ -246,27 +287,13 @@ XMDB_MEDIA_DECLARE_DEMUX_CREATE()
                "need to "
                "identify the format first");
 
-    GstElement *app_src = gst_element_factory_make("appsrc", nullptr);
-    if (app_src == nullptr)
-    {
-        return 0;
-    }
-
     GstElement *demux = gst_element_factory_make("qtdemux", nullptr);
     if (demux == nullptr)
     {
-        gst_object_unref(app_src);
         return 0;
     }
 
-    GstBuffer *buf = gst_buffer_new_wrapped(source_data, source_data_count);
-    gst_app_src_push_buffer(GST_APP_SRC(app_src), buf);
-    gst_app_src_end_of_stream(GST_APP_SRC(app_src));
-
-    gst_element_link(app_src, demux);
-
     auto *impl = new PluginDemuxState{
-            .app_src = app_src,
             .qt_demux = demux,
     };
 

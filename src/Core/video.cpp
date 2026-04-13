@@ -196,6 +196,45 @@ Result<Demux *, ok::String> Demux::create(ok::Allocator *allocator,
     };
 }
 
+Result<Push *, ok::String> Push::create(ok::Allocator *allocator,
+                                        Pipeline *pipeline)
+{
+    auto *video_plugin = pipeline->plugin();
+    auto &create_cap = video_plugin->m_caps.push_create;
+    xmdb_PluginEntity plugin_state{};
+    int ok = video_plugin->m_plugin->use_capability<int>(create_cap,
+                                                         &plugin_state);
+
+    if (!ok)
+    {
+        return get_error(allocator, video_plugin->m_plugin);
+    }
+
+    return new (allocator) Push{
+            allocator,
+            pipeline,
+            plugin_state,
+    };
+}
+
+void Push::push(MediaSource source)
+{
+    if (!source.is_in_memory())
+    {
+        OK_TODO_MSG("Streaming media source");
+    }
+
+    ok::Slice<U8> source_buffer = source.get_buffer();
+
+    auto *video_plugin = pipeline->plugin();
+    auto &push_cap = video_plugin->m_caps.push_push;
+    int ok = video_plugin->m_plugin->use_capability<int>(
+            push_cap, plugin_entity_to_callback(m_plugin_state),
+            source_buffer.items, source_buffer.count);
+
+    OK_VERIFY(ok);
+}
+
 void Demux::on_new_stream(OnNewStreamHook hook, void *data)
 {
     struct UserDataStub
@@ -302,6 +341,16 @@ ok::Slice<MediaStream *> Pull::outputs()
 }
 
 ok::Slice<MediaSink *> Pull::inputs()
+{
+    OK_TODO();
+}
+
+ok::Slice<MediaStream *> Push::outputs()
+{
+    OK_TODO();
+}
+
+ok::Slice<MediaSink *> Push::inputs()
 {
     OK_TODO();
 }

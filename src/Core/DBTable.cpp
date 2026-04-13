@@ -265,7 +265,11 @@ static Result<Pipeline *, ok::String> create_demux_pull_pipeline(
     pipeline->add(demux, "demux");
     pipeline->add(pull, PULL_NAME);
 
+    pipeline->connect(push, demux);
+
     pipeline->start();
+
+    push->push(source);
 
     return pipeline;
 }

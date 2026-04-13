@@ -140,11 +140,21 @@ public:
     Push() = delete;
 
     static Result<Push *, ok::String> create(ok::Allocator *allocator,
-                                      Pipeline *pipeline);
+                                             Pipeline *pipeline);
 
     void push(MediaSource source);
 
+    ok::Slice<MediaStream *> outputs() override;
+    ok::Slice<MediaSink *> inputs() override;
+
 private:
+    Push(ok::Allocator *allocator, Pipeline *pipeline,
+         xmdb_PluginEntity plugin_state) :
+        PipelineElement{pipeline, plugin_state}, m_allocator{allocator}
+    {
+    }
+
+    ok::Allocator *m_allocator;
 };
 
 class Pull : public PipelineElement
@@ -263,6 +273,7 @@ private:
     friend Pipeline;
     friend Demux;
     friend Pull;
+    friend Push;
     friend MediaSource;
 
     ok::Allocator *m_allocator;
