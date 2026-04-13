@@ -8,9 +8,14 @@
 
 extern "C"
 {
+struct PluginState
+{
+    ok::Array<char, 4096> error_buffer;
+};
+
 int xmdb_plugin_load(void **out_state)
 {
-    *out_state = nullptr;
+    *out_state = new PluginState{};
     return 1;
 }
 
@@ -55,6 +60,45 @@ XMDB_MEDIA_DECLARE_PIPELINE_START()
     GstStateChangeReturn ret =
             gst_element_set_state(GST_ELEMENT(pipeline), GST_STATE_PLAYING);
     return ret != GST_STATE_CHANGE_FAILURE;
+}
+
+XMDB_MEDIA_DECLARE_PIPELINE_WAIT_UNTIL_COMPLETION()
+{
+    auto *state = static_cast<PluginState *>(plugin_state);
+    GstBus *bus = gst_element_get_bus(GST_ELEMENT(pipeline_state));
+
+    for (;;)
+    {
+        GstMessage *msg = gst_bus_timed_pop_filtered(
+                bus, GST_CLOCK_TIME_NONE,
+                static_cast<GstMessageType>(GST_MESSAGE_ERROR |
+                                            GST_MESSAGE_EOS));
+
+        switch (GST_MESSAGE_TYPE(msg))
+        {
+        case GST_MESSAGE_ERROR:
+        {
+            GError *error{};
+            gchar *debug_info{};
+            gst_message_parse_error(msg, &error, &debug_info);
+
+            memset(state->error_buffer.items, 0,
+                   state->error_buffer.get_count());
+
+            strncpy(state->error_buffer.items, error->message,
+                    state->error_buffer.get_count() - 1);
+
+            g_clear_error(&error);
+            g_free(debug_info);
+
+            return 0;
+        }
+        case GST_MESSAGE_EOS: return 1;
+        default:              OK_PANIC("Unsupported message type");
+        }
+    }
+
+    OK_UNREACHABLE();
 }
 
 struct AppSinkNewSampleData
@@ -151,6 +195,9 @@ XMDB_MEDIA_DECLARE_PUSH_CREATE()
         return 0;
     }
 
+    g_object_set(G_OBJECT(app_src), "stream-type", GST_APP_STREAM_TYPE_STREAM,
+                 "format", GST_FORMAT_BYTES, "is-live", FALSE, nullptr);
+
     out_push->impl = app_src;
     out_push->callback_offset = 0;
     out_push->indirect = false;
@@ -187,6 +234,16 @@ XMDB_MEDIA_DECLARE_PUSH_PUSH()
     return ret == GST_FLOW_OK;
 }
 
+XMDB_MEDIA_DECLARE_PUSH_CLOSE()
+{
+    (void) plugin_state;
+
+    auto *appsrc_elem = static_cast<GstElement *>(push_state);
+    auto *appsrc = GST_APP_SRC(appsrc_elem);
+
+    GstFlowReturn ret = gst_app_src_end_of_stream(appsrc);
+    return ret == GST_FLOW_OK;
+}
 
 #if 0
 XMDB_EXTERN int create_pull_async(void *plugin_state,
@@ -382,9 +439,11 @@ void xmdb_plugin_install(void *state, const char *name,
     *caps_count = g_caps_count;
 }
 
-const char *xmdb_plugin_get_last_error(void *state)
+const char *xmdb_plugin_get_last_error(void *plugin_state)
 {
-    (void) state;
-    return nullptr;
+    auto *state = static_cast<PluginState *>(plugin_state);
+    UZ len = strlen(state->error_buffer.items);
+    if (len == 0) return nullptr;
+    return state->error_buffer.items;
 }
 }

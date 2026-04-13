@@ -110,6 +110,20 @@ void Pipeline::start()
             start_cap, plugin_entity_to_callback(m_plugin_entity), 1, 2, true);
 }
 
+Result<void, ok::String> Pipeline::wait_until_completion()
+{
+    auto &wait_cap = m_plugin->m_caps.pipeline_wait_until_completion;
+    int ok = m_plugin->m_plugin->use_capability<int>(
+            wait_cap, plugin_entity_to_callback(m_plugin_entity));
+
+    if (!ok)
+    {
+        return get_error(m_allocator, m_plugin->m_plugin);
+    }
+
+    return {};
+}
+
 ok::Optional<ok::String> Pipeline::connect(PipelineElement *source,
                                            PipelineElement *dest)
 {
@@ -233,6 +247,21 @@ void Push::push(MediaSource source)
             source_buffer.items, source_buffer.count);
 
     OK_VERIFY(ok);
+}
+
+Result<void, ok::String> Push::close()
+{
+    auto *video_plugin = pipeline->plugin();
+    auto &close_cap = video_plugin->m_caps.push_close;
+    int ok = video_plugin->m_plugin->use_capability<int>(
+            close_cap, plugin_entity_to_callback(m_plugin_state));
+
+    if (!ok)
+    {
+        return get_error(m_allocator, video_plugin->m_plugin);
+    }
+
+    return {};
 }
 
 void Demux::on_new_stream(OnNewStreamHook hook, void *data)

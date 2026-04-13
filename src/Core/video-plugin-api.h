@@ -42,8 +42,10 @@ static inline void *plugin_entity_to_callback(xmdb_PluginEntity e)
     X(pipeline_connect)                                                        \
     X(pipeline_add)                                                            \
     X(pipeline_start)                                                          \
+    X(pipeline_wait_until_completion)                                          \
     X(push_create)                                                             \
     X(push_push)                                                               \
+    X(push_close)                                                              \
     X(demux_create)                                                            \
     X(demux_on_new_stream)                                                     \
     X(pull_create)                                                             \
@@ -77,6 +79,10 @@ typedef void (*xmdb_DemuxOnNewStreamCallback)(void *demux,
 #define XMDB_MEDIA_DECLARE_PIPELINE_START()                                    \
     XMDB_EXTERN int pipeline_start_cap(void *plugin_state, void *pipeline_state)
 
+#define XMDB_MEDIA_DECLARE_PIPELINE_WAIT_UNTIL_COMPLETION()                    \
+    XMDB_EXTERN int pipeline_wait_until_completion_cap(void *plugin_state,     \
+                                                       void *pipeline_state)
+
 #define XMDB_MEDIA_DECLARE_PULL_CREATE()                                       \
     XMDB_EXTERN int pull_create_cap(void *plugin_state,                        \
                                     xmdb_PluginEntity *out_pull)
@@ -104,6 +110,9 @@ typedef void (*xmdb_DemuxOnNewStreamCallback)(void *demux,
     XMDB_EXTERN int push_push_cap(void *plugin_state, void *push_state,        \
                                   unsigned char *source_data,                  \
                                   unsigned int source_data_count)
+
+#define XMDB_MEDIA_DECLARE_PUSH_CLOSE()                                        \
+    XMDB_EXTERN int push_close_cap(void *plugin_state, void *push_state)
 
 #define XMDB_MEDIA_DECLARE_STREAM_CONNECT()                                    \
     XMDB_EXTERN int stream_connect_cap(void *plugin_state, void *stream_state, \

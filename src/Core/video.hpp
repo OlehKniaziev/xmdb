@@ -143,6 +143,7 @@ public:
                                              Pipeline *pipeline);
 
     void push(MediaSource source);
+    Result<void, ok::String> close();
 
     ok::Slice<MediaStream *> outputs() override;
     ok::Slice<MediaSink *> inputs() override;
@@ -217,6 +218,9 @@ public:
                                                  const char *name);
 
     void start();
+
+    // TODO(oleh): What's a meaningful return as a success value here?
+    Result<void, ok::String> wait_until_completion();
 
     void add(PipelineElement *element, const char *name);
 

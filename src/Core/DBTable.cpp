@@ -271,6 +271,8 @@ static Result<Pipeline *, ok::String> create_demux_pull_pipeline(
 
     push->push(source);
 
+    OK(push->close());
+
     return pipeline;
 }
 
@@ -478,6 +480,15 @@ DBTableStream DBTableStream::from_value(ok::Allocator *allocator,
         };
 
         using DataType = decltype(data);
+
+        Result<void, ok::String> wait_res = pipeline->wait_until_completion();
+        if (!wait_res.ok())
+        {
+            OK_PANIC_FMT("Failed to wait on pipeline until completion: %s",
+                         wait_res.error().cstr());
+        }
+
+        OK_TODO_MSG("Nuke the wait part");
 
         return DBTableStream{
                 allocator,

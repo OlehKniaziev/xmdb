@@ -11,6 +11,14 @@ namespace xmdb
         _x.unwrap();                                                           \
     })
 
+#define OK(res)                                                                \
+    do                                                                         \
+    {                                                                          \
+        auto _x = (res);                                                       \
+        if (!_x.ok()) return res.error();                                      \
+    }                                                                          \
+    while (false)
+
 /**
  * @brief A template class representing either a success value or an error
  * value.
@@ -124,6 +132,70 @@ private:
         TOk ok_val;
         TError error_val;
     } m_u;
+};
+
+template <typename TError>
+class [[nodiscard]] Result<void, TError>
+{
+public:
+    Result() : m_error{}
+    {
+    }
+
+    Result(const TError &error) : m_error{error}
+    {
+    }
+
+    void unwrap() = delete;
+    void unwrap() const = delete;
+    void unwrap_unchecked() = delete;
+    void unwrap_unchecked() const = delete;
+
+    TError &error()
+    {
+        if (ok())
+        {
+            OK_PANIC("Called 'error' on an ok value");
+        }
+
+        return m_error.get();
+    }
+
+    const TError &error() const
+    {
+        if (ok())
+        {
+            OK_PANIC("Called 'error' on an ok value");
+        }
+
+        return m_error.get();
+    }
+
+    TError &error_unchecked()
+    {
+        OK_ASSERT(!ok());
+        return m_error.get_unchecked();
+    }
+
+    const TError &error_unchecked() const
+    {
+        OK_ASSERT(!ok());
+        return m_error.get_unchecked();
+    }
+
+    template <typename TResult, typename TOkFn, typename TErrorFn>
+    TResult match(TOkFn ok_fn, TErrorFn error_fn) = delete;
+
+    template <typename TResult, typename TOkFn, typename TErrorFn>
+    TResult match(TOkFn ok_fn, TErrorFn error_fn) const = delete;
+
+    bool ok() const
+    {
+        return !m_error.has_value();
+    }
+
+private:
+    ok::Optional<TError> m_error;
 };
 
 template <typename TOk, typename TError>
