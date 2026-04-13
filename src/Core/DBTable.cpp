@@ -241,6 +241,8 @@ static Result<Pipeline *, ok::String> create_demux_pull_pipeline(
 {
     Pipeline *pipeline = CHECK(Pipeline::create(allocator, plugin, nullptr));
 
+    auto *push = CHECK(Push::create(allocator, pipeline));
+
     auto *pull = CHECK(Pull::create(allocator, pipeline));
 
     auto *demux = CHECK(Demux::create(allocator, pipeline, source));
@@ -259,12 +261,9 @@ static Result<Pipeline *, ok::String> create_demux_pull_pipeline(
             },
             pull);
 
+    pipeline->add(push, "push");
     pipeline->add(demux, "demux");
     pipeline->add(pull, PULL_NAME);
-
-    OK_TODO_MSG("move this connect outta here, connect a new demux stream to "
-                "the pull instead");
-    pipeline->connect(demux, pull);
 
     pipeline->start();
 

@@ -114,22 +114,37 @@ protected:
     xmdb_PluginEntity m_plugin_state;
 };
 
-class MediaStream : public PipelineElement
+class MediaStream
 {
 public:
-    void set_sink(MediaSink *consumer);
+    friend Pipeline;
 
     MediaType type() const;
 
-    ok::Slice<MediaSink *> inputs() override;
-    ok::Slice<MediaStream *> outputs() override;
+    static MediaStream *wrap(ok::Allocator *allocator, Pipeline *pipeline,
+                             xmdb_PluginEntity state);
 
 private:
-    MediaSource *m_source;
+    MediaStream(Pipeline *pipeline, xmdb_PluginEntity state) :
+        m_pipeline{pipeline}, m_plugin_state{state}
+    {
+    }
+
+    Pipeline *m_pipeline;
+    xmdb_PluginEntity m_plugin_state;
 };
 
-class MediaTransform : public MediaStream
+class Push : public PipelineElement
 {
+public:
+    Push() = delete;
+
+    static Result<Push *, ok::String> create(ok::Allocator *allocator,
+                                      Pipeline *pipeline);
+
+    void push(MediaSource source);
+
+private:
 };
 
 class Pull : public PipelineElement
@@ -198,6 +213,8 @@ public:
     ok::Optional<PipelineElement *> get_element(const char *name);
 
     ok::Optional<ok::String> connect(PipelineElement *source,
+                                     PipelineElement *dest);
+    ok::Optional<ok::String> connect(MediaStream *source,
                                      PipelineElement *dest);
 
     VideoPlugin *plugin()

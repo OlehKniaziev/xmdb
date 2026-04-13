@@ -44,6 +44,15 @@ static ok::String get_error(ok::Allocator *allocator, plugin::Plugin *plug)
     return error_message.to_string(allocator);
 }
 
+MediaStream *MediaStream::wrap(ok::Allocator *allocator, Pipeline *pipeline,
+                               xmdb_PluginEntity state)
+{
+    return new (allocator) MediaStream{
+            pipeline,
+            state,
+    };
+}
+
 Result<MediaSourceFormat, ok::String> MediaSource::identify_format(
         ok::Allocator *allocator, VideoPlugin *plugin)
 {
@@ -118,6 +127,23 @@ ok::Optional<ok::String> Pipeline::connect(PipelineElement *source,
     return {};
 }
 
+ok::Optional<ok::String> Pipeline::connect(MediaStream *source,
+                                           PipelineElement *dest)
+{
+    auto &connect_cap = m_plugin->m_caps.stream_connect;
+    int ok = m_plugin->m_plugin->use_capability<int>(
+            connect_cap, plugin_entity_to_callback(m_plugin_entity),
+            plugin_entity_to_callback(source->m_plugin_state),
+            plugin_entity_to_callback(dest->m_plugin_state));
+
+    if (!ok)
+    {
+        return get_error(m_allocator, m_plugin->m_plugin);
+    }
+
+    return {};
+}
+
 Result<Pipeline *, ok::String> Pipeline::create(ok::Allocator *allocator,
                                                 VideoPlugin *plugin,
                                                 const char *name)
@@ -174,21 +200,27 @@ void Demux::on_new_stream(OnNewStreamHook hook, void *data)
 {
     struct UserDataStub
     {
+        Demux *this_demux;
         OnNewStreamHook hook;
         void *user_data;
     };
 
-    auto hook_stub = [](void *demux_state, void *stream_state, void *user_data)
+    xmdb_DemuxOnNewStreamCallback hook_stub = [](void *demux_state,
+                                                 xmdb_PluginEntity stream_state,
+                                                 void *user_data)
     {
-        auto *stub = static_cast<UserDataStub *>(user_data);
-        (void) stub;
         (void) demux_state;
-        (void) stream_state;
-        OK_TODO();
-        // stub->hook(demux_state, stream_state, stub->user_data);
+
+        auto *stub = static_cast<UserDataStub *>(user_data);
+        auto *media_stream =
+                MediaStream::wrap(stub->this_demux->m_allocator,
+                                  stub->this_demux->pipeline, stream_state);
+
+        stub->hook(stub->this_demux, media_stream, stub->user_data);
     };
 
     auto *data_stub = new (m_allocator) UserDataStub{
+            .this_demux = this,
             .hook = hook,
             .user_data = data,
     };

@@ -46,6 +46,7 @@ static inline void *plugin_entity_to_callback(xmdb_PluginEntity e)
     X(demux_on_new_stream)                                                     \
     X(pull_create)                                                             \
     X(pull_pull_sync)                                                          \
+    X(stream_connect)                                                          \
     X(identify_format_base64)
 
 typedef void (*xmdb_PullOnFrameCallback)(void *pull_state, int frame_width,
@@ -53,7 +54,8 @@ typedef void (*xmdb_PullOnFrameCallback)(void *pull_state, int frame_width,
                                          unsigned char *frame_data,
                                          void *user_data);
 
-typedef void (*xmdb_DemuxOnNewStreamCallback)(void *demux, void *stream_state,
+typedef void (*xmdb_DemuxOnNewStreamCallback)(void *demux,
+                                              xmdb_PluginEntity stream_entity,
                                               void *user_data);
 
 #define XMDB_MEDIA_DECLARE_PIPELINE_CREATE()                                   \
@@ -91,6 +93,10 @@ typedef void (*xmdb_DemuxOnNewStreamCallback)(void *demux, void *stream_state,
     XMDB_EXTERN xmdb_PullSyncResult pull_pull_sync_cap(                        \
             void *plugin_state, void *pull_state, int *out_width,              \
             int *out_height, unsigned char **out_data, int *out_data_count)
+
+#define XMDB_MEDIA_DECLARE_STREAM_CONNECT()                                    \
+    XMDB_EXTERN int stream_connect_cap(void *plugin_state, void *stream_state, \
+                                       void *dest_state)
 
 #define XMDB_MEDIA_DECLARE_IDENTIFY_FORMAT_BASE64()                            \
     XMDB_EXTERN int identify_format_base64_cap(                                \

@@ -45,7 +45,8 @@ XMDB_MEDIA_DECLARE_PIPELINE_ADD()
 
     auto *pipeline = static_cast<GstElement *>(pipeline_state);
 
-    gst_bin_add(GST_BIN(pipeline), static_cast<GstElement *>(element_state));
+    OK_VERIFY(gst_bin_add(GST_BIN(pipeline),
+                          static_cast<GstElement *>(element_state)) == true);
 }
 
 XMDB_MEDIA_DECLARE_PIPELINE_START()
@@ -179,10 +180,6 @@ XMDB_EXTERN int create_pull_async(void *plugin_state,
 }
 #endif // 0
 
-// extern "C" int pull_pull_sync_cap(void *plugin_state, void *pull_state,
-//                                   int *out_width, int *out_height,
-//                                   unsigned char **out_data, int
-//                                   *out_data_count)
 XMDB_MEDIA_DECLARE_PULL_PULL_SYNC()
 {
     (void) plugin_state;
@@ -293,7 +290,12 @@ XMDB_EXTERN void qt_demux_pad_added_stub(GstElement *qt_demux, GstPad *pad,
     (void) qt_demux;
 
     auto *data = static_cast<PadAddedData *>(user_data);
-    data->callback(data->demux_state, pad, data->user_data);
+    xmdb_PluginEntity pad_entity = {
+            .impl = pad,
+            .callback_offset = 0,
+            .indirect = false,
+    };
+    data->callback(data->demux_state, pad_entity, data->user_data);
 }
 
 XMDB_MEDIA_DECLARE_DEMUX_ON_NEW_STREAM()
@@ -312,6 +314,12 @@ XMDB_MEDIA_DECLARE_DEMUX_ON_NEW_STREAM()
                      G_CALLBACK(qt_demux_pad_added_stub), data_stub);
 
     return 1;
+}
+
+XMDB_MEDIA_DECLARE_STREAM_CONNECT()
+{
+    (void) plugin_state;
+    OK_TODO();
 }
 
 XMDB_MEDIA_DECLARE_IDENTIFY_FORMAT_BASE64()
