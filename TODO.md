@@ -1,3 +1,3 @@
-- Uncomment DBConnection tests
-- Modify the `ok` library to not commit all of the memory on windows upfront
-- Instead of inserting straight away add a node to the graph
+- [ ] Fix CI
+- [ ] Document media plugins
+- [ ] Make gstreamer optional
