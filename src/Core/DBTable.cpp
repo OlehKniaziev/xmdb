@@ -236,7 +236,7 @@ constexpr bool chunk_images = false;
 
 static constexpr const char *PULL_NAME = "pull";
 
-static Result<Pipeline *, ok::String> create_demux_pull_pipeline(
+Result<Pipeline *, ok::String> create_demux_pull_pipeline(
         ok::Allocator *allocator, VideoPlugin *plugin, MediaSource source)
 {
     Pipeline *pipeline = CHECK(Pipeline::create(allocator, plugin, nullptr));
@@ -450,91 +450,39 @@ DBTableStream DBTableStream::from_value(ok::Allocator *allocator,
     }
     case DBValue::Kind::MEDIA:
     {
-        Result<VideoPlugin *, ok::String> video_plugin_res =
-                get_or_load_default_media_plugin(allocator);
-        if (!video_plugin_res.ok())
+        struct Data
         {
-            OK_PANIC_FMT("Failed to get/load the default media plugin: %s",
-                         video_plugin_res.error().cstr());
-        }
-
-        auto *video_plugin = video_plugin_res.unwrap();
-
-        auto *media_value = static_cast<MediaSourceDBValue *>(value);
-        MediaSource media_source = media_value->source();
-        Result<Pipeline *, ok::String> pipeline_res =
-                create_demux_pull_pipeline(allocator, video_plugin,
-                                           media_source);
-
-        if (!pipeline_res.ok())
-        {
-            OK_PANIC_FMT("Failed to create a pipeline: %s",
-                         pipeline_res.error().cstr());
-        }
-
-        auto *pipeline = pipeline_res.unwrap();
-
-        auto *data = new (allocator) ok::Pair{
-                .a = allocator,
-                .b = pipeline,
+            ok::Allocator *allocator;
+            DBValue *value;
+            bool done;
         };
 
-        using DataType = decltype(data);
-
-        // Result<void, ok::String> wait_res = pipeline->wait_until_completion();
-        // if (!wait_res.ok())
-        // {
-        //     OK_PANIC_FMT("Failed to wait on pipeline until completion: %s",
-        //                  wait_res.error().cstr());
-        // }
-        //
-        // OK_TODO_MSG("Nuke the wait part");
+        auto *data = new (allocator) Data{
+                .allocator = allocator,
+                .value = value,
+                .done = false,
+        };
 
         return DBTableStream{
                 allocator,
                 [](void *data_ptr) -> ok::Optional<Value>
                 {
-                    auto *data = static_cast<DataType>(data_ptr);
-                    auto [allocator, pipeline] = *data;
-
-                    ok::Optional<PipelineElement *> pull_opt =
-                            pipeline->get_element(PULL_NAME);
-                    if (!pull_opt)
+                    auto *data = static_cast<Data *>(data_ptr);
+                    if (data->done)
                     {
-                        OK_PANIC_FMT("Could not get the pull element '%s'",
-                                     PULL_NAME);
+                        return ok::Optional<Value>::empty();
                     }
 
-                    auto *pull_element = pull_opt.get();
-                    auto *pull = static_cast<Pull *>(pull_element);
+                    auto *media_value =
+                            static_cast<MediaSourceDBValue *>(data->value);
+                    MediaSource media_source = media_value->source();
 
-                    VideoFrame frame{};
+                    data->done = true;
 
-                    auto pull_res = pull->pull_sync(&frame);
-                    if (!pull_res.ok())
-                    {
-                        log::error("Failed to synchronously pull a frame: %s",
-                                   pull_res.error().cstr());
-                        return Optional<Value>::empty();
-                    }
-
-                    if (pull_res.unwrap())
-                    {
-                        log::debug(
-                                "got a frame (w: %d, h: %d, data_count: %zu)",
-                                frame.width, frame.height, frame.data.count);
-                        return Value::frame(allocator, frame);
-                    }
-                    else
-                    {
-                        log::debug("got no frame");
-                        return Optional<Value>::empty();
-                    }
+                    return Value::media_source(data->allocator, media_source);
                 },
                 data,
         };
-
-        break;
     }
     }
 
@@ -683,9 +631,97 @@ ok::Optional<Value> DBTableStream::next()
         }
         case SQL::ColumnType::MEDIA:
         {
-            // Result<Pipeline *, ok::String> pipeline_res =
-            // create_demux_pull_pipeline(m_allocator, media_source);
-            OK_TODO_MSG("media column");
+            OK_TODO();
+#if 0
+            Result<VideoPlugin *, ok::String> video_plugin_res =
+                    get_or_load_default_media_plugin(m_allocator);
+            if (!video_plugin_res.ok())
+            {
+                OK_PANIC_FMT("Failed to get/load the default media plugin: %s",
+                             video_plugin_res.error().cstr());
+            }
+
+            auto *video_plugin = video_plugin_res.unwrap();
+
+            auto *media_value = static_cast<MediaSourceDBValue *>(value);
+            MediaSource media_source = media_value->source();
+            Result<Pipeline *, ok::String> pipeline_res =
+                    create_demux_pull_pipeline(allocator, video_plugin,
+                                               media_source);
+
+            if (!pipeline_res.ok())
+            {
+                OK_PANIC_FMT("Failed to create a pipeline: %s",
+                             pipeline_res.error().cstr());
+            }
+
+            auto *pipeline = pipeline_res.unwrap();
+
+            auto *data = new (allocator) ok::Pair{
+                    .a = allocator,
+                    .b = pipeline,
+            };
+
+            using DataType = decltype(data);
+
+            // Result<void, ok::String> wait_res =
+            // pipeline->wait_until_completion(); if (!wait_res.ok())
+            // {
+            //     OK_PANIC_FMT("Failed to wait on pipeline until completion:
+            //     %s",
+            //                  wait_res.error().cstr());
+            // }
+            //
+            // OK_TODO_MSG("Nuke the wait part");
+
+            return DBTableStream{
+                    allocator,
+                    [](void *data_ptr) -> ok::Optional<Value>
+                    {
+                        auto *data = static_cast<DataType>(data_ptr);
+                        auto [allocator, pipeline] = *data;
+
+                        ok::Optional<PipelineElement *> pull_opt =
+                                pipeline->get_element(PULL_NAME);
+                        if (!pull_opt)
+                        {
+                            OK_PANIC_FMT("Could not get the pull element '%s'",
+                                         PULL_NAME);
+                        }
+
+                        auto *pull_element = pull_opt.get();
+                        auto *pull = static_cast<Pull *>(pull_element);
+
+                        VideoFrame frame{};
+
+                        auto pull_res = pull->pull_sync(&frame);
+                        if (!pull_res.ok())
+                        {
+                            log::error(
+                                    "Failed to synchronously pull a frame: %s",
+                                    pull_res.error().cstr());
+                            return Optional<Value>::empty();
+                        }
+
+                        if (pull_res.unwrap())
+                        {
+                            log::debug("got a frame (w: %d, h: %d, data_count: "
+                                       "%zu)",
+                                       frame.width, frame.height,
+                                       frame.data.count);
+                            return Value::frame(allocator, frame);
+                        }
+                        else
+                        {
+                            log::debug("got no frame");
+                            return Optional<Value>::empty();
+                        }
+                    },
+                    data,
+            };
+
+            break;
+#endif // 0
         }
         case SQL::ColumnType::BOOLEAN: OK_TODO_MSG("[next] BOOL");
         case SQL::ColumnType::FLOAT:   OK_TODO_MSG("[next] FLOAT");

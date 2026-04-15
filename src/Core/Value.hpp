@@ -106,9 +106,14 @@ public:
         return Value{Type::BIG_STRING, reinterpret_cast<void *>(s)};
     }
 
-    static Value media_source(MediaSource *source)
+    static Value media_source(ok::Allocator *allocator, MediaSource source)
     {
-        return Value{Type::MEDIA_SOURCE, reinterpret_cast<void *>(source)};
+        OK_ASSERT(source.is_in_memory());
+
+        auto *source_copy = allocator->alloc<MediaSource>();
+
+        *source_copy = MediaSource::from_slice(source.get_buffer());
+        return Value{Type::MEDIA_SOURCE, reinterpret_cast<void *>(source_copy)};
     }
 
     static Value frame(ok::Allocator *allocator, VideoFrame frame)
