@@ -116,6 +116,28 @@ a {
     background-color: var(--color-darker);
 }
 
+.help-btn-container {
+    position: relative;
+    margin-left: auto;
+    padding-right: 30px;
+}
+
+.help-dropdown {
+    position: absolute;
+    top: calc(100% + 8px);
+    right: 24px;
+    background: var(--color-main-light);
+    border: 1px solid var(--color-accent-dark);
+    border-radius: 8px;
+    padding: 12px 16px;
+    width: 200px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    z-index: 100;
+    font-size: 14px;
+    color: var(--color-black);
+    word-break: break-word;
+}
+
 .sidebar-container {
     /* max-width: 330px; */
     border-right: 1px solid var(--color-brown);

@@ -81,6 +81,16 @@ function ConnectionDialog() {
               type="text"
               placeholder="Server URL..."
             ></input>
+            <div className="input-hint-container">
+              <img
+                src="src/assets/icons/question.png"
+                alt="hint"
+                className="input-hint-icon"
+              />
+              <div className="input-hint-tooltip">
+                Right format: http&#91;s&#93;://&lt;hostname or IP&gt;:&lt;port&gt; 
+              </div>
+            </div>
           </div>
           <div className="horizontal-container">
             <label htmlFor="database">Database name:</label>

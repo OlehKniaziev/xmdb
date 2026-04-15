@@ -132,6 +132,45 @@ dialog .button-danger:hover {
     height: 24px;
 }
 
+.input-hint-container {
+    position: relative;
+    display: flex;
+    align-items: center;
+}
+
+.input-hint-icon {
+    width: 20px;
+    height: 20px;
+    cursor: pointer;
+    opacity: 0.7;
+}
+
+.input-hint-icon:hover {
+    opacity: 1;
+}
+
+.input-hint-tooltip {
+    display: none;
+    position: absolute;
+    top: calc(100% + 8px);
+    left: 50%;
+    transform: translateX(-50%);
+    background: var(--color-main-light);
+    border: 1px solid var(--color-accent-middle);
+    border-radius: 8px;
+    padding: 8px 12px;
+    font-size: 14px;
+    font-family: var(--font-main);
+    color: var(--color-black);
+    white-space: nowrap;
+    z-index: 200;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+.input-hint-container:hover .input-hint-tooltip {
+    display: block;
+}
+
 .close-button-gallery {
     background-color: transparent;
     border: none;
