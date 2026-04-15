@@ -116,6 +116,16 @@ const ConnectionEdit = forwardRef<ConnectionEditHandle>((_, ref) => {
           <div className="horizontal-container">
             <label htmlFor="hostname">Hostname:</label>
             <input name="hostname" type="text" defaultValue={Hostname}></input>
+            <div className="input-hint-container">
+              <img
+                src="src/assets/icons/question.png"
+                alt="hint"
+                className="input-hint-icon"
+              />
+              <div className="input-hint-tooltip">
+                Right format: http&#91;s&#93;://&lt;hostname or IP&gt;:port 
+              </div>
+            </div>
           </div>
           <div className="horizontal-container">
             <label htmlFor="database">Database name:</label>

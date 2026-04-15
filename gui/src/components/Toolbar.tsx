@@ -1,4 +1,4 @@
-import { use, useEffect, useRef } from "react";
+import { use, useEffect, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import ConnectionEdit, { type ConnectionEditHandle } from "./ConnectionEdit";
 import {
@@ -31,6 +31,44 @@ export default function Toolbar({ onAddTab }: ToolbarProps) {
   const activeTab = tabs.find((t) => t.id === activeTabId);
 
   const dialogRef = useRef<ConnectionEditHandle>(null);
+  const helpRef = useRef<HTMLDivElement>(null);
+  const [helpOpen, setHelpOpen] = useState(false);
+
+  useEffect(() => {
+    function handleClickOutside(e: MouseEvent) {
+      if (helpRef.current && !helpRef.current.contains(e.target as Node)) {
+        setHelpOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  const helpButton = (
+    <div className="help-btn-container" ref={helpRef}>
+      <div className="btn-label-container">
+        <button
+          name="helpBtn"
+          className="toolbar-btn"
+          data-src="src/assets/icons/question-mark.png"
+          data-hover="src/assets/icons/question-mark-dark.png"
+          onClick={() => setHelpOpen((o) => !o)}
+        >
+          <img alt="Help icon" src="src/assets/icons/question-mark.png" />
+        </button>
+        <label htmlFor="helpBtn">Help</label>
+      </div>
+      {helpOpen && (
+        <div className="help-dropdown">
+          {location.pathname === "/query" ? (
+            <>You can find SQL Syntax here: <a href="https://olehkniaziev.github.io/xmdb/sql.html" target="_blank" rel="noopener noreferrer" style={{color: 'var(--color-accent-bright)'}}>SQL Syntax</a></>
+          ) : (
+            <>You can find user help here: <a href="https://olehkniaziev.github.io/xmdb/gui.html" target="_blank" rel="noopener noreferrer" style={{color: 'var(--color-accent-bright)'}}>User Help</a></>
+          )}
+        </div>
+      )}
+    </div>
+  );
 
   async function runQuery(tabId: string, queryToExecute: string) {
     let resp: Response = new Response();
@@ -163,7 +201,7 @@ export default function Toolbar({ onAddTab }: ToolbarProps) {
   }, [location]);
 
   if (location.pathname === "/objects" || location.pathname === "/object") {
-    return <div className="toolbar"></div>;
+    return <div className="toolbar">{helpButton}</div>;
   }
 
   if (location.pathname === "/gallery") {
@@ -188,6 +226,7 @@ export default function Toolbar({ onAddTab }: ToolbarProps) {
           </button>
           <label htmlFor="refreshGalleryBtn">Refresh</label>
         </div>
+        {helpButton}
       </div>
     );
   }
@@ -332,7 +371,7 @@ export default function Toolbar({ onAddTab }: ToolbarProps) {
 
   return (
     <>
-      <div className="toolbar">{buttons}</div>
+      <div className="toolbar">{buttons}{helpButton}</div>
       <ConnectionEdit ref={dialogRef} />
     </>
   );
