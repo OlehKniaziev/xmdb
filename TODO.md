@@ -1,3 +1,4 @@
 - [ ] Fix CI
 - [ ] Document media plugins
 - [ ] Make gstreamer optional
+- [ ] Add doxygen docs to all the new stuff
