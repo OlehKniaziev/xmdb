@@ -108,10 +108,10 @@ export async function loadWasmModule() {
 
     const { instance } = await WebAssembly.instantiateStreaming(fetch(wasmModulePath), wasmImports);
 
-    // @ts-expect-error
+    // @ts-expect-error WebAssembly exports are dynamically typed here.
     wasmMem = instance.exports.memory.buffer;
     wasmInstance = instance;
 
-    // @ts-expect-error
+    // @ts-expect-error WebAssembly constructor export is provided by the module.
     instance.exports.__wasm_call_ctors();
 }

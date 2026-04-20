@@ -98,7 +98,6 @@ export default function MainLayout() {
   const handleTabClose = (tabId: string) => {
     closeTab(tabId);
     
-    const tabIndex = tabs.findIndex(t => t.id === tabId);
     let nextTab = null;
     
     if (tabs.length > 1) {
