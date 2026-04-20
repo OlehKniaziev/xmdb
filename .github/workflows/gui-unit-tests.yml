@@ -1,0 +1,35 @@
+name: GUI Unit Tests
+
+on:
+  push:
+    branches: [ "production", "development" ]
+    paths:
+      - 'gui/**'
+      - '.github/workflows/gui-unit-tests.yml'
+  pull_request:
+    branches: [ "production", "development" ]
+    paths:
+      - 'gui/**'
+      - '.github/workflows/gui-unit-tests.yml'
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: 22
+        cache: npm
+        cache-dependency-path: gui/package-lock.json
+
+    - name: Install dependencies
+      working-directory: gui
+      run: npm ci
+
+    - name: Run unit tests
+      working-directory: gui
+      run: npm test
