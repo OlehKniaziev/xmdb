@@ -1,4 +1,4 @@
-import { use, useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import ConnectionEdit, { type ConnectionEditHandle } from "./ConnectionEdit";
 import {
@@ -104,13 +104,14 @@ export default function Toolbar({ onAddTab }: ToolbarProps) {
             false,
           );
         }
-      } catch (e: any) {
+      } catch (e: unknown) {
+        const message = e instanceof Error ? `${e.name}: ${e.message}` : String(e);
         console.log(
           "Failed to execute query. Status code: %s (%s)",
           resp.status,
           resp.statusText,
         );
-        updateTabResults(tabId, `${e.name}: ${e.message}`, undefined, false);
+        updateTabResults(tabId, message, undefined, false);
       }
     }
   }

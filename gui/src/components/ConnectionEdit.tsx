@@ -86,7 +86,7 @@ const ConnectionEdit = forwardRef<ConnectionEditHandle>((_, ref) => {
           console.error("Status: %s, reason: %s", resp.statusText, errorReason);
           setErrorMessage("Wrong credentials! Try again!");
         }
-      } catch (e: any) {
+      } catch {
         setErrorMessage("Could not connect to the server. Try again!");
       } finally {
         setIsLoadingConnect(false);
