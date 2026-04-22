@@ -1,8 +1,11 @@
 #pragma once
 
+#include <Core/FixedString.hpp>
 #include "SourceLocation.hpp"
 #include "meta.hpp"
 #include "ok.hpp"
+
+#include <cstddef>
 
 #if !defined(OK_NO_STDLIB)
 #include <common.h>
@@ -15,15 +18,74 @@
     }                                                                          \
     while (0)
 
+#ifdef XMDB_DEBUG
+#define XMDB_DEBUG_BLOCK(b)                                                    \
+    do                                                                         \
+    {                                                                          \
+        b                                                                      \
+    }                                                                          \
+    while (false)
+#else
+#define XMDB_DEBUG_BLOCK(b)
+#endif // XMDB_DEBUG
+
 namespace xmdb
 {
+class StringSplit
+{
+public:
+    class Iter
+    {
+    public:
+        using difference_type = ptrdiff_t;
+        using value_type = ok::StringView;
+
+        Iter(const StringSplit *split, UZ pos) : m_split{split}, m_pos{pos}
+        {
+        }
+
+        ok::StringView operator*() const;
+
+        Iter &operator++();
+
+        void operator++(int);
+
+        bool operator!=(const Iter &);
+
+    private:
+        const StringSplit *m_split;
+        UZ m_pos;
+    };
+
+    Iter begin() const
+    {
+        return Iter{this, 0};
+    }
+
+    Iter end() const
+    {
+        return Iter{this, 0};
+    }
+
+private:
+    ok::StringView m_string;
+    ok::StringView m_separator;
+};
+
+/**
+ * @brief Creates an iterator that splits string based on a separator.
+ * @param s The string to split.
+ * @param separator The separator.
+ * @return The iterator.
+ */
+StringSplit split_string_on(ok::StringView s, ok::StringView separator);
+
 /**
  * @brief Terminates the program with a formatted error message.
  * @param fmt The format string.
  * @param ... The format arguments.
  */
-[[noreturn]]
-void dief(const char *fmt, ...) OK_ATTRIBUTE_PRINTF(1, 2);
+[[noreturn]] void dief(const char *fmt, ...) OK_ATTRIBUTE_PRINTF(1, 2);
 
 /**
  * @brief Represents an error message paired with its source location.

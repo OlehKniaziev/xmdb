@@ -1749,6 +1749,7 @@ struct File {
         CURRENTLY_IN_USE,
         READONLY_FS,
         DOES_NOT_EXIST,
+        FILE_NOT_FOUND,
     };
 
     using OpenError = IOError;
@@ -2151,6 +2152,7 @@ Optional<File::OpenError> File::open(File* out, const char* path) {
         case ENXIO:        return OpenError::IS_SOCKET;
         case EOVERFLOW:    return OpenError::FILE_TOO_BIG;
         case EROFS:        return OpenError::READONLY_FILE;
+        case ENOENT:       return OpenError::FILE_NOT_FOUND;
         case EFAULT:       OK_PANIC_FMT("Parameter 'path' (%p) is not mapped to the current process", (void*)path);
         default:           OK_PANIC_FMT("Unexpected error: %s", strerror(error));
         }
@@ -2239,6 +2241,7 @@ String File::error_string(Allocator* allocator, File::OpenError error) {
     case IOError::CURRENTLY_IN_USE:                 return String::alloc(allocator, "currently in use");
     case IOError::READONLY_FS:                      return String::alloc(allocator, "readonly file system");
     case IOError::DOES_NOT_EXIST:                   return String::alloc(allocator, "does not exist");
+    case IOError::FILE_NOT_FOUND:                   return String::alloc(allocator, "no such file or directory");
     }
 
     OK_UNREACHABLE();

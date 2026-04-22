@@ -6,6 +6,8 @@
 #include "constants.hpp"
 #include "image.hpp"
 
+#include <Core/DBTable.hpp>
+#include <Core/ok.hpp>
 #include <SQL/ir.hpp>
 #include <SQL/util.hpp>
 #include <csetjmp>
@@ -613,9 +615,46 @@ static void fill_column(DBRecord *record, DBTable *table, UZ column_index,
 
         if (media_source->is_in_memory())
         {
-            ok::Slice<U8> buffer = media_source->get_buffer();
-            (void) buffer;
-            OK_TODO_MSG("Insert full media from memory");
+            auto table_path = table_with_media_column_dir_name(
+                    ok::temp_allocator(), table);
+            auto column_path = media_column_dir_name(
+                    ok::temp_allocator(), table->columns_names()[column_index]);
+
+            XMDB_FIXME("Unchecked primary key use");
+            auto primary_key = record->primary_key_value;
+
+            auto full_record_file_path = ok::String::format(
+                    ok::temp_allocator(), OK_SV_FMT "/" OK_SV_FMT "/%lu",
+                    OK_SV_ARG(table_path), OK_SV_ARG(column_path), primary_key);
+
+            OK_ASSERT(column_layout.size == sizeof(primary_key));
+
+            ok::File row_file{};
+            auto open_err =
+                    ok::File::open(&row_file, full_record_file_path.view());
+            if (open_err)
+            {
+                auto error_string = ok::File::error_string(ok::temp_allocator(),
+                                                           open_err.get());
+                OK_PANIC_FMT("Failed to open the column file: %s",
+                             error_string.cstr());
+            }
+
+            ok::Slice<U8> media_buffer = media_source->get_buffer();
+
+            auto write_err = row_file.write(media_buffer);
+            if (write_err)
+            {
+                auto error_string = ok::File::error_string(ok::temp_allocator(),
+                                                           write_err.get());
+                OK_PANIC_FMT("Failed to write the column file: %s",
+                             error_string.cstr());
+            }
+
+            memcpy(&record->buffer[column_layout.offset], &primary_key,
+                   sizeof(primary_key));
+
+            return;
         }
         else
         {
@@ -642,7 +681,7 @@ static void fill_column(DBRecord *record, DBTable *table, UZ column_index,
             OK_VERIFY(!error);
         }
 
-        break;
+        OK_UNREACHABLE();
     }
     case Value::Type::FRAME:
     {

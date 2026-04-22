@@ -26,6 +26,8 @@ add_library(LibCore
   config.cpp
 )
 
+target_compile_definitions(LibCore PRIVATE $<$<CONFIG:Debug>:XMDB_DEBUG>)
+
 set_property(TARGET LibCore PROPERTY POSITION_INDEPENDENT_CODE 1)
 target_link_libraries(LibCore PUBLIC libweb LibPlugin)
 

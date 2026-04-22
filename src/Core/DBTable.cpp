@@ -43,15 +43,19 @@ static TypeLayout type_layout(SQL::ColumnType type)
 
     switch (type)
     {
-    case SQL::ColumnType::INTEGER: return {.size = 8, .alignment = 8};
-    case SQL::ColumnType::FLOAT:   return {.size = 4, .alignment = 4};
-    case SQL::ColumnType::DOUBLE:  return {.size = 8, .alignment = 8};
+    case SQL::ColumnType::INTEGER:
+        return {.size = sizeof(U64), .alignment = alignof(U64)};
+    case SQL::ColumnType::FLOAT:
+        return {.size = sizeof(F32), .alignment = alignof(F32)};
+    case SQL::ColumnType::DOUBLE:
+        return {.size = sizeof(F64), .alignment = alignof(F64)};
     case SQL::ColumnType::BOOLEAN: return {.size = 1, .alignment = 1};
     case SQL::ColumnType::TEXT:
         return {.size = sizeof(FixedString), .alignment = alignof(FixedString)};
-    case SQL::ColumnType::PNG: return {.size = sizeof(Png), .alignment = 8};
+    case SQL::ColumnType::PNG:
+        return {.size = sizeof(Png), .alignment = alignof(Png)};
     case SQL::ColumnType::MEDIA:
-        return {.size = sizeof(FixedString), .alignment = alignof(FixedString)};
+        return {.size = sizeof(U64), .alignment = alignof(U64)};
     }
 
     OK_UNREACHABLE();
@@ -156,6 +160,11 @@ DBTable::DBTable(ok::Allocator *allocator, DBTable::Flags flags,
         if (is_image(ty))
         {
             attribute.flags |= ColumnAttribute::F_IMAGE;
+        }
+
+        if (ty == SQL::TYPE_MEDIA)
+        {
+            attribute.flags |= ColumnAttribute::F_MEDIA;
         }
 
         m_column_attributes[i] = attribute;
@@ -739,4 +748,26 @@ Value Value::compare(Value)
 {
     OK_TODO();
 }
+
+ok::StringView table_with_media_column_dir_name(ok::Allocator *allocator,
+                                                DBTable *table)
+{
+    XMDB_DEBUG_BLOCK({
+        auto attrs = table->column_attributes();
+        auto idx = attrs.find_index(
+                [](const ColumnAttribute &attr)
+                { return attr.flags & ColumnAttribute::F_MEDIA; });
+        OK_ASSERT(idx != (UZ) -1);
+    });
+    (void) allocator;
+    return table->name();
+}
+
+ok::StringView media_column_dir_name(ok::Allocator *allocator,
+                                     ok::StringView column_name)
+{
+    (void) allocator;
+    return column_name;
+}
+
 } // namespace xmdb

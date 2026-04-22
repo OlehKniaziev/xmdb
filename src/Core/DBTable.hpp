@@ -17,6 +17,7 @@ struct ColumnAttribute
     enum
     {
         F_IMAGE = 1 << 0, ///< The column contains image data.
+        F_MEDIA = 1 << 1, ///< The column contains media.
     };
 
     using Flags = U8;
@@ -398,4 +399,12 @@ static inline ok::Optional<Value> poll(ok::Allocator *allocator, DBValue *value)
 {
     return DBTableStream::from_value(allocator, value).next();
 }
+
+ok::StringView table_with_media_column_dir_name(ok::Allocator *allocator,
+                                                DBTable *table);
+
+ok::StringView media_column_dir_name(ok::Allocator *allocator,
+                                     ok::StringView column_name);
+
+
 }; // namespace xmdb
