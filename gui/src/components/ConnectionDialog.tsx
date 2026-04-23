@@ -3,6 +3,7 @@ import "../styles/bars-style.css";
 import "../styles/forms-style.css";
 import { useConnectionStore } from "../data/global-states";
 import { sha256HexDigest } from "../data/util";
+import LoadingButton from "./LoadingButton";
 
 function ConnectionDialog() {
   // const [isConnected, setIsConnected] = useState(false);
@@ -121,13 +122,7 @@ function ConnectionDialog() {
           >
             {errorMessage}
           </p>
-          <button className="connect-button">
-            {isLoading ? (
-              <img src="src/assets/loading.svg" alt="loading..."></img>
-            ) : (
-              <span>Connect</span>
-            )}
-          </button>
+          <LoadingButton loading={isLoading}>Connect</LoadingButton>
         </div>
       </form>
     </dialog>

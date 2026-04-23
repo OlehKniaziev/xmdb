@@ -9,6 +9,7 @@ import "../styles/bars-style.css";
 import "../styles/forms-style.css";
 import { useConnectionStore } from "../data/global-states";
 import { sha256HexDigest } from "../data/util";
+import LoadingButton from "./LoadingButton";
 
 export type ConnectionEditHandle = {
   open: () => void;
@@ -153,20 +154,10 @@ const ConnectionEdit = forwardRef<ConnectionEditHandle>((_, ref) => {
             {errorMessage}
           </p>
           <div className="horizontal-container">
-            <button className="connect-button">
-              {isLoadingConnect ? (
-                <img src="src/assets/loading.svg" alt="loading..."></img>
-              ) : (
-                <span>Reconnect</span>
-              )}
-            </button>
-            <button className="connect-button button-danger">
-              {isLoadingDisconnect ? (
-                <img src="src/assets/loading.svg" alt="loading..."></img>
-              ) : (
-                <span>Disconnect</span>
-              )}
-            </button>
+            <LoadingButton loading={isLoadingConnect}>Reconnect</LoadingButton>
+            <LoadingButton loading={isLoadingDisconnect} className="button-danger">
+              Disconnect
+            </LoadingButton>
           </div>
         </div>
       </form>

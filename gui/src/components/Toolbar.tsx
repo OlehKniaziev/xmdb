@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import ConnectionEdit, { type ConnectionEditHandle } from "./ConnectionEdit";
+import ToolbarButton from "./ToolbarButton";
 import {
   useConnectionStore,
   useMultiTabQueryStore,
@@ -46,18 +47,14 @@ export default function Toolbar({ onAddTab }: ToolbarProps) {
 
   const helpButton = (
     <div className="help-btn-container" ref={helpRef}>
-      <div className="btn-label-container">
-        <button
-          name="helpBtn"
-          className="toolbar-btn"
-          data-src="src/assets/icons/question-mark.png"
-          data-hover="src/assets/icons/question-mark-dark.png"
-          onClick={() => setHelpOpen((o) => !o)}
-        >
-          <img alt="Help icon" src="src/assets/icons/question-mark.png" />
-        </button>
-        <label htmlFor="helpBtn">Help</label>
-      </div>
+      <ToolbarButton
+        name="helpBtn"
+        label="Help"
+        iconSrc="src/assets/icons/question-mark.png"
+        hoverIconSrc="src/assets/icons/question-mark-dark.png"
+        iconAlt="Help icon"
+        onClick={() => setHelpOpen((o) => !o)}
+      />
       {helpOpen && (
         <div className="help-dropdown">
           {location.pathname === "/query" ? (
@@ -181,26 +178,6 @@ export default function Toolbar({ onAddTab }: ToolbarProps) {
     addTab(newTitle);
   }
 
-  useEffect(() => {
-    const buttons = document.querySelectorAll<HTMLElement>(".toolbar-btn");
-
-    buttons.forEach((button) => {
-      const img = button.querySelector("img");
-      const defaultSrc = button.dataset.src;
-      const hoverSrc = button.dataset.hover;
-
-      if (!img || !defaultSrc || !hoverSrc) return;
-
-      button.addEventListener("mouseenter", () => {
-        img.src = hoverSrc!;
-      });
-
-      button.addEventListener("mouseleave", () => {
-        img.src = defaultSrc!;
-      });
-    });
-  }, [location]);
-
   if (location.pathname === "/objects" || location.pathname === "/object") {
     return <div className="toolbar">{helpButton}</div>;
   }
@@ -208,25 +185,18 @@ export default function Toolbar({ onAddTab }: ToolbarProps) {
   if (location.pathname === "/gallery") {
     return (
       <div className="toolbar">
-        <div className="btn-label-container">
-          <button
-            name="refreshGalleryBtn"
-            className="toolbar-btn"
-            data-src="src/assets/icons/refresh.png"
-            data-hover="src/assets/icons/refresh-dark-outline.png"
-            onClick={async () => {
-              if (activeTab && activeTab.type === "gallery") {
-                await runQuery(activeTab.id, activeTab.query);
-              }
-            }}
-          >
-            <img
-              alt="Refresh gallery icon"
-              src="src/assets/icons/refresh.png"
-            ></img>
-          </button>
-          <label htmlFor="refreshGalleryBtn">Refresh</label>
-        </div>
+        <ToolbarButton
+          name="refreshGalleryBtn"
+          label="Refresh"
+          iconSrc="src/assets/icons/refresh.png"
+          hoverIconSrc="src/assets/icons/refresh-dark-outline.png"
+          iconAlt="Refresh gallery icon"
+          onClick={async () => {
+            if (activeTab && activeTab.type === "gallery") {
+              await runQuery(activeTab.id, activeTab.query);
+            }
+          }}
+        />
         {helpButton}
       </div>
     );
@@ -236,136 +206,87 @@ export default function Toolbar({ onAddTab }: ToolbarProps) {
   if (location.pathname === "/query") {
     buttons = (
       <>
-        <div className="btn-label-container">
-          <button
-            name="newQueryBtn"
-            className="toolbar-btn"
-            data-src="src/assets/icons/sql-server.png"
-            data-hover="src/assets/icons/sql-server-dark-outline.png"
-            onClick={newQueryOnClick}
-          >
-            <img
-              alt="New query icon"
-              src="src/assets/icons/sql-server.png"
-            ></img>
-          </button>
-          <label htmlFor="newQueryBtn">New Query</label>
-        </div>
+        <ToolbarButton
+          name="newQueryBtn"
+          label="New Query"
+          iconSrc="src/assets/icons/sql-server.png"
+          hoverIconSrc="src/assets/icons/sql-server-dark-outline.png"
+          iconAlt="New query icon"
+          onClick={newQueryOnClick}
+        />
 
-        <div className="btn-label-container">
-          <button
-            name="openQueryBtn"
-            className="toolbar-btn"
-            data-src="src/assets/icons/open-file.png"
-            data-hover="src/assets/icons/open-file-dark-outline.png"
-            onClick={openQueryOnClick}
-          >
-            <img
-              alt="Open query icon"
-              src="src/assets/icons/open-file.png"
-            ></img>
-          </button>
-          <label htmlFor="openQueryBtn">Open Query</label>
-        </div>
+        <ToolbarButton
+          name="openQueryBtn"
+          label="Open Query"
+          iconSrc="src/assets/icons/open-file.png"
+          hoverIconSrc="src/assets/icons/open-file-dark-outline.png"
+          iconAlt="Open query icon"
+          onClick={openQueryOnClick}
+        />
 
-        <div className="btn-label-container">
-          <button
-            name="saveQueryBtn"
-            className="toolbar-btn"
-            data-src="src/assets/icons/diskette.png"
-            data-hover="src/assets/icons/diskette-dark-outline.png"
-            onClick={saveQueryOnClick}
-          >
-            <img
-              alt="Save query icon"
-              src="src/assets/icons/diskette.png"
-            ></img>
-          </button>
-          <label htmlFor="saveQueryBtn">Save Query</label>
-        </div>
+        <ToolbarButton
+          name="saveQueryBtn"
+          label="Save Query"
+          iconSrc="src/assets/icons/diskette.png"
+          hoverIconSrc="src/assets/icons/diskette-dark-outline.png"
+          iconAlt="Save query icon"
+          onClick={saveQueryOnClick}
+        />
 
-        <div className="btn-label-container">
-          <button
-            name="executeQueryBtn"
-            className="toolbar-btn"
-            data-src="src/assets/icons/play-button.png"
-            data-hover="src/assets/icons/play-button-dark-outline.png"
-            onClick={executeQuery}
-          >
-            <img
-              alt="Execute query icon"
-              src="src/assets/icons/play-button.png"
-            ></img>
-          </button>
-          <label htmlFor="executeQueryBtn">Execute</label>
-        </div>
+        <ToolbarButton
+          name="executeQueryBtn"
+          label="Execute"
+          iconSrc="src/assets/icons/play-button.png"
+          hoverIconSrc="src/assets/icons/play-button-dark-outline.png"
+          iconAlt="Execute query icon"
+          onClick={executeQuery}
+        />
 
-        <div className="btn-label-container">
-          <button
-            name="insertBtn"
-            className="toolbar-btn"
-            data-src="src/assets/icons/paperclip.png"
-            data-hover="src/assets/icons/paperclip-dark.png"
-            onClick={insertMedia}
-          >
-            <img
-              alt="Insert media icon"
-              src="src/assets/icons/paperclip.png"
-            ></img>
-          </button>
-          <label htmlFor="insertBtn">Insert Media</label>
-        </div>
+        <ToolbarButton
+          name="insertBtn"
+          label="Insert Media"
+          iconSrc="src/assets/icons/paperclip.png"
+          hoverIconSrc="src/assets/icons/paperclip-dark.png"
+          iconAlt="Insert media icon"
+          onClick={insertMedia}
+        />
       </>
     );
   } else if (location.pathname === "/settings") {
-    buttons = <button className="toolbar-btn">Save Settings</button>;
+    buttons = (
+      <ToolbarButton name="saveSettingsBtn" label="Save Settings">
+        Save Settings
+      </ToolbarButton>
+    );
   } else {
     buttons = (
       <>
-        <div className="btn-label-container">
-          <button
-            name="connectionBtn"
-            className="toolbar-btn"
-            onClick={editConnectionOnClick}
-            data-src="src/assets/icons/connect.png"
-            data-hover="src/assets/icons/connect-dark-outline.png"
-          >
-            <img alt="Connection icon" src="src/assets/icons/connect.png"></img>
-          </button>
-          <label htmlFor="connectionBtn">Connection</label>
-        </div>
+        <ToolbarButton
+          name="connectionBtn"
+          label="Connection"
+          iconSrc="src/assets/icons/connect.png"
+          hoverIconSrc="src/assets/icons/connect-dark-outline.png"
+          iconAlt="Connection icon"
+          onClick={editConnectionOnClick}
+        />
 
-        <div className="btn-label-container">
-          <button
-            name="openQueryBtnHome"
-            className="toolbar-btn"
-            data-src="src/assets/icons/open-file.png"
-            data-hover="src/assets/icons/open-file-dark-outline.png"
-            onClick={openQueryOnClick}
-          >
-            <img
-              alt="Open query icon"
-              src="src/assets/icons/open-file.png"
-            ></img>
-          </button>
-          <label htmlFor="openQueryBtnHome">Open Query</label>
-        </div>
+        <ToolbarButton
+          name="openQueryBtnHome"
+          label="Open Query"
+          iconSrc="src/assets/icons/open-file.png"
+          hoverIconSrc="src/assets/icons/open-file-dark-outline.png"
+          iconAlt="Open query icon"
+          onClick={openQueryOnClick}
+        />
 
-        <div className="btn-label-container">
-          <button
-            name="newQueryBtnHomePage"
-            className="toolbar-btn"
-            onClick={newQueryHomeOnClick}
-            data-src="src/assets/icons/sql-server.png"
-            data-hover="src/assets/icons/sql-server-dark-outline.png"
-          >
-            <img
-              alt="New query icon"
-              src="src/assets/icons/sql-server.png"
-            ></img>
-          </button>
-          <label htmlFor="newQueryBtnHomePage">New Query</label>
-        </div>
+        <ToolbarButton
+          name="newQueryBtnHomePage"
+          label="New Query"
+          iconSrc="src/assets/icons/sql-server.png"
+          hoverIconSrc="src/assets/icons/sql-server-dark-outline.png"
+          iconAlt="New query icon"
+          onClick={newQueryHomeOnClick}
+        />
       </>
     );
   }
