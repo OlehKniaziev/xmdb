@@ -2,16 +2,19 @@
 
 #include <Core/DBConnection.hpp>
 
-namespace xmdb::server {
+namespace xmdb::server
+{
 using ConnectionId = U64;
 
 using Timestamp = time_t;
 
-static inline Timestamp current_timestamp() {
+static inline Timestamp current_timestamp()
+{
     return time(NULL);
 }
 
-struct ConnectionData {
+struct ConnectionData
+{
     ConnectionData *next;
     xmdb::DBConnection *connection;
     ok::ArenaAllocator temp_arena;

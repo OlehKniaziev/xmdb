@@ -2,8 +2,10 @@
 
 using namespace ok::literals;
 
-namespace xmdb::SQL {
-__attribute__((constructor)) void init_global_state() {
+namespace xmdb::SQL
+{
+__attribute__((constructor)) void init_global_state()
+{
     ok::ArenaAllocator state_arena{};
 
     SQL::token_table = Table<StringView, SQL::Token::Type>::alloc(&state_arena);
@@ -11,4 +13,4 @@ __attribute__((constructor)) void init_global_state() {
     XMDB_ENUM_SQL_KEYWORDS
 #undef X
 }
-};
+}; // namespace xmdb::SQL

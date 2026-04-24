@@ -2,15 +2,19 @@
 
 #include "ok.hpp"
 
-namespace xmdb {
+namespace xmdb
+{
 /**
  * @brief Represents a SHA-256 hash digest.
  */
-struct SHA256Digest {
+struct SHA256Digest
+{
     static constexpr UZ SIZE = 32; ///< Size of the digest in bytes.
 
-    inline bool operator==(const SHA256Digest &other) const {
-        for (UZ i = 0; i < SIZE; ++i) {
+    inline bool operator==(const SHA256Digest &other) const
+    {
+        for (UZ i = 0; i < SIZE; ++i)
+        {
             if (bytes[i] != other.bytes[i]) return false;
         }
 

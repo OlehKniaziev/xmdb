@@ -885,8 +885,7 @@ static void run_single_node(QueryExecutionContext *ctx, QueryGraph::Node *node)
         Slice<DBValue *> call_args = call_node->args();
 
 #define X(name, ret, ...)                                                      \
-    do                                                                         \
-    {                                                                          \
+    do {                                                                       \
         if (fn_name == StringView{#name})                                      \
         {                                                                      \
             void *raw_ptr = ctx->static_storage->builtin_functions             \

@@ -4,7 +4,8 @@
 using namespace ok::literals;
 using namespace xmdb::SQL;
 
-int main() {
+int main()
+{
     ok::ArenaAllocator arena{};
     auto source = R"sql(CREATE TABLE MyTable (
         column1 int,

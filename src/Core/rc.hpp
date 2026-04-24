@@ -12,7 +12,7 @@ class Rc
 public:
     Rc(ok::Allocator *allocator, T *ptr) :
         m_allocator{allocator},
-        m_control_block{new (allocator) ControlBlock{
+        m_control_block{new(allocator) ControlBlock{
                 .count = 1,
                 .ptr = ptr,
         }}

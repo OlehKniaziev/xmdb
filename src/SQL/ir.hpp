@@ -182,7 +182,10 @@ enum IRInstructionOperator : U32
  */
 static inline const char *ir_instruction_operator_name(IRInstructionOperator op)
 {
-    switch (op) { ENUM_IR_CONTRACTS }
+    switch (op)
+    {
+        ENUM_IR_CONTRACTS
+    }
     OK_UNREACHABLE();
 }
 

@@ -1,6 +1,7 @@
-extern "C" void *module_alloc(unsigned long size) {
+extern "C" void *module_alloc(unsigned long size)
+{
     static unsigned long off = 0;
-    void *ptr = (void *)off;
+    void *ptr = (void *) off;
     off += size;
     return ptr;
 }
@@ -25,16 +26,13 @@ extern "C" void console_error(const char *fmt, ...);
 
 #include <SQL/constructor_linux.cpp>
 
-#include <SQL/util.hpp>
 #include <SQL/Lexer.cpp>
 #include <SQL/Parser.cpp>
+#include <SQL/util.hpp>
 
-extern "C" bool sql_parse_source(const char *source,
-                                 UZ count,
-                                 UZ *line,
-                                 UZ *col,
-                                 U8 *err_buf,
-                                 UZ err_buf_count) {
+extern "C" bool sql_parse_source(const char *source, UZ count, UZ *line,
+                                 UZ *col, U8 *err_buf, UZ err_buf_count)
+{
     ok::ArenaAllocator arena{};
 
     ok::StringView source_sv{source, count};
@@ -42,7 +40,8 @@ extern "C" bool sql_parse_source(const char *source,
 
     Optional<xmdb::SQL::Query> q = parser.query();
 
-    if (!q.has_value()) {
+    if (!q.has_value())
+    {
         xmdb::ErrorWithSourceLocation error = parser.error.get();
         *line = error.location.line;
         *col = error.location.column;

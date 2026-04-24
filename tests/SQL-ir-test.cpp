@@ -8,7 +8,8 @@
 using namespace ok::literals;
 using namespace xmdb::SQL;
 
-TEST(ir, basic) {
+TEST(ir, basic)
+{
     ok::ArenaAllocator arena{};
     auto source = R"sql(CREATE TABLE MyTable (
         column1 int,
@@ -34,7 +35,8 @@ TEST(ir, basic) {
     ASSERT_TRUE(type_check_query(&compiled_query, &t_ctx, &typed_query));
 }
 
-TEST(ir, select) {
+TEST(ir, select)
+{
     ok::ArenaAllocator arena{};
     auto source = R"sql(CREATE TABLE MyTable (
         column1 int,
@@ -58,7 +60,8 @@ TEST(ir, select) {
     ASSERT_TRUE(type_check_query(&compiled_query, &t_ctx, &typed_query));
 }
 
-TEST(ir, select_star) {
+TEST(ir, select_star)
+{
     ok::ArenaAllocator arena{};
     auto source = R"sql(CREATE TABLE MyTable (
         column1 int,
@@ -99,7 +102,8 @@ TEST(ir, select_star) {
               stringify_ir(&arena, &compiled_query_regular));
 }
 
-TEST(ir, create_database) {
+TEST(ir, create_database)
+{
     ok::ArenaAllocator arena{};
     auto source = "CREATE DATABASE DB; USE DB;"_sv;
     Parser parser{&arena, source};
@@ -118,7 +122,8 @@ TEST(ir, create_database) {
     ASSERT_TRUE(type_check_query(&compiled_query, &t_ctx, &typed_query));
 }
 
-TEST(ir, create_table) {
+TEST(ir, create_table)
+{
     ok::ArenaAllocator arena{};
     auto source = "CREATE TABLE MyTable (id int); SELECT id FROM MyTable;"_sv;
     Parser parser{&arena, source};
@@ -136,7 +141,8 @@ TEST(ir, create_table) {
     ASSERT_TRUE(type_check_query(&compiled_query, &t_ctx, &typed_query));
 }
 
-TEST(ir, drop_database) {
+TEST(ir, drop_database)
+{
     ok::ArenaAllocator arena{};
     auto source =
             "DROP DATABASE default; CREATE DATABASE DB; DROP DATABASE DB;"_sv;
@@ -154,7 +160,8 @@ TEST(ir, drop_database) {
     ASSERT_TRUE(type_check_query(&compiled_query, &t_ctx, &typed_query));
 }
 
-TEST(ir, select_png_column) {
+TEST(ir, select_png_column)
+{
     ok::ArenaAllocator arena{};
     auto source =
             "CREATE TABLE Tab (id int, avatar PNG); SELECT avatar FROM Tab;"_sv;
@@ -175,7 +182,8 @@ TEST(ir, select_png_column) {
     ASSERT_TRUE(type_check_query(&compiled_query, &t_ctx, &typed_query));
 }
 
-TEST(ir, drop_table) {
+TEST(ir, drop_table)
+{
     ok::ArenaAllocator arena{};
     auto source = "CREATE TABLE MyTable (id int); DROP TABLE MyTable;"_sv;
     Parser parser{&arena, source};
@@ -192,7 +200,8 @@ TEST(ir, drop_table) {
     ASSERT_TRUE(type_check_query(&compiled_query, &t_ctx, &typed_query));
 }
 
-TEST(ir, insert) {
+TEST(ir, insert)
+{
     ok::ArenaAllocator arena{};
     auto source = R"sql(CREATE TABLE MyTable (
         column1 int,
@@ -213,7 +222,8 @@ TEST(ir, insert) {
     ASSERT_TRUE(type_check_query(&compiled_query, &t_ctx, &typed_query));
 }
 
-TEST(ir, insert_columns_names_checking) {
+TEST(ir, insert_columns_names_checking)
+{
     ok::ArenaAllocator arena{};
     auto source = R"sql(CREATE TABLE MyTable (
         column1 int,
@@ -230,7 +240,8 @@ TEST(ir, insert_columns_names_checking) {
     ASSERT_FALSE(ir_compile_query(&query.value, &ir_ctx, &compiled_query));
 }
 
-TEST(ir, update) {
+TEST(ir, update)
+{
     ok::ArenaAllocator arena{};
     auto source = R"sql(CREATE TABLE MyTable (
         column1 int,
@@ -251,7 +262,8 @@ TEST(ir, update) {
     ASSERT_TRUE(type_check_query(&compiled_query, &t_ctx, &typed_query));
 }
 
-TEST(ir, delete_) {
+TEST(ir, delete_)
+{
     ok::ArenaAllocator arena{};
     auto source = R"sql(CREATE TABLE MyTable (
         column1 int,
@@ -272,7 +284,8 @@ TEST(ir, delete_) {
     ASSERT_TRUE(type_check_query(&compiled_query, &t_ctx, &typed_query));
 }
 
-TEST(ir, alter_user) {
+TEST(ir, alter_user)
+{
     ok::ArenaAllocator arena{};
     auto source =
             "CREATE USER foo; ALTER USER foo SET PASSWORD = 'strong_pass';"_sv;

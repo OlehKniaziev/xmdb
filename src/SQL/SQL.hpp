@@ -4,7 +4,8 @@
 
 #include "type_check.hpp"
 
-namespace xmdb::SQL {
+namespace xmdb::SQL
+{
 /// @defgroup SQL_API SQL API
 /// @{
 
@@ -15,15 +16,15 @@ namespace xmdb::SQL {
 /// @param[out] typed_query Output typed query pointer.
 /// @param[out] error       Pointer to the error string.
 /// @param[in]  ir_ctx      Optional IR context used for semantic analysis.
-///                         If nullptr is provided, constructs a default IR context.
+///                         If nullptr is provided, constructs a default IR
+///                         context.
 ///
-/// @return true if successful, false otherwise. The typed_query parameter is written to only on success;
+/// @return true if successful, false otherwise. The typed_query parameter is
+/// written to only on success;
 ///         the error parameter is written to only on failure.
-bool compile_and_type_check_source(ok::ArenaAllocator *arena,
-                                   StringView source,
+bool compile_and_type_check_source(ok::ArenaAllocator *arena, StringView source,
                                    TypedCompiledQuery *typed_query,
-                                   String *error,
-                                   IrContext *ir_ctx = nullptr);
+                                   String *error, IrContext *ir_ctx = nullptr);
 
 /// @}
 } // namespace xmdb::SQL

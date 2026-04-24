@@ -4,7 +4,8 @@
 
 using namespace xmdb;
 
-static BTreeIndex default_index() {
+static BTreeIndex default_index()
+{
     auto *arena = new ok::ArenaAllocator{};
     ok::File state_file{};
 
@@ -14,7 +15,8 @@ static BTreeIndex default_index() {
 }
 
 // NOTE(oleh): Just to ensure that the constructor will not crash.
-TEST(BTreeIndexTest, create_with_temp_state_file) {
+TEST(BTreeIndexTest, create_with_temp_state_file)
+{
     ok::ArenaAllocator arena{};
     ok::File state_file{};
 
@@ -27,7 +29,8 @@ TEST(BTreeIndexTest, create_with_temp_state_file) {
     ASSERT_EQ(tree.node_count(), 1);
 }
 
-TEST(BTreeIndexTest, create_then_reload) {
+TEST(BTreeIndexTest, create_then_reload)
+{
     ok::ArenaAllocator arena{};
     ok::File state_file{};
 
@@ -50,7 +53,8 @@ TEST(BTreeIndexTest, create_then_reload) {
     ASSERT_FALSE(state_file.remove());
 }
 
-TEST(BTreeIndexTest, contains_after_insert) {
+TEST(BTreeIndexTest, contains_after_insert)
+{
     BTreeIndex index = default_index();
 
     index.insert(0);
@@ -62,11 +66,13 @@ TEST(BTreeIndexTest, contains_after_insert) {
     ASSERT_TRUE(index.contains(2));
 }
 
-TEST(BTreeIndexTest, growing) {
+TEST(BTreeIndexTest, growing)
+{
     BTreeIndex index = default_index();
 
     UZ i;
-    for (i = 0; i < BTREE_MAX_KEYS; ++i) {
+    for (i = 0; i < BTREE_MAX_KEYS; ++i)
+    {
         index.insert(i);
     }
 
@@ -78,7 +84,8 @@ TEST(BTreeIndexTest, growing) {
     ASSERT_EQ(index.height(), 2);
     ASSERT_EQ(index.node_count(), 3);
 
-    for (i = 0; i <= BTREE_MAX_KEYS; ++i) {
+    for (i = 0; i <= BTREE_MAX_KEYS; ++i)
+    {
         // OK_ASSERT(index.contains(i));
         ASSERT_TRUE(index.contains(i)) << "does not contain " << i;
         ;

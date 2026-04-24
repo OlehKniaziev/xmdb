@@ -1,21 +1,28 @@
 #pragma once
 
-#include <Core/ok.hpp>
 #include <Core/Result.hpp>
+#include <Core/ok.hpp>
 #include <Core/util.hpp>
 
 #include "NativeLibrary.hpp"
 
-namespace xmdb::plugin {
-class PluginCapability {
+namespace xmdb::plugin
+{
+class PluginCapability
+{
 public:
-    PluginCapability(ok::StringView name, NativeSymbol symbol) : m_name{name}, m_symbol{symbol} {}
+    PluginCapability(ok::StringView name, NativeSymbol symbol) :
+        m_name{name}, m_symbol{symbol}
+    {
+    }
 
-    ok::StringView name() const {
+    ok::StringView name() const
+    {
         return m_name;
     }
 
-    NativeSymbol symbol() const {
+    NativeSymbol symbol() const
+    {
         return m_symbol;
     }
 
@@ -28,7 +35,8 @@ private:
  * @brief A representation of a dynamic library with specific
  * exported functions and structure.
  */
-class Plugin {
+class Plugin
+{
 public:
     static Result<Plugin *, ok::String> load(ok::Allocator *allocator,
                                              const NativeLibrary *native_lib);
@@ -39,12 +47,14 @@ public:
 
     ok::Optional<ok::StringView> get_last_error() const;
 
-    Result<PluginCapability, ok::String> get_capability(ok::StringView name) const;
+    Result<PluginCapability, ok::String> get_capability(
+            ok::StringView name) const;
 
     template <typename T, typename... Args>
     T use_capability(PluginCapability capability, Args... args);
 
-    static void operator delete(void *ptr) {
+    static void operator delete(void *ptr)
+    {
         auto *plug = reinterpret_cast<Plugin *>(ptr);
         plug->unload();
         plug->m_allocator->dealloc(plug, 1);
@@ -53,28 +63,24 @@ public:
 private:
     using LoadHook = int (*)(void **);
     using UnloadHook = void (*)(void *);
-    using InstallHook = void (*)(void *,
-                                 const char *,
-                                 const char ***,
-                                 void ***,
+    using InstallHook = void (*)(void *, const char *, const char ***, void ***,
                                  int *);
-    using GetLastErrorHook = const char *(*)(void *);
+    using GetLastErrorHook = const char *(*) (void *);
 
     using CapabilitiesList = ok::List<ok::Pair<ok::StringView, NativeSymbol>>;
 
-    Plugin(ok::Allocator *allocator,
-           const NativeLibrary *native_lib,
-           void *plugin_state,
-           UnloadHook unload_hook,
-           InstallHook install_hook,
+    Plugin(ok::Allocator *allocator, const NativeLibrary *native_lib,
+           void *plugin_state, UnloadHook unload_hook, InstallHook install_hook,
            GetLastErrorHook get_last_error_hook,
-           CapabilitiesList capabilities) : m_allocator{allocator},
-                                            m_native_lib{native_lib},
-                                            m_plugin_state{plugin_state},
-                                            m_unload_hook{unload_hook},
-                                            m_install_hook{install_hook},
-                                            m_get_last_error_hook{get_last_error_hook},
-                                            m_capabilities{capabilities} {
+           CapabilitiesList capabilities) :
+        m_allocator{allocator},
+        m_native_lib{native_lib},
+        m_plugin_state{plugin_state},
+        m_unload_hook{unload_hook},
+        m_install_hook{install_hook},
+        m_get_last_error_hook{get_last_error_hook},
+        m_capabilities{capabilities}
+    {
     }
 
     ok::Allocator *m_allocator;
@@ -88,7 +94,8 @@ private:
 };
 
 template <typename T, typename... Args>
-T Plugin::use_capability(PluginCapability capability, Args... args) {
+T Plugin::use_capability(PluginCapability capability, Args... args)
+{
     auto fn_ptr = capability.symbol().cast<T (*)(void *, Args...)>();
     return fn_ptr(m_plugin_state, args...);
 }

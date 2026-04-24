@@ -5,19 +5,24 @@
 #include "DBPool.hpp"
 #include "ok.hpp"
 
-namespace xmdb {
+namespace xmdb
+{
 /**
  * @brief Stores the results of a database query.
  */
-struct QueryResults {
-    Optional<ErrorWithSourceLocation> error; ///< Error information if the query failed.
-    Optional<DBTable *> value;              ///< The resulting table if the query succeeded and had any output.
+struct QueryResults
+{
+    Optional<ErrorWithSourceLocation>
+            error; ///< Error information if the query failed.
+    Optional<DBTable *> value; ///< The resulting table if the query succeeded
+                               ///< and had any output.
 };
 
 /**
  * @brief Represents an active connection to a database.
  */
-struct DBConnection {
+struct DBConnection
+{
     /**
      * @brief Constructs a new DBConnection.
      * @param pool The database pool this connection belongs to.
@@ -38,9 +43,10 @@ struct DBConnection {
      */
     void close();
 
-    DBPool *db_pool;     ///< Pointer to the database pool.
-    DBUser *user;        ///< Pointer to the associated user.
-    DBDescriptor *db;    ///< Pointer to the database descriptor.
-    SQL::IrContext ir_ctx; ///< The intermediate representation context for execution of queries.
+    DBPool *db_pool; ///< Pointer to the database pool.
+    DBUser *user; ///< Pointer to the associated user.
+    DBDescriptor *db; ///< Pointer to the database descriptor.
+    SQL::IrContext ir_ctx; ///< The intermediate representation context for
+                           ///< execution of queries.
 };
-}
+} // namespace xmdb

@@ -3,23 +3,28 @@
 #include <Core/util.hpp>
 #include <SQL/ast.hpp>
 
-#define SET_TOKEN_MISMATCH(p, got, ...)                                                                                \
-    do {                                                                                                               \
-        Token::Type expected_arr[] = {__VA_ARGS__};                                                                    \
-        ::ok::Slice<Token::Type> expected = {expected_arr, OK_ARR_LEN(expected_arr)};                                  \
-        p->set_token_mismatch((got), expected);                                                                        \
-    } while (0)
+#define SET_TOKEN_MISMATCH(p, got, ...)                                        \
+    do {                                                                       \
+        Token::Type expected_arr[] = {__VA_ARGS__};                            \
+        ::ok::Slice<Token::Type> expected = {expected_arr,                     \
+                                             OK_ARR_LEN(expected_arr)};        \
+        p->set_token_mismatch((got), expected);                                \
+    }                                                                          \
+    while (0)
 
 using namespace ok::literals;
 
-namespace xmdb::SQL {
-Optional<SelectExpr *> parse_select_expr(Parser *p) {
+namespace xmdb::SQL
+{
+Optional<SelectExpr *> parse_select_expr(Parser *p)
+{
     Optional<Token> select_token = p->expect(Token::KW_SELECT);
     TRY(select_token);
 
     auto exprs = ok::List<Expr *>::alloc(p->arena);
 
-    while (true) {
+    while (true)
+    {
         auto expr = p->expression();
         TRY(expr);
 
@@ -35,70 +40,88 @@ Optional<SelectExpr *> parse_select_expr(Parser *p) {
 
     TRY(p->expect(Token::SEMICOLON));
 
-    return SelectExpr::alloc(p->arena, select_token.value, exprs.slice(), table_expr.value);
+    return SelectExpr::alloc(p->arena, select_token.value, exprs.slice(),
+                             table_expr.value);
 }
 
-Optional<Expr *> parse_expression_prim(Parser *parser) {
+Optional<Expr *> parse_expression_prim(Parser *parser)
+{
     auto token = parser->get_cur_token_or_signal_eof();
     if (!token.has_value()) return {};
 
-    switch (token.value.type) {
-    case Token::IDENT: {
+    switch (token.value.type)
+    {
+    case Token::IDENT:
+    {
         ++parser->pos;
-        return IdentifierExpr::alloc(parser->arena, token.value, token.value.data);
+        return IdentifierExpr::alloc(parser->arena, token.value,
+                                     token.value.data);
     }
-    case Token::INTEGER: {
+    case Token::INTEGER:
+    {
         ++parser->pos;
         int64_t integer;
         OK_ASSERT(ok::parse_int64(token.value.data, &integer));
         return IntegerExpr::alloc(parser->arena, token.value, integer);
     }
-    case Token::STRING: {
+    case Token::STRING:
+    {
         ++parser->pos;
         String value = token.value.data.to_string(parser->arena);
         return StringExpr::alloc(parser->arena, token.value, value);
     }
-    case Token::STAR: {
+    case Token::STAR:
+    {
         ++parser->pos;
         return StarExpr::alloc(parser->arena, token.value);
     }
-    case Token::KW_TRUE: {
+    case Token::KW_TRUE:
+    {
         ++parser->pos;
         return Expr::alloc_true(parser->arena, token.value);
     }
-    case Token::KW_FALSE: {
+    case Token::KW_FALSE:
+    {
         ++parser->pos;
         return Expr::alloc_false(parser->arena, token.value);
     }
-    case Token::KW_NULL: {
+    case Token::KW_NULL:
+    {
         ++parser->pos;
         return Expr::alloc_null(parser->arena, token.value);
     }
     case Token::KW_SELECT: return parse_select_expr(parser).upcast<Expr>();
-    default:               {
-        SET_TOKEN_MISMATCH(parser, token.value, Token::IDENT, Token::INTEGER, Token::STRING, Token::KW_TRUE,
-                           Token::KW_FALSE, Token::KW_NULL, Token::KW_SELECT);
+    default:
+    {
+        SET_TOKEN_MISMATCH(parser, token.value, Token::IDENT, Token::INTEGER,
+                           Token::STRING, Token::KW_TRUE, Token::KW_FALSE,
+                           Token::KW_NULL, Token::KW_SELECT);
         return {};
     }
     }
 }
 
-Parser::Parser(ok::ArenaAllocator *arena, StringView source) : arena{arena}, source{source} {
+Parser::Parser(ok::ArenaAllocator *arena, StringView source) :
+    arena{arena}, source{source}
+{
     auto tokens = ok::List<Token>::alloc(arena);
     Lexer lexer{source};
 
-    for (auto token = lexer.next(); token.has_value(); token = lexer.next()) {
+    for (auto token = lexer.next(); token.has_value(); token = lexer.next())
+    {
         tokens.push(token.value);
     }
 
     this->tokens = tokens.slice();
 }
 
-Optional<Stmt *> Parser::stmt() {
+Optional<Stmt *> Parser::stmt()
+{
     auto cur_token = get_cur_token_or_signal_eof();
     TRY(cur_token);
 
-    switch (cur_token.value.type) {
+    switch (cur_token.value.type)
+    {
     case Token::KW_DELETE: return delete_stmt().upcast<Stmt>();
     case Token::KW_INSERT: return insert_stmt().upcast<Stmt>();
     case Token::KW_UPDATE: return update_stmt().upcast<Stmt>();
@@ -106,7 +129,8 @@ Optional<Stmt *> Parser::stmt() {
     case Token::KW_CREATE: return create_stmt().upcast<Stmt>();
     case Token::KW_USE:    return use_stmt().upcast<Stmt>();
     case Token::KW_ALTER:  return alter_stmt().upcast<Stmt>();
-    default:               {
+    default:
+    {
         auto expr = expression();
         TRY(expr);
         return ExprStmt::alloc(arena, expr.value->token, expr.value);
@@ -114,7 +138,8 @@ Optional<Stmt *> Parser::stmt() {
     }
 }
 
-Optional<UseStmt *> Parser::use_stmt() {
+Optional<UseStmt *> Parser::use_stmt()
+{
     Optional<Token> use_token = expect(Token::KW_USE);
     TRY(use_token);
 
@@ -126,7 +151,8 @@ Optional<UseStmt *> Parser::use_stmt() {
     return UseStmt::alloc(arena, use_token.value, database.value.data);
 }
 
-Optional<InsertStmt *> Parser::insert_stmt() {
+Optional<InsertStmt *> Parser::insert_stmt()
+{
     Optional<Token> insert_token = expect(Token::KW_INSERT);
     TRY(insert_token);
     TRY(expect(Token::KW_INTO));
@@ -137,7 +163,8 @@ Optional<InsertStmt *> Parser::insert_stmt() {
 
     auto columns = ok::List<ok::String>::alloc(arena);
 
-    while (true) {
+    while (true)
+    {
         auto column = expect(Token::IDENT);
         TRY(column);
         columns.push(column.value.data.to_string(arena));
@@ -152,11 +179,13 @@ Optional<InsertStmt *> Parser::insert_stmt() {
     auto values = ok::List<Expr *>::alloc(arena);
     auto values_counts = ok::List<uint32_t>::alloc(arena);
 
-    while (true) {
+    while (true)
+    {
         size_t values_count = 0;
 
         TRY(expect(Token::L_PAREN));
-        while (true) {
+        while (true)
+        {
             auto expr = expression();
             TRY(expr);
 
@@ -174,11 +203,13 @@ Optional<InsertStmt *> Parser::insert_stmt() {
 
     TRY(expect(Token::SEMICOLON));
 
-    return InsertStmt::alloc(arena, insert_token.value, table_name.value.data, columns.slice(), values.slice(),
+    return InsertStmt::alloc(arena, insert_token.value, table_name.value.data,
+                             columns.slice(), values.slice(),
                              values_counts.slice());
 }
 
-Optional<UpdateStmt *> Parser::update_stmt() {
+Optional<UpdateStmt *> Parser::update_stmt()
+{
     Optional<Token> update_token = expect(Token::KW_UPDATE);
     TRY(update_token);
 
@@ -190,7 +221,8 @@ Optional<UpdateStmt *> Parser::update_stmt() {
     auto columns = ok::List<ok::String>::alloc(arena);
     auto values = ok::List<Expr *>::alloc(arena);
 
-    while (true) {
+    while (true)
+    {
         auto column = expect(Token::IDENT);
         TRY(column);
 
@@ -207,7 +239,8 @@ Optional<UpdateStmt *> Parser::update_stmt() {
 
     Optional<Expr *> filter_expr{};
 
-    if (try_expect(Token::KW_WHERE)) {
+    if (try_expect(Token::KW_WHERE))
+    {
         auto filter = expression();
         TRY(filter);
 
@@ -216,10 +249,12 @@ Optional<UpdateStmt *> Parser::update_stmt() {
 
     TRY(expect(Token::SEMICOLON));
 
-    return UpdateStmt::alloc(arena, update_token.value, table_expr.value, columns.slice(), values.slice(), filter_expr);
+    return UpdateStmt::alloc(arena, update_token.value, table_expr.value,
+                             columns.slice(), values.slice(), filter_expr);
 }
 
-Optional<DeleteStmt *> Parser::delete_stmt() {
+Optional<DeleteStmt *> Parser::delete_stmt()
+{
     Optional<Token> delete_token = expect(Token::KW_DELETE);
     TRY(delete_token);
     TRY(expect(Token::KW_FROM));
@@ -229,7 +264,8 @@ Optional<DeleteStmt *> Parser::delete_stmt() {
 
     Optional<Expr *> filter_expr{};
 
-    if (try_expect(Token::KW_WHERE)) {
+    if (try_expect(Token::KW_WHERE))
+    {
         auto filter = expression();
         TRY(filter);
         filter_expr = filter.value;
@@ -237,10 +273,12 @@ Optional<DeleteStmt *> Parser::delete_stmt() {
 
     TRY(expect(Token::SEMICOLON));
 
-    return DeleteStmt::alloc(arena, delete_token.value, table_expr.value, filter_expr);
+    return DeleteStmt::alloc(arena, delete_token.value, table_expr.value,
+                             filter_expr);
 }
 
-Optional<DropStmt *> Parser::drop_stmt() {
+Optional<DropStmt *> Parser::drop_stmt()
+{
     Optional<Token> drop_token = expect(Token::KW_DROP);
     TRY(drop_token);
 
@@ -249,11 +287,13 @@ Optional<DropStmt *> Parser::drop_stmt() {
     if (try_expect(Token::KW_TABLE)) drop_target = DropStmt::Target::TABLE;
     else if (try_expect(Token::KW_DATABASE))
         drop_target = DropStmt::Target::DATABASE;
-    else {
+    else
+    {
         auto token = get_cur_token_or_signal_eof();
         TRY(token);
 
-        SET_TOKEN_MISMATCH(this, token.value, Token::KW_TABLE, Token::KW_DATABASE);
+        SET_TOKEN_MISMATCH(this, token.value, Token::KW_TABLE,
+                           Token::KW_DATABASE);
         return {};
     }
 
@@ -262,20 +302,26 @@ Optional<DropStmt *> Parser::drop_stmt() {
 
     TRY(expect(Token::SEMICOLON));
 
-    return DropStmt::alloc(arena, drop_token.value, drop_target, name.value.data.to_string(arena));
+    return DropStmt::alloc(arena, drop_token.value, drop_target,
+                           name.value.data.to_string(arena));
 }
 
-Optional<CreateStmt *> Parser::create_stmt() {
+Optional<CreateStmt *> Parser::create_stmt()
+{
     Optional<Token> create_token = expect(Token::KW_CREATE);
 
     CreateStmt *stmt;
 
-    if (try_expect(Token::KW_DATABASE)) {
+    if (try_expect(Token::KW_DATABASE))
+    {
         auto name = expect(Token::IDENT);
         TRY(name);
 
-        stmt = CreateDatabaseStmt::alloc(arena, create_token.value, name.value.data.to_string(arena));
-    } else if (try_expect(Token::KW_TABLE)) {
+        stmt = CreateDatabaseStmt::alloc(arena, create_token.value,
+                                         name.value.data.to_string(arena));
+    }
+    else if (try_expect(Token::KW_TABLE))
+    {
         auto name = expect(Token::IDENT);
         TRY(name);
 
@@ -284,7 +330,8 @@ Optional<CreateStmt *> Parser::create_stmt() {
 
         TRY(expect(Token::L_PAREN));
 
-        while (true) {
+        while (true)
+        {
             auto column_name = expect(Token::IDENT);
             TRY(column_name);
 
@@ -299,14 +346,20 @@ Optional<CreateStmt *> Parser::create_stmt() {
 
         TRY(expect(Token::R_PAREN));
 
-        stmt = CreateTableStmt::alloc(arena, create_token.value, name.value.data.to_string(arena), column_names.slice(),
-                                      column_types.slice());
-    } else if (try_expect(Token::KW_USER)) {
+        stmt = CreateTableStmt::alloc(
+                arena, create_token.value, name.value.data.to_string(arena),
+                column_names.slice(), column_types.slice());
+    }
+    else if (try_expect(Token::KW_USER))
+    {
         auto name = expect(Token::IDENT);
         TRY(name);
 
-        stmt = CreateUserStmt::alloc(arena, create_token.value, name.value.data.to_string(arena));
-    } else {
+        stmt = CreateUserStmt::alloc(arena, create_token.value,
+                                     name.value.data.to_string(arena));
+    }
+    else
+    {
         auto token = get_cur_token_or_signal_eof();
         TRY(token);
         SET_TOKEN_MISMATCH(this, token.value, Token::KW_CREATE);
@@ -318,7 +371,8 @@ Optional<CreateStmt *> Parser::create_stmt() {
     return stmt;
 }
 
-Optional<SetClause> Parser::set_clause() {
+Optional<SetClause> Parser::set_clause()
+{
     auto name_token = expect(Token::IDENT);
     TRY(name_token);
 
@@ -333,7 +387,8 @@ Optional<SetClause> Parser::set_clause() {
     };
 }
 
-Optional<AlterStmt *> Parser::alter_stmt() {
+Optional<AlterStmt *> Parser::alter_stmt()
+{
     auto token = expect(Token::KW_ALTER);
     TRY(token);
 
@@ -342,8 +397,10 @@ Optional<AlterStmt *> Parser::alter_stmt() {
 
     auto clauses = ok::List<SetClause>::alloc(arena);
 
-    switch (target_token.value.type) {
-    case Token::KW_USER: {
+    switch (target_token.value.type)
+    {
+    case Token::KW_USER:
+    {
         ++pos;
 
         auto name_token = expect(Token::IDENT);
@@ -356,7 +413,8 @@ Optional<AlterStmt *> Parser::alter_stmt() {
 
         clauses.push(clause.value);
 
-        while (try_expect(Token::COMMA)) {
+        while (try_expect(Token::COMMA))
+        {
             clause = set_clause();
             TRY(clause);
             clauses.push(clause.value);
@@ -364,7 +422,8 @@ Optional<AlterStmt *> Parser::alter_stmt() {
 
         TRY(expect(Token::SEMICOLON));
 
-        return AlterUserStmt::alloc(arena, token.value, name_token.value.data, clauses.slice());
+        return AlterUserStmt::alloc(arena, token.value, name_token.value.data,
+                                    clauses.slice());
     }
     default: SET_TOKEN_MISMATCH(this, target_token.value, Token::KW_USER);
     }
@@ -372,7 +431,8 @@ Optional<AlterStmt *> Parser::alter_stmt() {
     OK_UNREACHABLE();
 }
 
-Optional<Expr *> Parser::expression() {
+Optional<Expr *> Parser::expression()
+{
     auto lhs = parse_expression_prim(this);
     TRY(lhs);
 
@@ -380,40 +440,51 @@ Optional<Expr *> Parser::expression() {
 
     if (!token.has_value()) return lhs;
 
-    switch (token.value.type) {
-    case Token::EQ: {
+    switch (token.value.type)
+    {
+    case Token::EQ:
+    {
         ++pos;
         auto rhs = expression();
         TRY(rhs);
 
-        return BinaryOpExpr::alloc(arena, token.value, BinaryOpExpr::Kind::EQ, lhs.value, rhs.value);
+        return BinaryOpExpr::alloc(arena, token.value, BinaryOpExpr::Kind::EQ,
+                                   lhs.value, rhs.value);
     }
-    case Token::LT: {
+    case Token::LT:
+    {
         ++pos;
         auto rhs = expression();
         TRY(rhs);
 
-        return BinaryOpExpr::alloc(arena, token.value, BinaryOpExpr::Kind::LT, lhs.value, rhs.value);
+        return BinaryOpExpr::alloc(arena, token.value, BinaryOpExpr::Kind::LT,
+                                   lhs.value, rhs.value);
     }
-    case Token::GT: {
+    case Token::GT:
+    {
         ++pos;
         auto rhs = expression();
         TRY(rhs);
 
-        return BinaryOpExpr::alloc(arena, token.value, BinaryOpExpr::Kind::GT, lhs.value, rhs.value);
+        return BinaryOpExpr::alloc(arena, token.value, BinaryOpExpr::Kind::GT,
+                                   lhs.value, rhs.value);
     }
-    case Token::L_PAREN: {
+    case Token::L_PAREN:
+    {
         ++pos;
 
         ok::List<Expr *> args = ok::List<Expr *>::alloc(arena);
 
-        while (true) {
+        while (true)
+        {
             auto r_paren = get_cur_token_or_signal_eof();
             TRY(r_paren);
 
-            if (r_paren.get().type == Token::R_PAREN) {
+            if (r_paren.get().type == Token::R_PAREN)
+            {
                 ++pos;
-                return CallExpr::alloc(arena, token.value, lhs.value, args.slice());
+                return CallExpr::alloc(arena, token.value, lhs.value,
+                                       args.slice());
             }
 
             auto expr = expression();
@@ -424,7 +495,8 @@ Optional<Expr *> Parser::expression() {
             auto maybe_comma = get_cur_token_or_signal_eof();
             TRY(maybe_comma);
 
-            if (maybe_comma.get().type == Token::COMMA) {
+            if (maybe_comma.get().type == Token::COMMA)
+            {
                 ++pos;
             }
         }
@@ -433,9 +505,11 @@ Optional<Expr *> Parser::expression() {
     }
 }
 
-Optional<Query> Parser::query() {
+Optional<Query> Parser::query()
+{
     auto stmts = ok::List<Stmt *>::alloc(arena);
-    while (!is_eof()) {
+    while (!is_eof())
+    {
         auto stmt_opt = stmt();
         TRY(stmt_opt);
         stmts.push(stmt_opt.value);
@@ -443,12 +517,15 @@ Optional<Query> Parser::query() {
     return Query{stmts.slice()};
 }
 
-bool Parser::cur_token_is(Token::Type token_type) const {
+bool Parser::cur_token_is(Token::Type token_type) const
+{
     return pos < tokens.count && tokens[pos].type == token_type;
 }
 
-bool Parser::try_expect(Token::Type token_type) {
-    if (cur_token_is(token_type)) {
+bool Parser::try_expect(Token::Type token_type)
+{
+    if (cur_token_is(token_type))
+    {
         pos++;
         return true;
     }
@@ -456,13 +533,16 @@ bool Parser::try_expect(Token::Type token_type) {
     return false;
 }
 
-Optional<Token> Parser::expect(Token::Type token_type) {
-    if (is_eof()) {
+Optional<Token> Parser::expect(Token::Type token_type)
+{
+    if (is_eof())
+    {
         set_eof();
         return {};
     }
 
-    if (cur_token_is(token_type)) {
+    if (cur_token_is(token_type))
+    {
         return tokens[pos++];
     }
 
@@ -471,22 +551,27 @@ Optional<Token> Parser::expect(Token::Type token_type) {
     return {};
 }
 
-Optional<Token> Parser::get_cur_token() {
-    if (is_eof()) {
+Optional<Token> Parser::get_cur_token()
+{
+    if (is_eof())
+    {
         return {};
     }
     return tokens[pos];
 }
 
-Optional<Token> Parser::get_cur_token_or_signal_eof() {
+Optional<Token> Parser::get_cur_token_or_signal_eof()
+{
     auto token = get_cur_token();
-    if (!token) {
+    if (!token)
+    {
         set_eof();
     }
     return token;
 }
 
-void Parser::set_token_mismatch(Token got, ok::Slice<Token::Type> expected) {
+void Parser::set_token_mismatch(Token got, ok::Slice<Token::Type> expected)
+{
     OK_ASSERT(expected.count != 0);
 
     auto token_location = locate_token(source, got);
@@ -494,29 +579,39 @@ void Parser::set_token_mismatch(Token got, ok::Slice<Token::Type> expected) {
     String message;
 
     auto got_sv = token_type_to_string_view(got.type);
-    if (expected.count == 1) {
+    if (expected.count == 1)
+    {
         auto expected_sv = token_type_to_string_view(expected[0]);
-        message = String::format(arena, "expected a token of type " OK_SV_FMT ", but got " OK_SV_FMT " instead",
+        message = String::format(arena,
+                                 "expected a token of type " OK_SV_FMT
+                                 ", but got " OK_SV_FMT " instead",
                                  OK_SV_ARG(expected_sv), OK_SV_ARG(got_sv));
-    } else {
+    }
+    else
+    {
         message = String::alloc(arena, "expected a token of types ");
 
-        for (size_t i = 0; i < expected.count; i++) {
+        for (size_t i = 0; i < expected.count; i++)
+        {
             auto expected_sv = token_type_to_string_view(expected[i]);
             message.format_append(OK_SV_FMT, OK_SV_ARG(expected_sv));
             if (i != expected.count - 1) message.append(" or "_sv);
         }
 
-        message.format_append(", but got " OK_SV_FMT " instead", OK_SV_ARG(got_sv));
+        message.format_append(", but got " OK_SV_FMT " instead",
+                              OK_SV_ARG(got_sv));
     }
 
     error = ErrorWithSourceLocation{message, token_location};
 }
 
-void Parser::set_eof() {
+void Parser::set_eof()
+{
     SourceLocation location;
-    if (tokens.count > 0) location = locate_token(source, tokens[tokens.count - 1]);
-    else {
+    if (tokens.count > 0)
+        location = locate_token(source, tokens[tokens.count - 1]);
+    else
+    {
         location.line = 1;
         location.column = 1;
         location.length = 0;

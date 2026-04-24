@@ -2,22 +2,28 @@
 
 #include "ok.hpp"
 
-namespace xmdb {
+namespace xmdb
+{
 /**
  * @brief Severity levels for logging.
  */
-enum class LogLevel {
-    DEBUG, ///< Fine-grained informational events that are most useful to debug an application.
-    INFO,  ///< Informational messages that highlight the progress of the application at coarse-grained level.
-    WARN,  ///< Potentially harmful situations.
-    ERROR, ///< Error events that might still allow the application to continue running.
-    NONE,  ///< Turns off logging.
+enum class LogLevel
+{
+    DEBUG, ///< Fine-grained informational events that are most useful to debug
+           ///< an application.
+    INFO, ///< Informational messages that highlight the progress of the
+          ///< application at coarse-grained level.
+    WARN, ///< Potentially harmful situations.
+    ERROR, ///< Error events that might still allow the application to continue
+           ///< running.
+    NONE, ///< Turns off logging.
 };
 
 /**
  * @brief Abstract base class for loggers.
  */
-struct Logger {
+struct Logger
+{
     /**
      * @brief Sets the minimum log level for this logger.
      * @param level The log level to set.
@@ -36,20 +42,23 @@ struct Logger {
 /**
  * @brief A logger that outputs to a FILE* handle.
  */
-struct FileLogger : public Logger {
+struct FileLogger : public Logger
+{
     /**
      * @brief Constructs a new FileLogger.
      * @param lvl The minimum log level.
      * @param file The file to log to.
      */
-    FileLogger(LogLevel lvl, FILE *file) : log_level{lvl}, file{file} {
+    FileLogger(LogLevel lvl, FILE *file) : log_level{lvl}, file{file}
+    {
     }
 
     /**
      * @brief Sets the minimum log level.
      * @param lvl The log level to set.
      */
-    void set_log_level(LogLevel lvl) override {
+    void set_log_level(LogLevel lvl) override
+    {
         log_level = lvl;
     }
 
@@ -62,7 +71,7 @@ struct FileLogger : public Logger {
     void log(LogLevel level, const char *fmt, va_list args) override;
 
     LogLevel log_level; ///< The current minimum log level.
-    FILE *file;          ///< The file pointer.
+    FILE *file; ///< The file pointer.
 };
 
 /**
@@ -80,7 +89,8 @@ void set_logger(Logger *logger);
 /**
  * @brief Namespace containing logging functions.
  */
-namespace log {
+namespace log
+{
 /**
  * @brief Logs a message with a specific level.
  * @param level The log level.
@@ -118,8 +128,10 @@ void warn(const char *fmt, ...) OK_ATTRIBUTE_PRINTF(1, 2);
 void error(const char *fmt, ...) OK_ATTRIBUTE_PRINTF(1, 2);
 } // namespace log
 
-#define XMDB_FIXME(msg)                                                                                                \
-    do {                                                                                                               \
-    ::xmdb::log::warn("\x1B[38;5;208m%s:%d: [%s] FIXME: %s \x1B[0m", __FILE__, __LINE__, __FUNCTION__, (msg));                           \
-    } while (false)
+#define XMDB_FIXME(msg)                                                        \
+    do {                                                                       \
+        ::xmdb::log::warn("\x1B[38;5;208m%s:%d: [%s] FIXME: %s \x1B[0m",       \
+                          __FILE__, __LINE__, __FUNCTION__, (msg));            \
+    }                                                                          \
+    while (false)
 } // namespace xmdb

@@ -418,7 +418,8 @@ XMDB_MEDIA_DECLARE_STREAM_CONNECT()
     const char *pad_name = gst_structure_get_name(pad_structure);
     if (!g_str_has_prefix(pad_name, "video/"))
     {
-        xmdb::log::warn("skipping the linking of pad of unsupported type '%s'", pad_name);
+        xmdb::log::warn("skipping the linking of pad of unsupported type '%s'",
+                        pad_name);
         return 1;
     }
 

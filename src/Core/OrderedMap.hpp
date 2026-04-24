@@ -8,7 +8,8 @@
  * @tparam V The type of values.
  */
 template <typename K, typename V>
-class OrderedMap {
+class OrderedMap
+{
 public:
     /**
      * @brief Constructs a new OrderedMap.

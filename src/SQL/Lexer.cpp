@@ -1,14 +1,16 @@
 #include "Lexer.hpp"
 
 #ifdef OK_NO_STDLIB
-char toupper(char c) {
+char toupper(char c)
+{
     return c & ~(1 << 5);
 }
 #else
 #include <cctype>
 #endif // OK_NO_STDLIB
 
-namespace xmdb::SQL {
+namespace xmdb::SQL
+{
 TokenTable token_table{};
 
 StringView token_types_pretty[] = {
@@ -19,13 +21,16 @@ StringView token_types_pretty[] = {
 
 using namespace ok::literals;
 
-namespace {
-inline bool is_valid_ident_char(char c) {
+namespace
+{
+inline bool is_valid_ident_char(char c)
+{
     return ok::is_alpha(c) || ok::is_digit(c) || c == '_';
 }
 }; // namespace
 
-ok::Optional<Token> Lexer::next() {
+ok::Optional<Token> Lexer::next()
+{
     skip_whitespace();
 
     if (pos >= source.count) return {};
@@ -34,10 +39,13 @@ ok::Optional<Token> Lexer::next() {
 
     Token token{};
 
-    switch ((cur = source.data[pos])) {
-    case '-': {
+    switch ((cur = source.data[pos]))
+    {
+    case '-':
+    {
         ++pos;
-        if (source.count > pos && source.data[pos] == '-') {
+        if (source.count > pos && source.data[pos] == '-')
+        {
             skip_while([](U8 c) { return c != '\n'; });
             return next();
         }
@@ -46,62 +54,72 @@ ok::Optional<Token> Lexer::next() {
         token.data = source.view(pos - 1, pos);
         return token;
     }
-    case ',': {
+    case ',':
+    {
         token.type = Token::COMMA;
         token.data = source.view(pos, pos + 1);
         pos++;
         return token;
     }
-    case '.': {
+    case '.':
+    {
         token.type = Token::DOT;
         token.data = source.view(pos, pos + 1);
         pos++;
         return token;
     }
-    case '*': {
+    case '*':
+    {
         token.type = Token::STAR;
         token.data = source.view(pos, pos + 1);
         ++pos;
         return token;
     }
-    case ';': {
+    case ';':
+    {
         token.type = Token::SEMICOLON;
         token.data = source.view(pos, pos + 1);
         pos++;
         return token;
     }
-    case '(': {
+    case '(':
+    {
         token.type = Token::L_PAREN;
         token.data = source.view(pos, pos + 1);
         pos++;
         return token;
     }
-    case ')': {
+    case ')':
+    {
         token.type = Token::R_PAREN;
         token.data = source.view(pos, pos + 1);
         pos++;
         return token;
     }
-    case '=': {
+    case '=':
+    {
         token.type = Token::EQ;
         token.data = source.view(pos, pos + 1);
         pos++;
         return token;
     }
-    case '<': {
+    case '<':
+    {
         token.type = Token::LT;
         token.data = source.view(pos, pos + 1);
         pos++;
         return token;
     }
-    case '>': {
+    case '>':
+    {
         token.type = Token::GT;
         token.data = source.view(pos, pos + 1);
         pos++;
         return token;
     }
     case '\'':
-    case '"': {
+    case '"':
+    {
         auto quote = cur;
 
         ++pos;
@@ -109,7 +127,8 @@ ok::Optional<Token> Lexer::next() {
         auto start = pos;
         while (pos < source.count && source.data[pos] != quote) ++pos;
 
-        if (pos >= source.count) {
+        if (pos >= source.count)
+        {
             token.type = Token::UNTERMINATED_STRING;
             token.data = source.view(start, pos);
             return token;
@@ -122,15 +141,18 @@ ok::Optional<Token> Lexer::next() {
 
         return token;
     }
-    default: {
-        if (ok::is_digit(cur)) {
+    default:
+    {
+        if (ok::is_digit(cur))
+        {
             StringView integer = take_while(ok::is_digit);
             token.type = Token::INTEGER;
             token.data = integer;
             return token;
         }
 
-        if (!is_valid_ident_char(cur)) {
+        if (!is_valid_ident_char(cur))
+        {
             ++pos;
             token.type = Token::ILLEGAL;
             token.data = source.view(pos, pos + 1);
@@ -140,7 +162,8 @@ ok::Optional<Token> Lexer::next() {
         StringView ident_sv = take_while(is_valid_ident_char);
 
         String ident = ident_sv.to_string(ok::temp_allocator());
-        for (UZ i = 0; i < ident.count(); ++i) {
+        for (UZ i = 0; i < ident.count(); ++i)
+        {
             ident[i] = toupper(ident[i]);
         }
 
@@ -153,4 +176,4 @@ ok::Optional<Token> Lexer::next() {
     }
     }
 }
-}; // namespace xmdb
+}; // namespace xmdb::SQL

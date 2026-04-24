@@ -17,8 +17,7 @@ namespace xmdb::server
     web_http_response_status name(web_http_response_context *ctx)
 
 #define FAIL(status, reason)                                                   \
-    do                                                                         \
-    {                                                                          \
+    do {                                                                       \
         WebHttpResponseWrite(ctx, WEB_SV_LIT(reason));                         \
         return HTTP_STATUS_##status;                                           \
     }                                                                          \

@@ -1,4 +1,5 @@
 #include "DBValue.hpp"
 
-namespace xmdb {
+namespace xmdb
+{
 } // namespace xmdb

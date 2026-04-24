@@ -1,13 +1,16 @@
 #pragma once
 
-#include "ok.hpp"
 #include "Result.hpp"
+#include "ok.hpp"
 
-namespace xmdb {
-struct BufferedStream {
+namespace xmdb
+{
+struct BufferedStream
+{
     BufferedStream() = delete;
 
-    enum class Type {
+    enum class Type
+    {
         DISK,
     };
 
@@ -17,7 +20,8 @@ struct BufferedStream {
     Type type;
     ok::Slice<U8> buffer;
 
-    union {
+    union
+    {
         ok::File file;
     } u;
 };

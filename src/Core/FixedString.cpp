@@ -1,7 +1,9 @@
 #include "FixedString.hpp"
 
-namespace xmdb {
-FixedString create_fixed_string(ok::StringView sv) {
+namespace xmdb
+{
+FixedString create_fixed_string(ok::StringView sv)
+{
     OK_VERIFY(sv.count <= FixedString::DATA_SIZE);
 
     FixedString fs = {};

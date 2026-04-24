@@ -5,11 +5,12 @@
 
 using namespace ok::literals;
 
-namespace xmdb {
+namespace xmdb
+{
 
-#define XMDB_ENUM_USER_PERMISSIONS                                                                                     \
-    X(READ, 1 << 0)                                                                                                    \
-    X(WRITE, 1 << 1)                                                                                                   \
+#define XMDB_ENUM_USER_PERMISSIONS                                             \
+    X(READ, 1 << 0)                                                            \
+    X(WRITE, 1 << 1)                                                           \
     X(ADMIN, (1 << 2) | PERM_READ | PERM_WRITE)
 
 #define X(name, value) PERM_##name = value,
@@ -17,14 +18,18 @@ namespace xmdb {
 /**
  * @brief Permissions available for a database user.
  */
-enum DBUserPermissions : U8 { XMDB_ENUM_USER_PERMISSIONS };
+enum DBUserPermissions : U8
+{
+    XMDB_ENUM_USER_PERMISSIONS
+};
 
 #undef X
 
 /**
  * @brief Represents a database user with specific permissions.
  */
-struct DBUser {
+struct DBUser
+{
     /**
      * @brief Constructs a new DBUser.
      * @param name The user's name.
@@ -37,13 +42,15 @@ struct DBUser {
      * @brief Creates a default admin user.
      * @return A default admin user.
      */
-    static DBUser admin() {
+    static DBUser admin()
+    {
         return DBUser{"admin"_sv, "admin"_sv, PERM_ADMIN};
     }
 
-    DBUser *next;                       ///< Pointer to the next user in a list.
-    ok::StringView name;                ///< The user's name.
-    SHA256Digest sha256_password_digest; ///< The SHA-256 digest of the user's password.
-    U8 perm;                            ///< The user's permissions bitfield.
+    DBUser *next; ///< Pointer to the next user in a list.
+    ok::StringView name; ///< The user's name.
+    SHA256Digest sha256_password_digest; ///< The SHA-256 digest of the user's
+                                         ///< password.
+    U8 perm; ///< The user's permissions bitfield.
 };
 }; // namespace xmdb

@@ -1,83 +1,96 @@
 #include "catalog.hpp"
-#include "DBPool.hpp"
 #include "DBDescriptor.hpp"
+#include "DBPool.hpp"
 #include "FixedString.hpp"
 #include "Logger.hpp"
 
-namespace xmdb {
-struct [[gnu::packed]] CatalogDBEntry {
+namespace xmdb
+{
+struct [[gnu::packed]] CatalogDBEntry
+{
     FixedString name;
     U64 user_count;
     U64 table_count;
 };
 
-struct [[gnu::packed]] CatalogUserEntry {
+struct [[gnu::packed]] CatalogUserEntry
+{
     FixedString name;
     U8 sha256_password_digest[SHA256Digest::SIZE];
     U8 perm;
 };
 
-struct [[gnu::packed]] CatalogTableEntry {
+struct [[gnu::packed]] CatalogTableEntry
+{
     FixedString name;
     DBTable::Flags flags;
     U64 column_count;
 };
 
 template <typename T>
-static void write(ok::File *file, const T *value) {
+static void write(ok::File *file, const T *value)
+{
     UZ n_written = 0;
-    ok::Optional<ok::File::WriteError> write_err = file->write(reinterpret_cast<const U8 *>(value),
-                                                               sizeof(*value),
-                                                               &n_written);
+    ok::Optional<ok::File::WriteError> write_err = file->write(
+            reinterpret_cast<const U8 *>(value), sizeof(*value), &n_written);
     OK_VERIFY(!write_err);
     OK_VERIFY(n_written == sizeof(*value));
 }
 
-Result<UZ, ok::String> catalog_save(ok::Allocator *allocator,
-                                    DBPool *pool,
-                                    ok::StringView filename) {
+Result<UZ, ok::String> catalog_save(ok::Allocator *allocator, DBPool *pool,
+                                    ok::StringView filename)
+{
     ok::File file{};
-    ok::Optional<ok::File::OpenError> open_err = ok::File::open(&file, filename);
-    if (open_err) {
-        ok::String error_desc = ok::File::error_string(ok::temp_allocator(), open_err.get());
-        return ok::String::format(allocator, "Failed to open catalog file for writing: %s", error_desc.cstr());
+    ok::Optional<ok::File::OpenError> open_err =
+            ok::File::open(&file, filename);
+    if (open_err)
+    {
+        ok::String error_desc =
+                ok::File::error_string(ok::temp_allocator(), open_err.get());
+        return ok::String::format(allocator,
+                                  "Failed to open catalog file for writing: %s",
+                                  error_desc.cstr());
         return false;
     }
 
     U64 db_count = 0;
-    for (DBDescriptor *db = pool->db_descriptors; db != nullptr; db = db->next) {
+    for (DBDescriptor *db = pool->db_descriptors; db != nullptr; db = db->next)
+    {
         ++db_count;
     }
 
     CatalogHeader header = {
-        .magic = CATALOG_HEADER_MAGIC,
-        .version = CATALOG_VERSION,
-        .db_count = db_count,
+            .magic = CATALOG_HEADER_MAGIC,
+            .version = CATALOG_VERSION,
+            .db_count = db_count,
     };
 
     file.seek_start();
 
     write(&file, &header);
 
-    for (DBDescriptor *db = pool->db_descriptors; db != nullptr; db = db->next) {
+    for (DBDescriptor *db = pool->db_descriptors; db != nullptr; db = db->next)
+    {
         U64 user_count = 0;
-        for (DBUser *user = db->users; user != nullptr; user = user->next) {
+        for (DBUser *user = db->users; user != nullptr; user = user->next)
+        {
             ++user_count;
         }
 
         CatalogDBEntry entry = {
-            .name = create_fixed_string(db->name),
-            .user_count = user_count,
-            .table_count = db->tables.count,
+                .name = create_fixed_string(db->name),
+                .user_count = user_count,
+                .table_count = db->tables.count,
         };
 
         write(&file, &entry);
 
-        for (DBUser *user = db->users; user != nullptr; user = user->next) {
+        for (DBUser *user = db->users; user != nullptr; user = user->next)
+        {
             CatalogUserEntry user_entry = {
-                .name = create_fixed_string(user->name),
-                .sha256_password_digest = {},
-                .perm = user->perm,
+                    .name = create_fixed_string(user->name),
+                    .sha256_password_digest = {},
+                    .perm = user->perm,
             };
 
             memcpy(&user_entry.sha256_password_digest,
@@ -87,13 +100,14 @@ Result<UZ, ok::String> catalog_save(ok::Allocator *allocator,
             write(&file, &user_entry);
         }
 
-        for (UZ table_idx = 0; table_idx < db->tables.count; ++table_idx) {
+        for (UZ table_idx = 0; table_idx < db->tables.count; ++table_idx)
+        {
             DBTable *table = db->tables[table_idx];
 
             CatalogTableEntry table_entry = {
-                .name = create_fixed_string(table->name()),
-                .flags = table->flags(),
-                .column_count = table->columns_count(),
+                    .name = create_fixed_string(table->name()),
+                    .flags = table->flags(),
+                    .column_count = table->columns_count(),
             };
 
             write(&file, &table_entry);
@@ -101,7 +115,8 @@ Result<UZ, ok::String> catalog_save(ok::Allocator *allocator,
             ok::Slice<ok::StringView> col_names = table->columns_names();
             ok::Slice<SQL::ColumnType> col_types = table->columns_types();
 
-            for (UZ col_idx = 0; col_idx < table->columns_count(); ++col_idx) {
+            for (UZ col_idx = 0; col_idx < table->columns_count(); ++col_idx)
+            {
                 ok::StringView col_name = col_names[col_idx];
                 FixedString raw_col_name = create_fixed_string(col_name);
                 write(&file, &raw_col_name);
@@ -119,17 +134,23 @@ Result<UZ, ok::String> catalog_save(ok::Allocator *allocator,
 }
 
 template <typename T>
-static void read(ok::File *file, T *out) {
+static void read(ok::File *file, T *out)
+{
     UZ n_read;
-    ok::Optional<ok::File::ReadError> err = file->read(reinterpret_cast<U8 *>(out), sizeof(*out), &n_read);
+    ok::Optional<ok::File::ReadError> err =
+            file->read(reinterpret_cast<U8 *>(out), sizeof(*out), &n_read);
     OK_VERIFY(!err);
     OK_VERIFY(n_read == sizeof(*out));
 }
 
-Result<UZ, ok::String> catalog_load(ok::Allocator *allocator, DBPool *pool, ok::StringView filename) {
+Result<UZ, ok::String> catalog_load(ok::Allocator *allocator, DBPool *pool,
+                                    ok::StringView filename)
+{
     ok::File file{};
-    ok::Optional<ok::File::OpenError> open_err = ok::File::open(&file, filename);
-    if (open_err) {
+    ok::Optional<ok::File::OpenError> open_err =
+            ok::File::open(&file, filename);
+    if (open_err)
+    {
         return false;
     }
 
@@ -138,25 +159,32 @@ Result<UZ, ok::String> catalog_load(ok::Allocator *allocator, DBPool *pool, ok::
     CatalogHeader header{};
     read(&file, &header);
 
-    if (header.magic != CATALOG_HEADER_MAGIC) {
+    if (header.magic != CATALOG_HEADER_MAGIC)
+    {
         file.close();
-        return ok::String::alloc(allocator, "Invalid catalog file magic number");
+        return ok::String::alloc(allocator,
+                                 "Invalid catalog file magic number");
     }
 
-    if (header.version != CATALOG_VERSION) {
+    if (header.version != CATALOG_VERSION)
+    {
         file.close();
-        return ok::String::format(allocator, "Unsupported catalog version %lu", header.version);
+        return ok::String::format(allocator, "Unsupported catalog version %lu",
+                                  header.version);
     }
 
     pool->db_descriptors = nullptr;
 
-    for (U64 db_idx = 0; db_idx < header.db_count; ++db_idx) {
+    for (U64 db_idx = 0; db_idx < header.db_count; ++db_idx)
+    {
         CatalogDBEntry db_entry{};
         read(&file, &db_entry);
 
-        DBDescriptor *db = pool->create_db(db_entry.name.view().to_string(allocator).view());
+        DBDescriptor *db = pool->create_db(
+                db_entry.name.view().to_string(allocator).view());
 
-        for (U64 user_idx = 0; user_idx < db_entry.user_count; ++user_idx) {
+        for (U64 user_idx = 0; user_idx < db_entry.user_count; ++user_idx)
+        {
             CatalogUserEntry user_entry{};
             read(&file, &user_entry);
 
@@ -172,35 +200,44 @@ Result<UZ, ok::String> catalog_load(ok::Allocator *allocator, DBPool *pool, ok::
             db->add_user(user);
         }
 
-        for (U64 table_idx = 0; table_idx < db_entry.table_count; ++table_idx) {
+        for (U64 table_idx = 0; table_idx < db_entry.table_count; ++table_idx)
+        {
             CatalogTableEntry table_entry{};
             read(&file, &table_entry);
 
-            ok::Slice<ok::StringView> column_names = allocator->alloc_slice<ok::StringView>(table_entry.column_count);
-            ok::Slice<SQL::ColumnType> column_types = allocator->alloc_slice<SQL::ColumnType>(table_entry.column_count);
+            ok::Slice<ok::StringView> column_names =
+                    allocator->alloc_slice<ok::StringView>(
+                            table_entry.column_count);
+            ok::Slice<SQL::ColumnType> column_types =
+                    allocator->alloc_slice<SQL::ColumnType>(
+                            table_entry.column_count);
 
-            for (U64 col_idx = 0; col_idx < table_entry.column_count; ++col_idx) {
+            for (U64 col_idx = 0; col_idx < table_entry.column_count; ++col_idx)
+            {
                 FixedString col_name_fs{};
                 read(&file, &col_name_fs);
 
                 U8 col_type_raw = 0;
                 read(&file, &col_type_raw);
 
-                column_names[col_idx] = col_name_fs.view().to_string(allocator).view();
+                column_names[col_idx] =
+                        col_name_fs.view().to_string(allocator).view();
                 // TODO(oleh): Verify that the column type is valid.
-                column_types[col_idx] = static_cast<SQL::ColumnType>(col_type_raw);
+                column_types[col_idx] =
+                        static_cast<SQL::ColumnType>(col_type_raw);
             }
 
-            ok::StringView table_name = table_entry.name.view().to_string(allocator).view();
+            ok::StringView table_name =
+                    table_entry.name.view().to_string(allocator).view();
 
-            Result<DBTable *, ok::String> load_table_result = db->load_existing_table(allocator,
-                                                                                      table_name,
-                                                                                      table_entry.flags,
-                                                                                      (UZ) table_entry.column_count,
-                                                                                      column_names,
-                                                                                      column_types);
+            Result<DBTable *, ok::String> load_table_result =
+                    db->load_existing_table(allocator, table_name,
+                                            table_entry.flags,
+                                            (UZ) table_entry.column_count,
+                                            column_names, column_types);
 
-            if (!load_table_result.ok()) {
+            if (!load_table_result.ok())
+            {
                 return load_table_result.error();
             }
         }

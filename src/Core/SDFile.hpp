@@ -2,11 +2,14 @@
 
 #include "ok.hpp"
 
-namespace xmdb {
+namespace xmdb
+{
 /**
- * @brief SD (self-destructing) file is accessible only to the current process and gets deleted on process exit.
+ * @brief SD (self-destructing) file is accessible only to the current process
+ * and gets deleted on process exit.
  */
-struct SDFile {
+struct SDFile
+{
     int fd; ///< The file descriptor.
 };
 

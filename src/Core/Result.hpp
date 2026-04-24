@@ -12,8 +12,7 @@ namespace xmdb
     })
 
 #define OK(res)                                                                \
-    do                                                                         \
-    {                                                                          \
+    do {                                                                       \
         auto _x = (res);                                                       \
         if (!_x.ok()) return res.error();                                      \
     }                                                                          \

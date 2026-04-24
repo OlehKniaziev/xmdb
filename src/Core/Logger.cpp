@@ -63,8 +63,7 @@ void set_log_level(LogLevel lvl)
 namespace log
 {
 #define LOG(lvl)                                                               \
-    do                                                                         \
-    {                                                                          \
+    do {                                                                       \
         if (check_logger()) return;                                            \
         va_list args;                                                          \
         va_start(args, fmt);                                                   \

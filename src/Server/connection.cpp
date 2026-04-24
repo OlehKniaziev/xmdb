@@ -1,16 +1,20 @@
 #include "connection.hpp"
 
-namespace xmdb::server {
+namespace xmdb::server
+{
 static ConnectionId last_connection_id = 0;
 
 static xmdb::MallocAllocator shared_alloc{};
-static ok::Table<ConnectionId, ConnectionData *> db_connections_table = ok::Table<ConnectionId, ConnectionData *>::alloc(&shared_alloc);
+static ok::Table<ConnectionId, ConnectionData *> db_connections_table =
+        ok::Table<ConnectionId, ConnectionData *>::alloc(&shared_alloc);
 
 static ConnectionData *connection_free_list;
 
-Optional<ConnectionData *> get_connection_data(ConnectionId id) {
+Optional<ConnectionData *> get_connection_data(ConnectionId id)
+{
     auto conn_opt = db_connections_table.get(id);
-    if (conn_opt) {
+    if (conn_opt)
+    {
         conn_opt.get()->last_use_time = current_timestamp();
     }
     return conn_opt;
@@ -18,15 +22,18 @@ Optional<ConnectionData *> get_connection_data(ConnectionId id) {
 
 static xmdb::DBPool *shared_db_pool;
 
-void init_connection_state() {
+void init_connection_state()
+{
     shared_db_pool = new (&shared_alloc) DBPool{&shared_alloc};
 }
 
-xmdb::DBPool *get_shared_db_pool() {
+xmdb::DBPool *get_shared_db_pool()
+{
     return shared_db_pool;
 }
 
-static void free_connection_data(ConnectionData *data) {
+static void free_connection_data(ConnectionData *data)
+{
     data->temp_arena.free();
     shared_alloc.dealloc(data->connection, 1);
     data->next = connection_free_list;
@@ -37,11 +44,13 @@ static constexpr S64 SECOND = 1;
 static constexpr S64 MINUTE = 60 * SECOND;
 static constexpr S64 TIMEOUT_DURATION = 15 * MINUTE;
 
-ConnectionId gen_connection(xmdb::DBDescriptor *db, xmdb::DBUser *user) {
+ConnectionId gen_connection(xmdb::DBDescriptor *db, xmdb::DBUser *user)
+{
     Timestamp now = current_timestamp();
 
     OK_TABLE_FOREACH(db_connections_table, conn_id, conn_data, {
-        if (now - conn_data->last_use_time >= TIMEOUT_DURATION) {
+        if (now - conn_data->last_use_time >= TIMEOUT_DURATION)
+        {
             free_connection_data(conn_data);
             db_connections_table.remove(conn_id);
         }
@@ -51,17 +60,21 @@ ConnectionId gen_connection(xmdb::DBDescriptor *db, xmdb::DBUser *user) {
 
     ConnectionData *connection_data = nullptr;
     // TODO(oleh): These should also be pooled.
-    DBConnection *connection = new (&shared_alloc) xmdb::DBConnection{pool, db, user};
+    DBConnection *connection =
+            new (&shared_alloc) xmdb::DBConnection{pool, db, user};
 
-    if (connection_free_list == nullptr) {
+    if (connection_free_list == nullptr)
+    {
         connection_data = new (&shared_alloc) ConnectionData{
-            .next = nullptr,
-            .connection = connection,
-            .temp_arena = {},
-            .user = user,
-            .last_use_time = now,
+                .next = nullptr,
+                .connection = connection,
+                .temp_arena = {},
+                .user = user,
+                .last_use_time = now,
         };
-    } else {
+    }
+    else
+    {
         connection_data = connection_free_list;
         connection_free_list = connection_data->next;
         // shared_alloc.dealloc(data->connection, 1);

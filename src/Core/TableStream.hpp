@@ -4,13 +4,15 @@
 #include "constants.hpp"
 #include "ok.hpp"
 
-namespace xmdb {
+namespace xmdb
+{
 class RowDescriptor;
 
 /**
  * @brief Describes a column in a row.
  */
-class ColumnDescriptor {
+class ColumnDescriptor
+{
 public:
     /**
      * @brief Constructs a new ColumnDescriptor.
@@ -23,7 +25,8 @@ public:
      * @brief Gets the column index.
      * @return The index.
      */
-    U64 index() const {
+    U64 index() const
+    {
         return m_index;
     }
 
@@ -35,15 +38,18 @@ private:
 /**
  * @brief Describes a row in a table.
  */
-class RowDescriptor {
+class RowDescriptor
+{
 public:
     /**
      * @brief Gets the collection of column descriptors.
      * @return A slice of column descriptors.
      */
-    ok::Slice<ColumnDescriptor> column_descriptors() const {
+    ok::Slice<ColumnDescriptor> column_descriptors() const
+    {
         return m_column_descriptors;
     }
+
 private:
     ok::Slice<ColumnDescriptor> m_column_descriptors;
 };
@@ -51,19 +57,21 @@ private:
 /**
  * @brief Base class for table storage backends.
  */
-class Store {
+class Store
+{
 public:
     Store() = delete;
 
-    template<typename T>
+    template <typename T>
     const T &deref(ColumnDescriptor) = delete;
 
 protected:
     /**
      * @brief Storage backend type.
      */
-    enum class Type {
-        RAM,  ///< In-memory storage.
+    enum class Type
+    {
+        RAM, ///< In-memory storage.
         DISK, ///< Disk-based storage.
     };
 
@@ -71,7 +79,8 @@ protected:
      * @brief Constructs a Store with a specific type.
      * @param type The storage type.
      */
-    Store(Type type) : m_type{type} {
+    Store(Type type) : m_type{type}
+    {
     }
 
     Type m_type;
@@ -80,12 +89,14 @@ protected:
 /**
  * @brief Disk-based storage backend.
  */
-class DiskStore : public Store {
+class DiskStore : public Store
+{
 public:
     /**
      * @brief Constructs a new DiskStore.
      */
-    DiskStore() : Store(Store::Type::DISK) {
+    DiskStore() : Store(Store::Type::DISK)
+    {
     }
 
 private:

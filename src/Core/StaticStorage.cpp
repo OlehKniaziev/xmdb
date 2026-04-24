@@ -8,8 +8,7 @@
 namespace xmdb
 {
 #define FAIL(loc, msg)                                                         \
-    do                                                                         \
-    {                                                                          \
+    do {                                                                       \
         return ErrorWithSourceLocation{                                        \
                 .message = ok::String::alloc(allocator, (msg)),                \
                 .location = (loc),                                             \
@@ -18,8 +17,7 @@ namespace xmdb
     while (false)
 
 #define FAIL_FMT(loc, msg, ...)                                                \
-    do                                                                         \
-    {                                                                          \
+    do {                                                                       \
         return ErrorWithSourceLocation{                                        \
                 .message = ok::String::format(allocator, (msg), __VA_ARGS__),  \
                 .location = (loc),                                             \
@@ -85,8 +83,7 @@ StaticStorage *make_or_get_static_storage()
                 ok::Table<ok::StringView, void *>::alloc(&malloc_allocator);
 
 #define X(fn_name, ret, ...)                                                   \
-    do                                                                         \
-    {                                                                          \
+    do {                                                                       \
         XMDB_BUILTIN_FUNCTION_SIG_NAME(fn_ptr, ret, __VA_ARGS__) =             \
                 builtin_##fn_name;                                             \
         storage.builtin_functions.put(ok::StringView{#fn_name},                \

@@ -1,15 +1,18 @@
 #pragma once
 
-#include "ok.hpp"
 #include "Result.hpp"
+#include "ok.hpp"
 
-namespace xmdb {
+namespace xmdb
+{
 using namespace ok::literals;
 
-static inline constexpr U64 gen_magic(ok::StringView s) {
+static inline constexpr U64 gen_magic(ok::StringView s)
+{
     U64 res = 0;
 
-    for (UZ i = 0; i < ok::min(s.count, 8); ++i) {
+    for (UZ i = 0; i < ok::min(s.count, 8); ++i)
+    {
         res = (res << 8) | (U64) s.data[i];
     }
 
@@ -18,22 +21,26 @@ static inline constexpr U64 gen_magic(ok::StringView s) {
     return res;
 }
 
-constexpr U64 DB_STATE_HEADER_MAGIC = ((U64) 's' << 56) | ((U64) 'x' << 48) | ((U64) 'm' << 40) | ((U64) 'd' << 32) | ((U64) 'b' << 24);
+constexpr U64 DB_STATE_HEADER_MAGIC = ((U64) 's' << 56) | ((U64) 'x' << 48) |
+                                      ((U64) 'm' << 40) | ((U64) 'd' << 32) |
+                                      ((U64) 'b' << 24);
 
 /**
  * @brief Header for a table state file.
  */
-struct DBStateHeader {
-    U64 magic;        ///< Magic number identifying the file type.
+struct DBStateHeader
+{
+    U64 magic; ///< Magic number identifying the file type.
     U64 record_count; ///< Total number of records in the table.
 };
 
 /**
  * @brief Represents the persistent state of a database table.
  */
-struct DBState {
+struct DBState
+{
     DBStateHeader header; ///< The state header.
-    ok::File file;        ///< The backing file for the state.
+    ok::File file; ///< The backing file for the state.
 };
 
 /**
@@ -50,7 +57,8 @@ bool db_state_create(ok::File file, DBState *out);
  * @param file The file to use.
  * @return A loaded DBState on success, an error string otherwise.
  */
-Result<DBState, ok::String> db_state_load(ok::Allocator *allocator, ok::File file);
+Result<DBState, ok::String> db_state_load(ok::Allocator *allocator,
+                                          ok::File file);
 
 /**
  * @brief Synchronizes the table state to disk.
@@ -71,8 +79,9 @@ constexpr U64 COLUMN_STATE_HEADER_MAGIC = gen_magic("ixmdb"_sv);
 /**
  * @brief Header for an image column state file.
  */
-struct ImageColumnStateHeader {
-    U64 magic;        ///< Magic number.
+struct ImageColumnStateHeader
+{
+    U64 magic; ///< Magic number.
     U64 chunks_count; ///< Number of image chunks stored.
 };
 
@@ -81,9 +90,10 @@ constexpr UZ IMAGE_COLUMN_STATE_HEADER_SIZE = sizeof(ImageColumnStateHeader);
 /**
  * @brief Represents the persistent state of an image column.
  */
-struct ImageColumnState {
+struct ImageColumnState
+{
     ImageColumnStateHeader header; ///< The state header.
-    ok::File file;                 ///< The backing file.
+    ok::File file; ///< The backing file.
 };
 
 /**
@@ -100,7 +110,8 @@ bool image_state_create(ok::File file, ImageColumnState *out);
  * @param file The file to use.
  * @return Loaded ImageColumnState on success, an error string otherwise.
  */
-Result<ImageColumnState, ok::String> image_state_load(ok::Allocator *allocator, ok::File file);
+Result<ImageColumnState, ok::String> image_state_load(ok::Allocator *allocator,
+                                                      ok::File file);
 
 /**
  * @brief Synchronizes the image column state to disk.

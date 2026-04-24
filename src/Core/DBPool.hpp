@@ -1,18 +1,21 @@
 #pragma once
 
-#include "DBValue.hpp"
 #include "DBTable.hpp"
+#include "DBValue.hpp"
 #include "ok.hpp"
 
 #include "QueryExecutionContext.hpp"
 
-namespace xmdb {
+namespace xmdb
+{
 /**
  * @brief Manages a pool of databases and execution contexts.
  */
-struct DBPool {
+struct DBPool
+{
     using Flags = U16;
-    enum : Flags {
+    enum : Flags
+    {
         F_EPHEMERAL = 1 << 0, ///< No catalog data will be loaded or stored.
     };
 
@@ -43,7 +46,8 @@ struct DBPool {
      * @param user The user associated with the execution.
      * @return A pointer to the rented execution context.
      */
-    QueryExecutionContext *rent_empty_execution_context(DBDescriptor *db, DBUser *user);
+    QueryExecutionContext *rent_empty_execution_context(DBDescriptor *db,
+                                                        DBUser *user);
 
     /**
      * @brief Returns an execution context to the pool.
@@ -61,14 +65,16 @@ struct DBPool {
      * @brief Returns whether this DBPool is ephemeral.
      * @return true if the F_EPHEMERAL flag is set, false otherwise
      */
-    bool ephemeral() const {
+    bool ephemeral() const
+    {
         return (flags & F_EPHEMERAL) != 0;
     }
 
-    ok::Allocator *allocator;               ///< The allocator for the pool.
-    Flags flags;                            ///< Behavior flags.
-    QueryExecutionContext *execution_contexts; ///< List of available execution contexts.
-    DBDescriptor *db_descriptors;           ///< List of database descriptors.
-    ok::StringView catalog_file_name;        ///< File name for the pool's catalog.
+    ok::Allocator *allocator; ///< The allocator for the pool.
+    Flags flags; ///< Behavior flags.
+    QueryExecutionContext
+            *execution_contexts; ///< List of available execution contexts.
+    DBDescriptor *db_descriptors; ///< List of database descriptors.
+    ok::StringView catalog_file_name; ///< File name for the pool's catalog.
 };
 } // namespace xmdb

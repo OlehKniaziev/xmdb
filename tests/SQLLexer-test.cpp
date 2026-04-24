@@ -5,7 +5,8 @@
 using namespace xmdb::SQL;
 using namespace ok::literals;
 
-TEST(Lexer, Next) {
+TEST(Lexer, Next)
+{
     Lexer lexer{"SELECT id, name, 123, * FROM Users"_sv};
 
     EXPECT_EQ(lexer.next().get().type, Token::KW_SELECT);
@@ -35,7 +36,8 @@ TEST(Lexer, Next) {
     EXPECT_EQ(users_token.data, "Users"_sv);
 }
 
-TEST(Lexer, Comments) {
+TEST(Lexer, Comments)
+{
     Lexer lexer{"-- SELECT +/*-/123error fro t;ebl\nSELECT"_sv};
 
     EXPECT_EQ(lexer.next().get().type, Token::KW_SELECT);

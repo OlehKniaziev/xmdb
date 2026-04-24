@@ -2,11 +2,13 @@
 
 #include "ok.hpp"
 
-namespace xmdb {
+namespace xmdb
+{
 /**
  * @brief A B-Tree index for efficient key-value lookups and storage.
  */
-struct BTreeIndex {
+struct BTreeIndex
+{
     /**
      * @brief Creates a new BTreeIndex from a state file.
      * @param allocator The allocator to use.
@@ -14,8 +16,9 @@ struct BTreeIndex {
      * @param index Pointer to store the resulting index.
      * @return An optional open error if the operation failed.
      */
-    static ok::Optional<ok::File::OpenError> create(ok::Allocator *allocator, ok::StringView state_filename,
-                                                    BTreeIndex *index);
+    static ok::Optional<ok::File::OpenError> create(
+            ok::Allocator *allocator, ok::StringView state_filename,
+            BTreeIndex *index);
 
     /**
      * @brief Creates a BTreeIndex from an already open state file.

@@ -12,16 +12,14 @@
 #endif // !OK_NO_STDLIB
 
 #define TRY(x)                                                                 \
-    do                                                                         \
-    {                                                                          \
+    do {                                                                       \
         if (!(x)) return {};                                                   \
     }                                                                          \
     while (0)
 
 #ifdef XMDB_DEBUG
 #define XMDB_DEBUG_BLOCK(b)                                                    \
-    do                                                                         \
-    {                                                                          \
+    do {                                                                       \
         b                                                                      \
     }                                                                          \
     while (false)

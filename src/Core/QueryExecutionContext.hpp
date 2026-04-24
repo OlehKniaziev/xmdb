@@ -2,40 +2,46 @@
 
 #include <csetjmp>
 
-#include "util.hpp"
 #include "DBDescriptor.hpp"
+#include "DBRecord.hpp"
 #include "DBTable.hpp"
 #include "DBValue.hpp"
-#include "DBRecord.hpp"
 #include "QueryGraph.hpp"
 #include "StaticStorage.hpp"
+#include "util.hpp"
 
-#define XMDB_FAIL(ctx, msg)                                             \
-    do {                                                                \
-        /* TODO(oleh): Retrieve location from the query executed. */    \
-        (ctx)->error =                                                  \
-            ErrorWithSourceLocation{.message = String::alloc((ctx)->allocator, msg), .location = {}}; \
-        longjmp((ctx)->jmpbuf, 1);                                      \
-                                                                        \
-    } while (false)
+#define XMDB_FAIL(ctx, msg)                                                    \
+    do {                                                                       \
+        /* TODO(oleh): Retrieve location from the query executed. */           \
+        (ctx)->error = ErrorWithSourceLocation{                                \
+                .message = String::alloc((ctx)->allocator, msg),               \
+                .location = {}};                                               \
+        longjmp((ctx)->jmpbuf, 1);                                             \
+    }                                                                          \
+    while (false)
 
-#define XMDB_FAIL_FMT(ctx, fmt, ...)                                    \
-    do {                                                                \
-        /* TODO(oleh): Retrieve location from the query executed. */    \
-        (ctx)->error =                                                  \
-            ErrorWithSourceLocation{.message = String::format((ctx)->allocator, fmt, __VA_ARGS__), .location = {}}; \
-        longjmp((ctx)->jmpbuf, 1);                                      \
-    } while (false)
+#define XMDB_FAIL_FMT(ctx, fmt, ...)                                           \
+    do {                                                                       \
+        /* TODO(oleh): Retrieve location from the query executed. */           \
+        (ctx)->error = ErrorWithSourceLocation{                                \
+                .message = String::format((ctx)->allocator, fmt, __VA_ARGS__), \
+                .location = {}};                                               \
+        longjmp((ctx)->jmpbuf, 1);                                             \
+    }                                                                          \
+    while (false)
 
-namespace xmdb {
+namespace xmdb
+{
 struct DBPool;
 
 /**
- * @brief Context for executing a database query, managing variables, tables, and operations.
- * Note that the execution context does not actually perform any work (despite it's name) besides setting up all
- * data that is required for a query to be executed. It only appends new nodes to the query_graph field.
+ * @brief Context for executing a database query, managing variables, tables,
+ * and operations. Note that the execution context does not actually perform any
+ * work (despite it's name) besides setting up all data that is required for a
+ * query to be executed. It only appends new nodes to the query_graph field.
  */
-struct QueryExecutionContext {
+struct QueryExecutionContext
+{
     /**
      * @brief Fetches a variable value by index.
      * @param index The variable index.
@@ -152,7 +158,8 @@ struct QueryExecutionContext {
      * @param property_name The property to alter.
      * @param value Pointer to the new property value.
      */
-    void alter_user_property(StringView user_name, StringView property_name, DBValue *value);
+    void alter_user_property(StringView user_name, StringView property_name,
+                             DBValue *value);
 
     /**
      * @brief Commits pending user alterations.
@@ -188,26 +195,34 @@ struct QueryExecutionContext {
      */
     void sync_state();
 
-    QueryExecutionContext *next;             ///< Pointer to the next context in a pool.
-    StaticStorage *static_storage;           ///< Pointer to global static storage.
-    QueryGraph query_graph;                  ///< The graph of operations to perform.
-    ok::Allocator *allocator;                ///< The allocator for this execution.
-    DBUser *user;                            ///< The user performing the query.
-    ok::Table<U32, DBValue *> vars;          ///< Local variables.
-    ok::Table<U32, DBTable *> tables;        ///< Tables referenced in the query.
-    List<StringView> insert_column_names;    ///< Pending column names for insertion.
-    List<DBValue *> insert_column_values;    ///< Pending column values for insertion.
-    List<ok::Pair<Slice<StringView>, Slice<DBValue *>>> rows_to_insert; ///< Rows pending insertion.
-    ok::MultiList<StringView, DBValue *, DBTable *> emitted_columns; ///< Columns emitted for the result.
-    ok::MultiList<StringView, DBValue *> columns_to_update; ///< Columns pending update.
-    Optional<QueryGraph::AtomicNode *> alter_user_atomic_node; ///< Atomic node for user alterations.
-    DBPool *db_pool;                         ///< The database pool in use.
-    DBDescriptor *current_db;                ///< The database being queried.
-    Optional<DBTable *> table_to_insert;     ///< Target table for insertion.
-    Optional<DBTable *> table_to_update;     ///< Target table for update.
-    Optional<DBTable *> last_emitted_query;  ///< The last table emitted by a query.
-    List<DBValue *> call_args;               ///< Arguments for the next function call.
-    Optional<ErrorWithSourceLocation> error; ///< Error information if execution failed.
-    jmp_buf jmpbuf;                          ///< Jump buffer for error handling.
+    QueryExecutionContext *next; ///< Pointer to the next context in a pool.
+    StaticStorage *static_storage; ///< Pointer to global static storage.
+    QueryGraph query_graph; ///< The graph of operations to perform.
+    ok::Allocator *allocator; ///< The allocator for this execution.
+    DBUser *user; ///< The user performing the query.
+    ok::Table<U32, DBValue *> vars; ///< Local variables.
+    ok::Table<U32, DBTable *> tables; ///< Tables referenced in the query.
+    List<StringView>
+            insert_column_names; ///< Pending column names for insertion.
+    List<DBValue *>
+            insert_column_values; ///< Pending column values for insertion.
+    List<ok::Pair<Slice<StringView>, Slice<DBValue *>>>
+            rows_to_insert; ///< Rows pending insertion.
+    ok::MultiList<StringView, DBValue *, DBTable *>
+            emitted_columns; ///< Columns emitted for the result.
+    ok::MultiList<StringView, DBValue *>
+            columns_to_update; ///< Columns pending update.
+    Optional<QueryGraph::AtomicNode *>
+            alter_user_atomic_node; ///< Atomic node for user alterations.
+    DBPool *db_pool; ///< The database pool in use.
+    DBDescriptor *current_db; ///< The database being queried.
+    Optional<DBTable *> table_to_insert; ///< Target table for insertion.
+    Optional<DBTable *> table_to_update; ///< Target table for update.
+    Optional<DBTable *>
+            last_emitted_query; ///< The last table emitted by a query.
+    List<DBValue *> call_args; ///< Arguments for the next function call.
+    Optional<ErrorWithSourceLocation>
+            error; ///< Error information if execution failed.
+    jmp_buf jmpbuf; ///< Jump buffer for error handling.
 };
 } // namespace xmdb
