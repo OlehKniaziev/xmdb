@@ -27,7 +27,8 @@ public:
         IMAGE_CHUNK, ///< Image chunk value.
         BIG_STRING, ///< String of size exceeding the maximum size of a fixed
                     ///< string.
-        MEDIA_SOURCE, ///< Media stream.
+        MEDIA_SOURCE, ///< Media source.
+        MEDIA_STREAM, ///< Media stream.
         FRAME, ///<
     };
 

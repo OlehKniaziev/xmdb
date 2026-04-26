@@ -640,8 +640,6 @@ ok::Optional<Value> DBTableStream::next()
         }
         case SQL::ColumnType::MEDIA:
         {
-            OK_TODO();
-#if 0
             Result<VideoPlugin *, ok::String> video_plugin_res =
                     get_or_load_default_media_plugin(m_allocator);
             if (!video_plugin_res.ok())
@@ -672,16 +670,6 @@ ok::Optional<Value> DBTableStream::next()
             };
 
             using DataType = decltype(data);
-
-            // Result<void, ok::String> wait_res =
-            // pipeline->wait_until_completion(); if (!wait_res.ok())
-            // {
-            //     OK_PANIC_FMT("Failed to wait on pipeline until completion:
-            //     %s",
-            //                  wait_res.error().cstr());
-            // }
-            //
-            // OK_TODO_MSG("Nuke the wait part");
 
             return DBTableStream{
                     allocator,
@@ -730,7 +718,6 @@ ok::Optional<Value> DBTableStream::next()
             };
 
             break;
-#endif // 0
         }
         case SQL::ColumnType::BOOLEAN: OK_TODO_MSG("[next] BOOL");
         case SQL::ColumnType::FLOAT:   OK_TODO_MSG("[next] FLOAT");

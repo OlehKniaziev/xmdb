@@ -701,7 +701,7 @@ TEST(DBConnection, create_duplicate_user_fails)
     ASSERT_TRUE(error.ends_with("already exists")) << error.cstr();
 }
 
-TEST(DBConnection, insert_media)
+TEST(DBConnection, insert_then_select_media)
 {
     ok::StringView media_source = tests::load_test_file_hex("earth.mp4");
 
@@ -728,4 +728,11 @@ TEST(DBConnection, insert_media)
                                          &query_results, &error);
 
     ASSERT_TRUE(ok) << error.cstr();
+
+    DBTableOutlet outlet{query_results.value.get()};
+
+    DBTableStream stream = outlet.column_stream(&arena, 0);
+
+    auto next_val = stream.next();
+    ASSERT_TRUE(next_val);
 }

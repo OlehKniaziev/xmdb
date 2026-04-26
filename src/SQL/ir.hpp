@@ -103,6 +103,7 @@ struct TableSchema
 };
 
 #define ENUM_IR_CONTRACTS                                                      \
+        /* TODO(oleh): Just use a single comparison operator instead of 3. */  \
     INSTR_VAR_2(Eq, U32, U32)                                                  \
     INSTR_VAR_2(Lt, U32, U32)                                                  \
     INSTR_VAR_2(Gt, U32, U32)                                                  \

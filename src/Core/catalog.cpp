@@ -151,8 +151,13 @@ Result<UZ, ok::String> catalog_load(ok::Allocator *allocator, DBPool *pool,
             ok::File::open(&file, filename);
     if (open_err)
     {
-        return false;
+        return ok::String::format(allocator,
+                                  "Failed to open file '" OK_SV_FMT "' for reading: %s",
+                                  OK_SV_ARG(filename),
+                                  ok::File::error_string(allocator, open_err.get()).cstr());
     }
+
+    ScopeGuard guard{[&]() { file.close(); }};
 
     file.seek_start();
 
@@ -161,14 +166,12 @@ Result<UZ, ok::String> catalog_load(ok::Allocator *allocator, DBPool *pool,
 
     if (header.magic != CATALOG_HEADER_MAGIC)
     {
-        file.close();
         return ok::String::alloc(allocator,
                                  "Invalid catalog file magic number");
     }
 
     if (header.version != CATALOG_VERSION)
     {
-        file.close();
         return ok::String::format(allocator, "Unsupported catalog version %lu",
                                   header.version);
     }
@@ -242,8 +245,6 @@ Result<UZ, ok::String> catalog_load(ok::Allocator *allocator, DBPool *pool,
             }
         }
     }
-
-    file.close();
 
     return file.offset;
 }

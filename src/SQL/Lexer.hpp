@@ -123,8 +123,8 @@ extern TokenTable token_table;
 /**
  * @brief Lexical analyzer for SQL source code.
  */
-struct Lexer
-{
+class Lexer {
+public:
     /**
      * @brief Constructs a Lexer from an ok::String.
      * @param source The source string.
@@ -147,6 +147,7 @@ struct Lexer
      */
     Optional<Token> next();
 
+private:
     /**
      * @brief Consumes characters while a predicate is true and returns them as
      * a view.

@@ -55,8 +55,16 @@ static bool create_file_based_on_table_flags(DBTable::Flags flags,
     return true;
 }
 
+using CreateDirFlags = U8;
+
+enum : CreateDirFlags
+{
+    CREATE_DIR_FLAG_DISALLOW_EXISTING = 1 << 0,
+};
+
 static Result<void, ok::String> create_dir(ok::Allocator *allocator,
-                                           ok::StringView dirname)
+                                           ok::StringView dirname,
+                                           CreateDirFlags flags = 0)
 {
     if (dirname.count == 0)
     {
@@ -72,7 +80,17 @@ static Result<void, ok::String> create_dir(ok::Allocator *allocator,
     case EPERM:
     case EACCES: return ok::String::alloc(allocator, "no permissions");
     case EDQUOT: return ok::String::alloc(allocator, "out of disk quota");
-    case EEXIST: return ok::String::alloc(allocator, "path already exists");
+    case EEXIST:
+    {
+        if (flags & CREATE_DIR_FLAG_DISALLOW_EXISTING)
+        {
+            return ok::String::alloc(allocator, "path already exists");
+        }
+        else
+        {
+            return {};
+        }
+    }
     case EINVAL: return ok::String::alloc(allocator, "invalid path name");
     case ENOSPC: return ok::String::alloc(allocator, "disk is out of space");
     case EROFS:  return ok::String::alloc(allocator, "read-only filesystem");
@@ -107,11 +125,6 @@ static Result<void, ok::String> create_dir_recursively(ok::Allocator *allocator,
         last_slash_idx = (SZ) i;
 
         auto part = dirname.view(0, i);
-
-        if (ok::File::exists(part))
-        {
-            continue;
-        }
 
         auto res = create_dir(allocator, part);
         if (!res.ok())

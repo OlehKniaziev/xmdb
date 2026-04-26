@@ -5,8 +5,6 @@
 #include "meta.hpp"
 #include "ok.hpp"
 
-#include <cstddef>
-
 #if !defined(OK_NO_STDLIB)
 #include <common.h>
 #endif // !OK_NO_STDLIB
@@ -35,7 +33,7 @@ public:
     class Iter
     {
     public:
-        using difference_type = ptrdiff_t;
+        using difference_type = SZ;
         using value_type = ok::StringView;
 
         Iter(const StringSplit *split, UZ pos) : m_split{split}, m_pos{pos}
