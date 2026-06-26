@@ -5,48 +5,9 @@
 #include <Core/util.hpp>
 #include <Core/image.hpp>
 
-#include "ast.hpp"
-
-using ok::Allocator;
-using ok::List;
-using ok::Optional;
-using ok::Slice;
-using ok::String;
-using ok::StringView;
-using ok::Table;
+#include "type_check2.hpp"
 
 namespace xmdb::SQL {
-
-#define XMDB_ENUM_COLUMN_TYPES \
-    X(INTEGER) \
-    X(FLOAT) \
-    X(DOUBLE) \
-    X(TEXT) \
-    X(BOOLEAN) \
-    X(PNG)
-
-/**
- * @brief Supported types for table columns.
- */
-enum class ColumnType {
-#define X(type) type,
-XMDB_ENUM_COLUMN_TYPES
-#undef X
-};
-
-/**
- * @brief Converts a ColumnType to its string representation.
- * @param type The column type.
- * @return The name of the column type.
- */
-const char *column_type_to_string(ColumnType type);
-
-/**
- * @brief Parses a column type from a string view.
- * @param sv The string view to parse.
- * @return The parsed ColumnType, or empty if unknown.
- */
-ok::Optional<ColumnType> parse_column_type(ok::StringView sv);
 
 /**
  * @brief Represents the schema of a table in the IR.

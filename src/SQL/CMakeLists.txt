@@ -6,6 +6,7 @@ add_library(LibSQL
   constructor_linux.cpp
   ir.cpp
   type_check.cpp
+  type_check2.cpp
   SQL.cpp
 )
 
